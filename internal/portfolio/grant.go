@@ -31,18 +31,33 @@ func Repeating(first time.Time, everyMonths, count int, shares decimal.Decimal) 
 // each year: percentPerYear has the percentage of every year, in order, which is spread evenly over
 // the vests of that year. The first vest is on the day first, and the others follow every so many
 // months, which have to divide a year.
+//
+// Only whole shares vest. Each vest brings what has vested in all up to what the schedule says for
+// that day, rounded down, so a fraction a vest leaves behind arrives with a later one and the vests
+// add up to the grant.
 func Graded(first time.Time, everyMonths int, total decimal.Decimal, percentPerYear []int) []Vest {
 	vestsPerYear := 12 / everyMonths
 
-	var vests []Vest
-	for year, percent := range percentPerYear {
-		ofYear := total.Mul(decimal.NewFromInt(int64(percent))).Div(decimal.NewFromInt(100))
-		each := ofYear.Div(decimal.NewFromInt(int64(vestsPerYear)))
-
+	var (
+		vests   []Vest
+		vested  decimal.Decimal // the shares of the vests so far
+		percent int             // the percentage of the years before the one being laid out
+	)
+	for year, percentOfYear := range percentPerYear {
 		for i := range vestsPerYear {
+			// What has vested after this vest, in percent of the grant times vestsPerYear, which
+			// keeps the fraction of a year a whole number until the one division below.
+			share := percent*vestsPerYear + percentOfYear*(i+1)
+			due := total.Mul(decimal.NewFromInt(int64(share))).
+				Div(decimal.NewFromInt(int64(100 * vestsPerYear))).
+				Floor()
+
 			months := (year*vestsPerYear + i) * everyMonths
-			vests = append(vests, Vest{Date: addMonths(first, months), Shares: each.Floor()})
+			vests = append(vests, Vest{Date: addMonths(first, months), Shares: due.Sub(vested)})
+			vested = due
 		}
+
+		percent += percentOfYear
 	}
 
 	return vests

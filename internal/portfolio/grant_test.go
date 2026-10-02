@@ -61,3 +61,27 @@ func TestGraded(t *testing.T) {
 	}
 	assert.Equal(t, expected, vests)
 }
+
+// TestGraded_WholeShares covers a grant whose shares do not divide evenly: only whole shares vest,
+// so each vest rounds down what has vested by then in all, and a fraction that was left over is
+// made up for in a later vest. That way the vests add up to the grant, to the last share.
+func TestGraded_WholeShares(t *testing.T) {
+	vests := Graded(day("2026-02-20"), 3, shares("100"), []int{10, 20, 30, 40})
+
+	// The first year vests 2.5 shares a quarter, the third 7.5.
+	expected := []string{
+		"2", "3", "2", "3",
+		"5", "5", "5", "5",
+		"7", "8", "7", "8",
+		"10", "10", "10", "10",
+	}
+
+	var actual []string
+	total := shares("0")
+	for _, vest := range vests {
+		actual = append(actual, vest.Shares.String())
+		total = total.Add(vest.Shares)
+	}
+	assert.Equal(t, expected, actual)
+	assert.Equal(t, "100", total.String())
+}
