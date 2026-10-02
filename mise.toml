@@ -1,0 +1,20 @@
+[tools]
+go = "1.27.0"
+
+# Go language server (used by Claude Code's gopls-lsp plugin for code navigation)
+"go:golang.org/x/tools/gopls" = "latest"
+
+# Linters and formatters
+golangci-lint = "latest"
+
+[tasks."git:hooks"]
+description = "Install git hooks"
+run = "cp scripts/pre-push.githook .git/hooks/pre-push"
+
+[tasks.lint]
+description = "Run golangci-lint over all packages"
+run = "golangci-lint run ./..."
+
+[tasks.test]
+description = "Run all unit tests"
+run = "go test ./..."

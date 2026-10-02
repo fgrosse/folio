@@ -1,0 +1,23 @@
+#!/bin/sh
+
+set -e
+
+# This file contains the recommended minimal Git hook that should be executed
+# before pushing commits. It can be installed via `mise run git:hooks`.
+#
+# Note that we intentionally want to keep the default set of executed targets
+# short and prioritize speed of execution. Otherwise, people won't use the hooks
+# or frequently skip them using the --no-verify flag.
+#
+# Another conscious decision is to use a pre-push hook instead of pre-commit
+# hook because this way the hook isn't executed as often and thus less in the way
+# of typical development flows.
+
+(
+    set -x
+    go mod tidy -diff
+    mise run lint
+    mise run test
+)
+
+printf "\nCongratulations. All your code looks fine! \ʕ◔ϖ◔ʔ/"

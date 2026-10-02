@@ -1,0 +1,155 @@
+version: "2"
+
+run:
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    - asciicheck
+    - bidichk
+    - depguard
+    - durationcheck
+    - errcheck
+    - gocritic
+    - godot
+    - gosec
+    - govet
+    - grouper
+    - ineffassign
+    - makezero
+    - misspell
+    - nestif
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - staticcheck
+    - unconvert
+    - unused
+    - wastedassign
+
+  settings:
+    depguard:
+      rules:
+        # Prevent deprecated packages.
+        no-deprecated:
+          list-mode: lax
+          files:
+            - $all
+            - "!$test"
+          deny:
+            - pkg: "io/ioutil"
+              desc: "deprecated since Go 1.16 - use io and os packages"
+            - pkg: "github.com/pkg/errors"
+              desc: "use standard library errors with fmt.Errorf and %w"
+
+    errcheck:
+      # Output written to the terminal has nowhere better to report a failed write, so these are
+      # called without looking at the error. Same list as revive's unhandled-error rule below.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+
+    godot:
+      exclude:
+        - '^\s*TODO:'
+
+    misspell:
+      locale: US
+
+    gosec:
+      excludes:
+        - G304 # Potential file inclusion via variable (the database path is user configured)
+
+    staticcheck:
+      checks:
+        - "all"
+        - "-S1002"  # Disable: should omit comparison to bool constant …
+        - "-ST1000" # Package comments are checked via revive
+        - "-QF1008" # Disable: could remove embedded field "…" from selector
+
+    revive:
+      # See https://golangci-lint.run/usage/linters/#revive
+      enable-all-rules: true
+      rules:
+        - name: blank-imports
+          disabled: true
+        - name: add-constant
+          disabled: true
+        - name: line-length-limit
+          arguments: [ 160 ]
+        - name: function-length
+          disabled: true
+        - name: import-alias-naming
+          disabled: true
+        - name: empty-lines
+          disabled: true
+        - name: unused-receiver
+          disabled: true
+        - name: flag-parameter
+          disabled: true
+        - name: cognitive-complexity
+          disabled: true
+        - name: epoch-naming
+          disabled: true
+        - name: unhandled-error
+          disabled: false
+          exclude: [ "" ]
+          arguments:
+            - "fmt.Fprintf"
+            - "fmt.Printf"
+            - "fmt.Println"
+            - "fmt.Fprintln"
+            - "fmt.Fprint"
+            - "strings.Builder.WriteString"
+            - "strings.Builder.WriteRune"
+            - "bytes.Buffer.WriteString"
+        - name: cyclomatic
+          disabled: true
+        - name: confusing-naming
+          disabled: true
+        - name: increment-decrement
+          disabled: true
+        - name: bool-literal-in-expr
+          disabled: true
+        - name: max-public-structs
+          disabled: true
+        - name: unchecked-type-assertion
+          disabled: true
+        - name: function-result-limit
+          disabled: true
+        - name: nested-structs
+          disabled: true
+        - name: enforce-switch-style
+          disabled: true
+        - name: enforce-repeated-arg-type-style
+          disabled: true
+        - name: useless-fallthrough
+          disabled: true
+        - name: identical-switch-branches
+          disabled: true
+        - name: var-naming
+          disabled: true
+        - name: unused-parameter
+          disabled: true
+
+  exclusions:
+    generated: strict # Sources are excluded by strictly following the Go generated file convention
+    warn-unused: true # Log a warning if an exclusion rule is unused.
+    presets: [ ]       # No preset exclusion rules.
+
+issues:
+  max-issues-per-linter: 0 # Show all found issues
+  max-same-issues: 0       # Show all found issues
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/fgrosse/folio
+  exclusions:
+    generated: strict
