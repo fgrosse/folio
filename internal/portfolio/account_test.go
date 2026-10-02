@@ -64,3 +64,27 @@ func TestAccount_Total(t *testing.T) {
 
 	assert.Equal(t, "12779.57", account.Total().String())
 }
+
+// TestNewAccount_Unpriced covers stock there is no quote of, such as right after a lot of a new
+// symbol was entered or when a symbol was mistyped. It is worth nothing in the values, since there
+// is nothing to value it at, and the account names the symbol so that a view can say the values are
+// incomplete rather than pass them off as the whole account.
+func TestNewAccount_Unpriced(t *testing.T) {
+	lots := []Lot{
+		{Symbol: "PANW", Shares: shares("2"), Acquired: day("2026-01-15")},
+		{Symbol: "SAP.DE", Shares: shares("5"), Acquired: day("2026-01-15")},
+	}
+	grants := []Grant{
+		{Name: "Plan", Symbol: "MSFT", Vests: []Vest{{Date: day("2027-01-01"), Shares: shares("1")}}},
+		{Name: "More", Symbol: "MSFT", Vests: []Vest{{Date: day("2027-01-01"), Shares: shares("1")}}},
+	}
+	quotes := map[string]Quote{
+		"PANW": {Symbol: "PANW", Price: shares("396.25")},
+	}
+
+	account := NewAccount(lots, grants, quotes)
+
+	assert.Equal(t, "792.5", account.Current.String())
+	assert.Equal(t, "0", account.Potential.String())
+	assert.Equal(t, []string{"MSFT", "SAP.DE"}, account.Unpriced)
+}

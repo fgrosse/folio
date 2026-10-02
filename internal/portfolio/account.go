@@ -1,6 +1,9 @@
 package portfolio
 
 import (
+	"maps"
+	"slices"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -13,19 +16,34 @@ type Account struct {
 	// Potential is the value of the shares still to come, which are the vests that have not been
 	// released: the ones that have yet to vest, and the ones that have and are pending release.
 	Potential decimal.Decimal
+
+	// Unpriced are the symbols of stock in the account that there was no quote of, in alphabetical
+	// order. Their shares are missing from the values.
+	Unpriced []string
 }
 
-// NewAccount works out what lots and grants are worth at quotes, each value to the cent.
+// NewAccount works out what lots and grants are worth at quotes, each value to the cent. Stock
+// without a quote adds nothing to the values and is listed as unpriced instead.
 func NewAccount(lots []Lot, grants []Grant, quotes map[string]Quote) Account {
+	unpriced := make(map[string]bool)
+	value := func(symbol string, shares decimal.Decimal) decimal.Decimal {
+		quote, ok := quotes[symbol]
+		if !ok {
+			unpriced[symbol] = true
+		}
+
+		return shares.Mul(quote.Price)
+	}
+
 	var current, potential decimal.Decimal
 	for _, lot := range lots {
-		current = current.Add(lot.Shares.Mul(quotes[lot.Symbol].Price))
+		current = current.Add(value(lot.Symbol, lot.Shares))
 	}
 
 	for _, grant := range grants {
 		for _, vest := range grant.Vests {
 			if !vest.Released {
-				potential = potential.Add(vest.Shares.Mul(quotes[grant.Symbol].Price))
+				potential = potential.Add(value(grant.Symbol, vest.Shares))
 			}
 		}
 	}
@@ -33,6 +51,7 @@ func NewAccount(lots []Lot, grants []Grant, quotes map[string]Quote) Account {
 	return Account{
 		Current:   current.Round(2),
 		Potential: potential.Round(2),
+		Unpriced:  slices.Sorted(maps.Keys(unpriced)),
 	}
 }
 
