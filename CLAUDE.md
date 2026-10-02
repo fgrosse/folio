@@ -67,18 +67,20 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
   An employer plan can release fractions of a share, and a float would not add them up exactly.
 - **Dates are days, not instants.** A lot is acquired and a vest is due on a calendar day, held as a
   `time.Time` at midnight UTC so that two of them compare without a time zone getting in the way.
-- **The data model is small.** A *lot* is shares that are held: a symbol, a number of shares and
-  the day they were acquired. A *grant* is an award of shares that vest over time, and a *vest* is
-  one day on which some of them do. A vest stays potential until it is *released*, which is what
-  turns it into a lot - with the number of shares that actually arrived, which is fewer than vested
-  whenever some were withheld for tax.
+- **The data model is small.** A *lot* is shares that are held: a symbol, a number of shares, the
+  day they were acquired and what one of them cost that day. A *grant* is an award of shares that
+  vest over time, and a *vest* is one day on which some of them do. A vest stays potential until it
+  is *released*, which is what turns it into a lot - with the number of shares that actually
+  arrived, which is fewer than vested whenever some were withheld for tax, and at the value of a
+  share on that day as the lot's cost. The vest keeps the number that vested, so both are there for
+  a tax estimate to work from.
 - **Prices come from behind an interface and are cached in the database.** `portfolio.Quoter` is
   what the domain asks of a source of prices, and `internal/yahoo` is the one there is, over an
   endpoint that needs no key and is no official API. The views show the last quote the database has
   right away and replace it once a fresh one arrives, so the TUI opens without waiting for the
   network and still works without one. Tests never touch the network.
 - **A lot and a grant are typed as one line**, a spec, the way a task is in tick: `12.5 PANW
-  2026-03-15` and `Payout: 10 PANW monthly x24 from 2026-01-15`. `NewLot` and `NewGrant` have the
+  2026-03-15 @380.12` and `Payout: 10 PANW monthly x24 from 2026-01-15`. `NewLot` and `NewGrant` have the
   grammar in their doc comments, and the CLI verbs and the TUI's dialogs both go through them.
 - **Every view shows the same account.** They all receive the one `PortfolioLoadedMsg`, whichever
   of them asked for the load, and each renders the same header with the three values. The Holdings

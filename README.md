@@ -14,10 +14,10 @@ local SQLite database, and prices come from Yahoo Finance.
   8.5 PANW                                                                       Total: $11,293.13
   PANW $396.25 ▼ 0.3%                                      Current $3,368.13 · Potential $7,925.00
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ Acquired    Symbol    From                                    Shares       Price           Value │
+│ Acquired    Symbol    From                        Shares        Cost       Price           Value │
 │──────────────────────────────────────────────────────────────────────────────────────────────────│
-│ 2026-01-15  PANW      Payout                                       6     $396.25       $2,377.50 │
-│ 2026-02-15  PANW                                                 2.5     $396.25         $990.63 │
+│ 2026-01-15  PANW      Payout                           6     $380.12     $396.25       $2,377.50 │
+│ 2026-02-15  PANW                                     2.5           -     $396.25         $990.63 │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘
 ↑/k up • ↓/j down • q quit
 a add • d delete
@@ -41,12 +41,12 @@ or `FOLIO_DB` for another one.
 
 An account is made of three things:
 
-- A **lot** is shares that you hold: a number of shares of one stock and the day they arrived.
-  Lots are what the current value counts.
+- A **lot** is shares that you hold: a number of shares of one stock, the day they arrived and
+  what one of them cost that day. Lots are what the current value counts.
 - A **grant** is an award of shares that vest over time, such as a grant of RSUs.
 - A **vest** is one day on which shares of a grant vest. Vests are what the potential value counts,
   until each is **released** into a lot - with the number of shares that actually arrived, which
-  is fewer than vested when some were withheld for tax.
+  is fewer than vested when some were withheld for tax, and what a share was worth that day.
 
 ## The TUI
 
@@ -62,10 +62,13 @@ worked out from. `1`-`3` or `tab` switch views, `q` quits.
 A lot and a grant are typed as one line:
 
 ```
-12.5 PANW 2026-03-15                                       a lot (the day defaults to today)
+12.5 PANW 2026-03-15 @380.12                               a lot: shares, day and cost of a share
 Payout: 10 PANW monthly x24 from 2026-01-15                10 shares each month, 24 times
 RSU 2025: 400 PANW quarterly 10/20/30/40 from 2026-02-20   400 shares over four years
 ```
+
+In a lot, the day defaults to today and the cost may be left out. Releasing a vest asks for the
+shares that arrived and their cost the same way: `6 @380.12`.
 
 In a grant, the interval is `monthly`, `quarterly` or `yearly`, and the day after `from` is that
 of the first vest. With percentages, the shares are those of the whole grant, and each percentage
@@ -78,7 +81,7 @@ prices it saw, so it works without a network too.
 ## The command line
 
 ```bash
-folio lot 12.5 PANW 2026-03-15
+folio lot 12.5 PANW 2026-03-15 @380.12
 folio grant "Payout: 10 PANW monthly x24 from 2026-01-15"
 folio status
 folio status --json

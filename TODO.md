@@ -29,9 +29,10 @@ Roughly in the order worth doing.
 - **Show values in EUR**, toggled with a key in the TUI and a flag on `folio status`. It needs an
   exchange rate, fetched and cached like a quote.
 - **Tax estimates**: what is left of a vest after tax, from a rate that is configured, and the
-  potential value after tax next to the one before.
-- **Stock bought privately** as a first-class thing: a lot can be entered by hand already, but it
-  has no cost, so there is no gain or loss to show.
+  potential value after tax next to the one before. For what is held, the gain of a lot since its
+  cost, which is recorded, and the tax on it if it was sold. Costs are in USD, and a German tax
+  return wants them in EUR at the rate of the day, so this needs the exchange rate of a past day.
+- **The gain of a lot** in the Holdings view, now that it has a cost: per lot and in the header.
 - **Sales**: selling shares takes them out of a lot, and what they sold for is worth keeping.
 - **The account value over time**, as a chart or a table by month.
 - **The Omarchy bar widget of `~/src/stock-ticker`** could show the account value from

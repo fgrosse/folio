@@ -214,7 +214,7 @@ func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 	case key.Matches(msg, m.keys.Delete):
 		return m.askToDelete()
 	case key.Matches(msg, m.keys.Add):
-		m.input = NewInputDialog("New lot", "12.5 PANW 2026-03-15", m.newLot, dialogWidth, m.style)
+		m.input = NewInputDialog("New lot", "12.5 PANW 2026-03-15 @380.12", m.newLot, dialogWidth, m.style)
 		return m, m.input.Init()
 	}
 
