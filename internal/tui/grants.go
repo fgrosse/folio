@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
 	"github.com/shopspring/decimal"
@@ -22,9 +23,11 @@ const grantsColumnsWidth = symbolColumnWidth + 2*sharesColumnWidth + valueColumn
 type GrantsModel struct {
 	store     Store
 	style     Style
+	keys      keyMap
 	table     table.Model
 	width     int       // width of the table, which the header line is spread across
 	portfolio Portfolio // the account as it was last loaded
+	err       error     // why the last load failed or had no fresh quotes, nil unless it did
 }
 
 // NewGrantsModel returns the Grants view over store, rendered in style.
@@ -32,6 +35,7 @@ func NewGrantsModel(store Store, style Style) *GrantsModel {
 	m := &GrantsModel{
 		store: store,
 		style: style,
+		keys:  defaultKeyMap(),
 		// A real width arrives with the first WindowSizeMsg, as it does for the other views.
 		width: minTableWidth,
 	}
@@ -63,10 +67,12 @@ func (m *GrantsModel) Init() tea.Cmd {
 	return loadPortfolioCmd(m.store)
 }
 
-// Update implements tea.Model by fitting the table to the window and filling it with the grants of
-// the portfolio once it is loaded.
+// Update implements tea.Model by fitting the table to the window, filling it with the grants of the
+// portfolio once it is loaded, and moving the selection through it.
 func (m *GrantsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		return m.handleKeyPress(msg)
 	case tea.WindowSizeMsg:
 		m.width = tableWidth(msg.Width)
 		m.table.SetColumns(m.columns())
@@ -74,12 +80,29 @@ func (m *GrantsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table.SetHeight(msg.Height - chromeHeight)
 		return m, nil
 	case PortfolioLoadedMsg:
-		m.portfolio = msg.portfolio
-		m.updateRows()
+		m.err = msg.err
+		if msg.err == nil {
+			// Quotes that could not be refreshed do not make the portfolio any less the latest.
+			m.err = msg.quotesErr
+			m.portfolio = msg.portfolio
+			m.updateRows()
+		}
 		return m, nil
 	}
 
 	return m, nil
+}
+
+// handleKeyPress quits on the quit keys and hands every other key to the table, which moves the
+// selection.
+func (m *GrantsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if key.Matches(msg, m.keys.Quit) {
+		return m, tea.Quit
+	}
+
+	var cmd tea.Cmd
+	m.table, cmd = m.table.Update(msg)
+	return m, cmd
 }
 
 // updateRows fills the table with a row for every grant of the portfolio.
@@ -92,9 +115,34 @@ func (m *GrantsModel) updateRows() {
 	m.table.SetRows(rows)
 }
 
-// View implements tea.Model by rendering the table of grants.
+// View implements tea.Model by rendering the header above the table of grants, and the keys below
+// it.
 func (m *GrantsModel) View() tea.View {
-	return tea.NewView(m.style.Table.Render(m.table.View()))
+	frame := m.headerView() + "\n" +
+		m.style.Table.Render(m.table.View()) + "\n" +
+		m.helpView()
+
+	return tea.NewView(trimTrailingSpace(frame) + "\n")
+}
+
+// headerView renders the two lines above the table: how many grants there are on the left, with the
+// prices underneath, and the account values on the right.
+func (m *GrantsModel) headerView() string {
+	summary := "No grants"
+	if n := len(m.portfolio.Grants); n > 0 {
+		summary = count(n, "grant")
+	}
+
+	return portfolioHeader(summary, m.portfolio, m.err, m.width-cellPadding, m.style)
+}
+
+// helpView renders the keys worth knowing in two lines, as every view does: getting around on the
+// first, and what can be done to the table on the second, which is nothing yet and stays empty so
+// that the frame has the height of the other views'.
+func (m *GrantsModel) helpView() string {
+	help, nav := m.table.Help, m.table.KeyMap
+
+	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n"
 }
 
 // grantRow renders a grant as a row of the Grants table: how many of its shares are still to come,

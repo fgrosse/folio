@@ -1,10 +1,13 @@
 package tui
 
 import (
+	"errors"
 	"testing"
 
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/charmbracelet/x/exp/golden"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -37,6 +40,45 @@ func TestGrantsModel_LoadsPortfolio(t *testing.T) {
 	require.Len(t, rows, 1)
 	assert.Equal(t, grantRow(p.Grants[0], p.Quotes["PANW"]), rows[0])
 	store.AssertExpectations(t)
+}
+
+// TestGrantsModel_Keys covers the keys the view answers to before it can change anything: q and
+// ctrl+c quit, and every other key is the table's.
+func TestGrantsModel_Keys(t *testing.T) {
+	m, _ := newTestingGrants(t)
+
+	_, cmd := m.Update(keyPressed("q"))
+	assert.Equal(t, tea.QuitMsg{}, runCmd(t, cmd))
+
+	_, cmd = m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	assert.Equal(t, tea.QuitMsg{}, runCmd(t, cmd))
+
+	_, cmd = m.Update(keyPressed("j"))
+	assert.Nil(t, cmd)
+}
+
+// TestGrantsModel_Render is the frame the Grants view puts on screen, in the shape of the other
+// views': how many grants there are above the table next to the account values, a row for every
+// grant, and the keys underneath.
+func TestGrantsModel_Render(t *testing.T) {
+	m, _ := newTestingGrants(t)
+
+	golden.RequireEqual(t, ansi.Strip(m.View().Content))
+}
+
+// TestGrantsModel_ShowsErrors covers a load that failed: the view says why where the prices
+// otherwise are and keeps the grants it had on display, as the other views do.
+func TestGrantsModel_ShowsErrors(t *testing.T) {
+	m, _ := newTestingGrants(t)
+
+	m.Update(PortfolioLoadedMsg{err: errors.New("database is locked")})
+
+	assert.Contains(t, ansi.Strip(m.View().Content), "database is locked")
+	assert.Len(t, m.table.Rows(), 1, "the grants should stay on display")
+
+	m.Update(PortfolioLoadedMsg{portfolio: testPortfolio(), quotesErr: errors.New("no quote of PANW")})
+
+	assert.Contains(t, ansi.Strip(m.View().Content), "no quote of PANW")
 }
 
 // TestGrantRow covers how one grant reads as a row of the Grants table: its name and stock, how many
