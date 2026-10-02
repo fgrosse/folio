@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestRepeating covers the simplest vesting schedule, the one of a payout that releases the same
@@ -84,4 +85,47 @@ func TestGraded_WholeShares(t *testing.T) {
 	}
 	assert.Equal(t, expected, actual)
 	assert.Equal(t, "100", total.String())
+}
+
+// TestNewGrant covers the syntax a grant is typed in, which names it and describes its schedule:
+// "<name>: <shares> <symbol> <interval> x<count> from <YYYY-MM-DD>" for the same number of shares
+// every month, quarter or year, that many times.
+func TestNewGrant(t *testing.T) {
+	tests := map[string]struct {
+		spec     string
+		expected Grant
+	}{
+		"the same shares every month": {
+			spec: "Acquisition payout: 10 PANW monthly x3 from 2026-01-15",
+			expected: Grant{
+				Name:   "Acquisition payout",
+				Symbol: "PANW",
+				Vests:  Repeating(day("2026-01-15"), 1, 3, shares("10")),
+			},
+		},
+		"every quarter, in lower case": {
+			spec: "Bonus: 2.5 panw quarterly x2 from 2026-03-01",
+			expected: Grant{
+				Name:   "Bonus",
+				Symbol: "PANW",
+				Vests:  Repeating(day("2026-03-01"), 3, 2, shares("2.5")),
+			},
+		},
+		"every year": {
+			spec: "Retention: 100 PANW yearly x4 from 2027-01-01",
+			expected: Grant{
+				Name:   "Retention",
+				Symbol: "PANW",
+				Vests:  Repeating(day("2027-01-01"), 12, 4, shares("100")),
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			grant, err := NewGrant(tt.spec)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, grant)
+		})
+	}
 }

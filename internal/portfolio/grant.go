@@ -1,10 +1,23 @@
 package portfolio
 
 import (
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
 )
+
+// A Grant is an award of shares of one stock that vest over time, such as a grant of RSUs. What it
+// is worth is potential until its vests are released, one by one, into lots.
+type Grant struct {
+	ID     int
+	Name   string
+	Symbol string
+
+	// Vests are the days on which the shares of the grant vest, in order.
+	Vests []Vest
+}
 
 // A Vest is one day on which shares of a grant vest. Until it is released into a lot, what it is
 // worth counts as potential.
@@ -14,6 +27,47 @@ type Vest struct {
 	// Date is the calendar day the shares vest, at midnight UTC.
 	Date   time.Time
 	Shares decimal.Decimal
+}
+
+// intervals are the words a grant spec says how often a grant vests with, and how many months each
+// of them is.
+var intervals = map[string]int{
+	"monthly":   1,
+	"quarterly": 3,
+	"yearly":    12,
+}
+
+// NewGrant parses a grant from its spec, which names it and describes its schedule:
+//
+//	<name>: <shares> <symbol> <interval> x<count> from <YYYY-MM-DD>
+//
+// The interval is monthly, quarterly or yearly. The grant vests that many shares count times, the
+// first time on the day after "from": "Payout: 10 PANW monthly x24 from 2026-01-15" is 10 shares
+// on the 15th of each of 24 months.
+func NewGrant(spec string) (Grant, error) {
+	name, schedule, _ := strings.Cut(spec, ":")
+	fields := strings.Fields(schedule)
+
+	shares, err := decimal.NewFromString(fields[0])
+	if err != nil {
+		return Grant{}, err
+	}
+
+	count, err := strconv.Atoi(strings.TrimPrefix(fields[3], "x"))
+	if err != nil {
+		return Grant{}, err
+	}
+
+	first, err := ParseDay(fields[5])
+	if err != nil {
+		return Grant{}, err
+	}
+
+	return Grant{
+		Name:   strings.TrimSpace(name),
+		Symbol: strings.ToUpper(fields[1]),
+		Vests:  Repeating(first, intervals[strings.ToLower(fields[2])], count, shares),
+	}, nil
 }
 
 // Repeating returns the schedule of a grant that vests the same number of shares count times, the
