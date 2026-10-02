@@ -5,6 +5,8 @@ import (
 
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/charmbracelet/x/exp/golden"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -50,6 +52,24 @@ func TestHoldingsModel_Keys(t *testing.T) {
 	_, cmd = m.Update(keyPressed("j"))
 	assert.Nil(t, cmd)
 	assert.Equal(t, 1, m.table.Cursor(), "j should move the selection down a row")
+}
+
+// TestHoldingsModel_Render is the frame the Holdings view puts on screen, which has the shape of
+// every view's: the positions and the account values on two header lines, a row for every lot in a
+// boxed table, and the keys underneath.
+func TestHoldingsModel_Render(t *testing.T) {
+	store := new(MockStore)
+	store.returns(testPortfolio())
+	m := NewHoldingsModel(store, DefaultStyle())
+
+	// The window size matters as much as the portfolio: without it the table has no width, and a
+	// golden taken without one would lock in an empty frame.
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
+	m.Update(runCmd(t, m.Init()))
+
+	// Stripped of styling: the frame is mostly escape sequences otherwise, and this golden is here
+	// for the layout.
+	golden.RequireEqual(t, ansi.Strip(m.View().Content))
 }
 
 // TestPositions covers the line the Holdings view puts above its table: how many shares of each

@@ -130,9 +130,32 @@ func (m *HoldingsModel) updateRows() {
 	m.table.SetRows(rows)
 }
 
-// View implements tea.Model by rendering the table of lots.
+// View implements tea.Model by rendering the header above the table of lots, and the keys below it.
 func (m *HoldingsModel) View() tea.View {
-	return tea.NewView(m.style.Table.Render(m.table.View()))
+	frame := m.headerView() + "\n" +
+		m.style.Table.Render(m.table.View()) + "\n" +
+		m.helpView()
+
+	return tea.NewView(trimTrailingSpace(frame) + "\n")
+}
+
+// headerView renders the two lines above the table: the positions the lots add up to on the left,
+// with the prices they are valued at underneath, and the account values on the right.
+func (m *HoldingsModel) headerView() string {
+	p := m.portfolio
+	account := portfolio.NewAccount(p.Lots, p.Grants, p.Quotes)
+	status := m.style.Hint.Render(quoteStatus(portfolio.Symbols(p.Lots, p.Grants), p.Quotes))
+
+	return accountHeader(positions(p.Lots), status, account, m.width-cellPadding, m.style)
+}
+
+// helpView renders the keys worth knowing in two lines, as every view does: getting around on the
+// first, and what can be done to the table on the second, which is nothing yet and stays empty so
+// that the frame has the height it will have.
+func (m *HoldingsModel) helpView() string {
+	help, nav := m.table.Help, m.table.KeyMap
+
+	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n"
 }
 
 // positions sums up lots as how many shares of each stock they hold, the stocks in alphabetical

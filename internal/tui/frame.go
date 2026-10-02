@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"strings"
+
 	"charm.land/bubbles/v2/table"
 )
 
@@ -50,4 +52,18 @@ func newTable(style Style, cols []table.Column) table.Model {
 // neither overflows a small window nor stretches across a very large one.
 func tableWidth(terminalWidth int) int {
 	return min(max(terminalWidth-borderWidth, minTableWidth), maxTableWidth)
+}
+
+// trimTrailingSpace strips the padding the compositor leaves behind. It draws onto a grid as wide
+// as the widest line in the frame - the table's box - and fills everything a shorter line does not
+// reach with real spaces, so the header and the help line come back padded out to the full width.
+// None of it is visible on a terminal. It is visible in the golden files, where trailing whitespace
+// is both invisible to a reviewer and liable to be stripped by an editor.
+func trimTrailingSpace(frame string) string {
+	lines := strings.Split(frame, "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimRight(line, " ")
+	}
+
+	return strings.Join(lines, "\n")
 }
