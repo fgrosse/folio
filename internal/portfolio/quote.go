@@ -1,6 +1,8 @@
 package portfolio
 
 import (
+	"context"
+	"errors"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -20,4 +22,30 @@ type Quote struct {
 
 	// At is when the price was read.
 	At time.Time
+}
+
+// A Quoter looks up what a share of a stock is worth right now, such as a client of a service that
+// serves quotes.
+type Quoter interface {
+	Quote(ctx context.Context, symbol string) (Quote, error)
+}
+
+// FetchQuotes asks quoter for the quote of each of symbols and returns them by symbol. A symbol
+// that has no quote does not cost the others theirs: the quotes that could be read come back
+// together with an error that joins the ones of those that could not.
+func FetchQuotes(ctx context.Context, quoter Quoter, symbols []string) (map[string]Quote, error) {
+	quotes := make(map[string]Quote, len(symbols))
+
+	var errs []error
+	for _, symbol := range symbols {
+		quote, err := quoter.Quote(ctx, symbol)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+
+		quotes[symbol] = quote
+	}
+
+	return quotes, errors.Join(errs...)
 }
