@@ -6,7 +6,9 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/charmbracelet/x/exp/golden"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -261,4 +263,39 @@ func TestAppModel_CapturingViewKeepsTheKeys(t *testing.T) {
 	m = driveApp(t, m, tab)
 	assert.Equal(t, 1, m.selected, "once the view lets go, tab switches views again")
 	assert.Len(t, holdings.msgs, 3, "and the key that switched is not passed on")
+}
+
+// TestNew_Render is the golden of the whole frame the app puts on screen: the Holdings view with the
+// tab bar under it, which lists the three views folio has. Each view has a golden of its own, and
+// none of them can see what this one is here for - that the app fits a view and the tab bar into
+// the window together.
+func TestNew_Render(t *testing.T) {
+	store := new(MockStore)
+	store.returns(testPortfolio())
+	store.On("SaveQuote", mock.Anything).Return(nil)
+
+	m := New(store, quotes{"PANW": "396.25"}, DefaultStyle())
+	m = driveApp(t, m, tea.WindowSizeMsg{Width: 100, Height: 21})
+	m = driveApp(t, m, PortfolioLoadedMsg{portfolio: testPortfolio()})
+
+	frame := ansi.Strip(m.View().Content)
+	assert.Equal(t, 21, lipgloss.Height(frame), "the frame should fill the window, and no more")
+	golden.RequireEqual(t, frame)
+}
+
+// TestNew_TabsAreTheSameHeight covers what makes switching views calm: every view renders a frame of
+// the same height, so the tab bar stays on the line it is on and nothing above it jumps.
+func TestNew_TabsAreTheSameHeight(t *testing.T) {
+	store := new(MockStore)
+	store.returns(testPortfolio())
+
+	m := New(store, quotes{}, DefaultStyle())
+	m = driveApp(t, m, tea.WindowSizeMsg{Width: 100, Height: 21})
+	m = driveApp(t, m, PortfolioLoadedMsg{portfolio: testPortfolio()})
+
+	height := lipgloss.Height(m.View().Content)
+	for _, key := range []string{"2", "3"} {
+		m = driveApp(t, m, keyPressed(key))
+		assert.Equal(t, height, lipgloss.Height(m.View().Content), "tab %s should be as tall as the first", key)
+	}
 }

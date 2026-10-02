@@ -47,6 +47,8 @@ type KeyCapturer interface {
 func New(store Store, quoter portfolio.Quoter, style Style) *AppModel {
 	return NewAppModel(style,
 		NewHoldingsModel(store, quoter, style),
+		NewVestingModel(store, style),
+		NewGrantsModel(store, style),
 	)
 }
 
