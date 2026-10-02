@@ -25,3 +25,13 @@ func shares(s string) decimal.Decimal {
 
 	return d
 }
+
+// timestamp parses an instant written as YYYY-MM-DDTHH:MM, in UTC.
+func timestamp(s string) time.Time {
+	t, err := time.Parse("2006-01-02T15:04", s)
+	if err != nil {
+		panic(err)
+	}
+
+	return t
+}

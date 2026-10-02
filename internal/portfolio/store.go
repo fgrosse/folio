@@ -115,6 +115,51 @@ func (s *SQLiteStore) DeleteLot(id int) error {
 	return nil
 }
 
+// Quotes returns the latest quote the database has of every symbol it has one of, by symbol. The
+// database is the cache of the prices: what comes back is as old as the last SaveQuote.
+func (s *SQLiteStore) Quotes() (map[string]Quote, error) {
+	var rows []struct {
+		Symbol        string          `db:"symbol"`
+		Price         decimal.Decimal `db:"price"`
+		PreviousClose decimal.Decimal `db:"previous_close"`
+		Currency      string          `db:"currency"`
+		At            time.Time       `db:"quoted_at"`
+	}
+
+	if err := s.db.Select(&rows, `SELECT symbol, price, previous_close, currency, quoted_at FROM quotes`); err != nil {
+		return nil, err
+	}
+
+	quotes := make(map[string]Quote, len(rows))
+	for _, r := range rows {
+		quotes[r.Symbol] = Quote{
+			Symbol:        r.Symbol,
+			Price:         r.Price,
+			PreviousClose: r.PreviousClose,
+			Currency:      r.Currency,
+			At:            r.At,
+		}
+	}
+
+	return quotes, nil
+}
+
+// SaveQuote records quote as the latest of its symbol, in place of the one before. Its time is
+// stored to the whole second and in UTC.
+func (s *SQLiteStore) SaveQuote(quote Quote) error {
+	_, err := s.db.Exec(`
+		INSERT INTO quotes (symbol, price, previous_close, currency, quoted_at) VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT (symbol) DO UPDATE SET
+			price = excluded.price,
+			previous_close = excluded.previous_close,
+			currency = excluded.currency,
+			quoted_at = excluded.quoted_at`,
+		quote.Symbol, quote.Price, quote.PreviousClose, quote.Currency, quote.At.UTC().Truncate(time.Second),
+	)
+
+	return err
+}
+
 // Close closes the database.
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()

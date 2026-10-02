@@ -121,3 +121,43 @@ func TestStore_DeleteLot(t *testing.T) {
 
 	assert.EqualError(t, s.DeleteLot(7), "no lot with ID 7")
 }
+
+// TestStore_SaveQuote covers the database as the cache of prices: a quote that is saved comes back
+// under its symbol, and saving another for the same symbol replaces it, since only the latest price
+// of a stock is worth anything.
+func TestStore_SaveQuote(t *testing.T) {
+	s := NewTestingStore()
+
+	quotes, err := s.Quotes()
+	require.NoError(t, err)
+	assert.Empty(t, quotes)
+
+	panw := Quote{
+		Symbol:        "PANW",
+		Price:         shares("396.25"),
+		PreviousClose: shares("397.31"),
+		Currency:      "USD",
+		At:            timestamp("2026-10-02T08:30"),
+	}
+	aapl := Quote{
+		Symbol:        "AAPL",
+		Price:         shares("330.32"),
+		PreviousClose: shares("333.02"),
+		Currency:      "USD",
+		At:            timestamp("2026-10-02T08:30"),
+	}
+	require.NoError(t, s.SaveQuote(panw))
+	require.NoError(t, s.SaveQuote(aapl))
+
+	quotes, err = s.Quotes()
+	require.NoError(t, err)
+	assert.Equal(t, map[string]Quote{"PANW": panw, "AAPL": aapl}, quotes)
+
+	panw.Price = shares("401.5")
+	panw.At = timestamp("2026-10-02T08:35")
+	require.NoError(t, s.SaveQuote(panw))
+
+	quotes, err = s.Quotes()
+	require.NoError(t, err)
+	assert.Equal(t, map[string]Quote{"PANW": panw, "AAPL": aapl}, quotes)
+}
