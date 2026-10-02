@@ -37,6 +37,9 @@ const (
 	holdingsColumnsWidth = dayColumnWidth + symbolColumnWidth + sharesColumnWidth + 2*priceColumnWidth + valueColumnWidth +
 		6*cellPadding
 
+	// lotPlaceholder shows how a lot is written, in the empty field of the dialog that takes one.
+	lotPlaceholder = "12.5 PANW 2026-03-15 @380.12"
+
 	// noValue stands where a cost, price or value would be if it was known.
 	noValue = "-"
 )
@@ -56,7 +59,7 @@ type HoldingsModel struct {
 
 	refreshInterval time.Duration  // how long the quotes are left alone before they are fetched again
 	refreshing      bool           // a RefreshQuotesMsg is on its way, so no load needs to schedule another
-	input           *InputDialog   // the dialog that adds a lot, nil unless it is open
+	input           *InputDialog   // the dialog that adds or edits a lot, nil unless it is open
 	confirm         *ConfirmDialog // the dialog asking whether to delete a lot, nil unless it is open
 }
 
@@ -69,7 +72,7 @@ type DeleteLotMsg struct {
 }
 
 // SaveLotMsg reports that the dialog was confirmed with the spec of a lot. The lot has not been saved
-// yet; that is up to whoever receives it.
+// yet; that is up to whoever receives it. A new lot has no ID, and an edited one keeps its own.
 type SaveLotMsg struct {
 	lot portfolio.Lot
 }
@@ -197,8 +200,8 @@ func (m *HoldingsModel) scheduleRefreshCmd() tea.Cmd {
 	return tea.Tick(m.refreshInterval, func(time.Time) tea.Msg { return RefreshQuotesMsg{} })
 }
 
-// handleKeyPress quits on the quit keys, opens the dialog for a new lot on the add key, asks whether
-// to delete the selected lot on the delete key, and hands every other key to the table, which moves
+// handleKeyPress quits on the quit keys, opens the dialog for a new lot on the add key and for the
+// selected one on the edit key, asks whether to delete the selected lot on the delete key, and hands every other key to the table, which moves
 // the selection. While a dialog is open, every key is the dialog's.
 func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.input != nil {
@@ -214,13 +217,45 @@ func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 	case key.Matches(msg, m.keys.Delete):
 		return m.askToDelete()
 	case key.Matches(msg, m.keys.Add):
-		m.input = NewInputDialog("New lot", "12.5 PANW 2026-03-15 @380.12", m.newLot, dialogWidth, m.style)
+		m.input = NewInputDialog("New lot", lotPlaceholder, m.newLot, dialogWidth, m.style)
 		return m, m.input.Init()
+	case key.Matches(msg, m.keys.Edit):
+		return m.editSelected()
 	}
 
 	var cmd tea.Cmd
 	m.table, cmd = m.table.Update(msg)
 	return m, cmd
+}
+
+// editSelected opens the dialog on the selected lot, with the spec of that lot in its field. What
+// the spec says once it is confirmed replaces the lot: it keeps its ID, and its day if the spec no
+// longer has one. Without a lot to select, there is nothing to edit.
+func (m *HoldingsModel) editSelected() (tea.Model, tea.Cmd) {
+	i := m.table.Cursor()
+	if i < 0 || i >= len(m.portfolio.Lots) {
+		return m, nil
+	}
+
+	lot := m.portfolio.Lots[i]
+	submit := func(spec string) (tea.Msg, error) {
+		edited, err := portfolio.NewLot(spec)
+		if err != nil {
+			return nil, err
+		}
+
+		edited.ID = lot.ID
+		if edited.Acquired.IsZero() {
+			edited.Acquired = lot.Acquired
+		}
+
+		return SaveLotMsg{lot: edited}, nil
+	}
+
+	m.input = NewInputDialog("Edit lot", lotPlaceholder, submit, dialogWidth, m.style)
+	m.input.SetValue(lot.String())
+
+	return m, m.input.Init()
 }
 
 // askToDelete opens a dialog asking whether to delete the selected lot, which sends a DeleteLotMsg
@@ -346,7 +381,7 @@ func (m *HoldingsModel) helpView() string {
 	}
 
 	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n" +
-		help.ShortHelpView([]key.Binding{m.keys.Add, m.keys.Delete})
+		help.ShortHelpView([]key.Binding{m.keys.Add, m.keys.Edit, m.keys.Delete})
 }
 
 // positions sums up lots as how many shares of each stock they hold, the stocks in alphabetical

@@ -295,6 +295,62 @@ func TestHoldingsModel_KeepsQuotesFresh(t *testing.T) {
 	assert.Equal(t, RefreshQuotesMsg{}, runCmd(t, cmd), "the load after a refresh should schedule the next")
 }
 
+// TestHoldingsModel_EditLot covers correcting a lot in the view, such as one that was released
+// without its cost: e opens the dialog with the spec of the selected lot in its field, and on enter
+// the view saves what the spec now says under the ID of that lot, so that it replaces the lot rather
+// than adding one, and loads the portfolio again.
+func TestHoldingsModel_EditLot(t *testing.T) {
+	m, store := newTestingHoldings(t)
+	m.Update(keyPressed("j")) // the second lot, which has no cost
+
+	m.Update(keyPressed("e"))
+	require.True(t, m.CapturesKeys(), "the dialog should take the keyboard")
+	assert.Equal(t, "2.5 PANW 2026-02-15", m.input.Value())
+	assert.Contains(t, ansi.Strip(m.View().Content), "Edit lot")
+
+	for _, key := range keysPressed(" @391.4") {
+		m.Update(key)
+	}
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	lot := portfolio.Lot{ID: 2, Symbol: "PANW", Shares: dec("2.5"), Acquired: day("2026-02-15"), Cost: dec("391.4")}
+	msg := runCmd(t, cmd)
+	require.Equal(t, SaveLotMsg{lot: lot}, msg)
+
+	store.On("SaveLot", lot).Return(nil)
+	_, cmd = m.Update(msg)
+	assert.False(t, m.CapturesKeys(), "the dialog should be closed")
+	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
+	store.AssertExpectations(t)
+}
+
+// TestHoldingsModel_EditKeepsTheDay covers a spec whose day was deleted while editing: the lot
+// keeps the day it has, rather than moving to today as a new lot without a day would. In an account
+// without lots there is nothing to edit, and e opens no dialog.
+func TestHoldingsModel_EditKeepsTheDay(t *testing.T) {
+	m, _ := newTestingHoldings(t)
+	m.Update(keyPressed("e"))
+	m.input.SetValue("7 PANW @380.12")
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	msg, ok := runCmd(t, cmd).(SaveLotMsg)
+	require.True(t, ok)
+	assert.Equal(t, 1, msg.lot.ID)
+	assert.Equal(t, day("2026-01-15"), msg.lot.Acquired)
+	assert.Equal(t, "7", msg.lot.Shares.String())
+
+	store := new(MockStore)
+	store.returns(Portfolio{})
+	empty := NewHoldingsModel(store, quotes{}, DefaultStyle())
+	empty.Update(runCmd(t, loadPortfolioCmd(store)))
+
+	_, cmd = empty.Update(keyPressed("e"))
+
+	assert.Nil(t, cmd)
+	assert.False(t, empty.CapturesKeys(), "there should be no dialog without a lot")
+}
+
 // TestPositions covers the line the Holdings view puts above its table: how many shares of each
 // stock the lots add up to, which no single row says. The stocks are in alphabetical order, and an
 // account without lots says so.
