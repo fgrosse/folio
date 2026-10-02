@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 
 	"github.com/fgrosse/folio/internal/portfolio"
@@ -33,6 +35,12 @@ Show the three values of the account at the latest prices:
 			quotes, err := portfolio.FetchQuotes(c.Context(), cmd.quoter, portfolio.Symbols(lots, grants))
 			if err != nil {
 				return err
+			}
+
+			for _, quote := range quotes {
+				if err := cmd.store.SaveQuote(quote); err != nil {
+					return fmt.Errorf("save quote of %s: %w", quote.Symbol, err)
+				}
 			}
 
 			cmd.printAccount(portfolio.NewAccount(lots, grants, quotes))

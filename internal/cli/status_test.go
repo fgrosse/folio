@@ -32,6 +32,25 @@ func TestStatusCmd(t *testing.T) {
 	assert.Equal(t, expected, out.String())
 }
 
+// TestStatusCmd_CachesQuotes covers what status leaves behind: the quotes it fetched are saved to
+// the database, where the TUI finds them the next time it opens, before it has fetched any itself.
+func TestStatusCmd_CachesQuotes(t *testing.T) {
+	cmd, dbPath := NewTestingCmd(t, "status")
+	cmd.quoter = quotes{"PANW": "396.25"}
+	seed(t, dbPath)
+
+	require.NoError(t, cmd.Execute())
+
+	store, err := portfolio.NewStore(dbPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = store.Close() })
+
+	cached, err := store.Quotes()
+	require.NoError(t, err)
+	require.Contains(t, cached, "PANW")
+	assert.Equal(t, "396.25", cached["PANW"].Price.String())
+}
+
 // seed fills the database at dbPath with an account of PANW stock: two lots of 8.5 shares in all,
 // and a grant with two vests of 10 shares each that have not been released.
 func seed(t *testing.T, dbPath string) {
