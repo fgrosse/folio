@@ -35,3 +35,8 @@ func NewAccount(lots []Lot, grants []Grant, quotes map[string]Quote) Account {
 		Potential: potential.Round(2),
 	}
 }
+
+// Total is the value of the whole account, held and still to come.
+func (a Account) Total() decimal.Decimal {
+	return a.Current.Add(a.Potential)
+}

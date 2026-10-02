@@ -57,3 +57,10 @@ func TestNewAccount_Potential(t *testing.T) {
 	assert.Equal(t, "8420.48", account.Potential.String())
 	assert.Equal(t, "0", account.Current.String())
 }
+
+// TestAccount_Total covers the third value, which is the other two added up.
+func TestAccount_Total(t *testing.T) {
+	account := Account{Current: shares("4359.09"), Potential: shares("8420.48")}
+
+	assert.Equal(t, "12779.57", account.Total().String())
+}

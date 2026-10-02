@@ -120,6 +120,9 @@ with the package path without `internal/`, and a body that says what was done an
   non-fatal). No `t.Parallel()` by default.
 - **The store is tested against a real SQLite database** that lives in memory (`NewTestingStore`),
   so the tests run the same SQL as the program.
+- **A computed decimal is compared as text**, `account.Total().String()`, not with `assert.Equal` on
+  the decimal: two decimals of the same value are not always the same bytes, and those are what
+  testify compares. A decimal that was only parsed, stored and read back is safe to compare.
 - **TUI tests come in layers**, each catching what the one below cannot: pure formatting of a row,
   message and state transitions through `Update` with the `runCmd` helper, and golden-file frames.
 - **Goldens**: regenerate with `go test ./internal/tui/ -update`, then *read* the result before
