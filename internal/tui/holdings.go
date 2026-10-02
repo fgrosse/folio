@@ -45,8 +45,16 @@ type HoldingsModel struct {
 	style     Style
 	keys      keyMap
 	table     table.Model
-	width     int       // width of the table, which the header line is spread across
-	portfolio Portfolio // the account as it was last loaded
+	width     int              // width of the table, which the header line is spread across
+	now       func() time.Time // the clock that says what today is
+	portfolio Portfolio        // the account as it was last loaded
+	input     *InputDialog     // the dialog that adds a lot, nil unless it is open
+}
+
+// SaveLotMsg reports that the dialog was confirmed with the spec of a lot. The lot has not been saved
+// yet; that is up to whoever receives it.
+type SaveLotMsg struct {
+	lot portfolio.Lot
 }
 
 // NewHoldingsModel returns the Holdings view over store, rendered in style.
@@ -55,6 +63,7 @@ func NewHoldingsModel(store Store, style Style) *HoldingsModel {
 		store: store,
 		style: style,
 		keys:  defaultKeyMap(),
+		now:   time.Now,
 		// A real width arrives with the first WindowSizeMsg, which Bubble Tea sends at startup.
 		// Until then the narrowest supported layout is the safest thing to hold.
 		width: minTableWidth,
@@ -82,6 +91,12 @@ func (m *HoldingsModel) Title() string {
 	return "Holdings"
 }
 
+// CapturesKeys implements KeyCapturer: while the dialog is open the keyboard belongs to it, down to
+// the keys that would otherwise switch views. The digits are the shares of the lot being typed.
+func (m *HoldingsModel) CapturesKeys() bool {
+	return m.input != nil
+}
+
 // Init implements tea.Model by loading the portfolio.
 func (m *HoldingsModel) Init() tea.Cmd {
 	return loadPortfolioCmd(m.store)
@@ -103,21 +118,60 @@ func (m *HoldingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.portfolio = msg.portfolio
 		m.updateRows()
 		return m, nil
+	case SaveLotMsg:
+		m.input = nil
+		return m, m.saveLotCmd(msg.lot)
 	}
 
 	return m, nil
 }
 
-// handleKeyPress quits on the quit keys and hands every other key to the table, which moves the
-// selection.
+// handleKeyPress quits on the quit keys, opens the dialog for a new lot on the add key, and hands
+// every other key to the table, which moves the selection. While the dialog is open, every key is
+// the dialog's.
 func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if key.Matches(msg, m.keys.Quit) {
+	if m.input != nil {
+		return m, m.input.HandleKeyPress(msg)
+	}
+
+	switch {
+	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
+	case key.Matches(msg, m.keys.Add):
+		m.input = NewInputDialog("New lot", "12.5 PANW 2026-03-15", m.newLot, dialogWidth, m.style)
+		return m, m.input.Init()
 	}
 
 	var cmd tea.Cmd
 	m.table, cmd = m.table.Update(msg)
 	return m, cmd
+}
+
+// newLot turns the spec typed into the dialog into the message that asks for the lot to be saved. A
+// lot whose spec has no day is of today.
+func (m *HoldingsModel) newLot(spec string) (tea.Msg, error) {
+	lot, err := portfolio.NewLot(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	if lot.Acquired.IsZero() {
+		lot.Acquired = portfolio.DayOf(m.now())
+	}
+
+	return SaveLotMsg{lot: lot}, nil
+}
+
+// saveLotCmd returns a command that saves lot and loads the portfolio again, which then has it.
+func (m *HoldingsModel) saveLotCmd(lot portfolio.Lot) tea.Cmd {
+	store := m.store
+	return func() tea.Msg {
+		if err := store.SaveLot(lot); err != nil {
+			return PortfolioLoadedMsg{err: err}
+		}
+
+		return loadPortfolioCmd(store)()
+	}
 }
 
 // updateRows fills the table with a row for every lot of the portfolio.

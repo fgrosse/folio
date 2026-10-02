@@ -2,6 +2,7 @@ package tui
 
 import (
 	"testing"
+	"time"
 
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
@@ -70,6 +71,48 @@ func TestHoldingsModel_Render(t *testing.T) {
 	// Stripped of styling: the frame is mostly escape sequences otherwise, and this golden is here
 	// for the layout.
 	golden.RequireEqual(t, ansi.Strip(m.View().Content))
+}
+
+// newTestingHoldings returns a Holdings view that has loaded the test portfolio into a window of
+// 100 by 20, and the store it loaded it from, for a test to set up what comes next.
+func newTestingHoldings(t *testing.T) (*HoldingsModel, *MockStore) {
+	t.Helper()
+
+	store := new(MockStore)
+	store.returns(testPortfolio())
+
+	m := NewHoldingsModel(store, DefaultStyle())
+	m.now = func() time.Time { return time.Date(2026, time.October, 2, 14, 30, 0, 0, time.UTC) }
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
+	m.Update(runCmd(t, m.Init()))
+
+	return m, store
+}
+
+// TestHoldingsModel_AddLot covers recording shares in the view: a opens a dialog that takes the
+// keyboard, the spec typed into it becomes a lot on enter, dated today since the spec has no day,
+// and the view saves that lot and loads the portfolio again to show it.
+func TestHoldingsModel_AddLot(t *testing.T) {
+	m, store := newTestingHoldings(t)
+	assert.False(t, m.CapturesKeys())
+
+	m.Update(keyPressed("a"))
+	assert.True(t, m.CapturesKeys(), "the dialog should take the keyboard")
+
+	for _, key := range keysPressed("12 panw") {
+		m.Update(key)
+	}
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	lot := portfolio.Lot{Symbol: "PANW", Shares: dec("12"), Acquired: day("2026-10-02")}
+	msg := runCmd(t, cmd)
+	require.Equal(t, SaveLotMsg{lot: lot}, msg)
+
+	store.On("SaveLot", lot).Return(nil)
+	_, cmd = m.Update(msg)
+	assert.False(t, m.CapturesKeys(), "the dialog should be closed")
+	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
+	store.AssertExpectations(t)
 }
 
 // TestPositions covers the line the Holdings view puts above its table: how many shares of each

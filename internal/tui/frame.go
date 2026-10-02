@@ -29,6 +29,10 @@ const (
 	// maxTableWidth stops the table from spanning an ultra-wide display, where the eye has to
 	// travel the whole screen to get from the start of a row to its value.
 	maxTableWidth = 120
+
+	// dialogWidth is how many columns the text field of a dialog occupies. A grant spec is a long
+	// line, and this fits one with a name of some length.
+	dialogWidth = 56
 )
 
 // newTable returns a focused table with the given columns, styled the way every table in the TUI is:

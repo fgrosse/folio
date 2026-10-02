@@ -35,6 +35,10 @@ func (m *MockStore) Quotes() (map[string]portfolio.Quote, error) {
 	return nil, result.Error(1)
 }
 
+func (m *MockStore) SaveLot(lot portfolio.Lot) error {
+	return m.Called(lot).Error(0)
+}
+
 // testPortfolio is the account most tests of the views look at: PANW stock in two lots of 8.5
 // shares in all, and a grant with one vest released into the first of them and two still to come.
 func testPortfolio() Portfolio {
