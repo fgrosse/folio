@@ -1,9 +1,17 @@
-# folio
+<h1 align="center">folio</h1>
+<p align="center">A terminal-first tracker for the stock you hold and the stock that is still to vest.</p>
+<p align="center">
+    <a href="https://github.com/fgrosse/folio/releases"><img src="https://img.shields.io/github/tag/fgrosse/folio.svg?label=version&color=brightgreen"></a>
+    <a href="https://github.com/fgrosse/folio/actions/workflows/ci.yml"><img src="https://github.com/fgrosse/folio/actions/workflows/ci.yml/badge.svg"></a>
+    <a href="https://github.com/fgrosse/folio/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-BSD--3--Clause-blue.svg"></a>
+</p>
+
+---
 
 ![A tour of folio on a demo account: selling shares, releasing a vest, and the grants and sales views](demo.gif)
 
-A terminal-first tracker for the stock you hold and the stock that is still to vest. It answers
-what the web site of the bank or broker behind your equity plan answers, without logging in there:
+`folio` answers what the web site of the bank or broker behind your equity plan answers, without
+logging in there:
 
 - **Current**: what the shares you hold would sell for.
 - **Potential**: what the shares that are still to vest, or vested and not released yet, are worth.
@@ -27,8 +35,7 @@ mise install        # Go, and the tools used to develop folio
 mise run install    # build folio and install it
 ```
 
-mise may ask you to trust the `mise.toml` of the checkout first (`mise trust`). The one thing it
-does not bring is a C compiler such as `gcc`, which SQLite is built with and most systems have.
+mise may ask you to trust the `mise.toml` of the checkout first (`mise trust`).
 
 Inside the checkout, `folio` is on your `PATH` from then on. To have it everywhere, make that Go
 your global one (`mise use -g go@1.27.0`), or copy the binary from `go env GOBIN` to a directory
@@ -39,6 +46,8 @@ Without mise, any Go from 1.27 on does the same:
 ```bash
 go install github.com/fgrosse/folio/cmd/folio@latest
 ```
+
+Or build nothing at all: the [releases page][releases] has binaries for Linux, macOS and Windows.
 
 ### 2. Look around with a demo account
 
@@ -161,7 +170,7 @@ ask for their prices.
 ## Development
 
 ```bash
-mise install          # Go, gopls, golangci-lint and vhs
+mise install          # Go, gopls, golangci-lint, vhs and goreleaser
 mise run install      # build and install folio
 mise run test
 mise run lint
@@ -177,3 +186,21 @@ planned.
 Quotes come from Yahoo Finance's chart endpoint, which needs no API key but is not an official API:
 it may change or turn requests away without notice, and prices can be delayed. Everything is in USD
 for now. folio keeps records and adds them up; it is no tax or investment advice.
+
+## Contributing
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of
+conduct and on the process for submitting pull requests to this repository.
+
+## Versioning
+
+We use [SemVer](http://semver.org/) for versioning.
+All significant (e.g. breaking) changes are documented in the [CHANGELOG.md](CHANGELOG.md).
+A list of all available versions can be found at the [releases page][releases], and
+[RELEASING.md](RELEASING.md) describes how a release is cut.
+
+## License
+
+folio is licensed under the BSD 3-Clause License. See [LICENSE](LICENSE) for the full text.
+
+[releases]: https://github.com/fgrosse/folio/releases

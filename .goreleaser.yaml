@@ -1,0 +1,27 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    main: ./cmd/folio
+
+archives:
+  - formats: [tar.gz]
+    name_template: '{{ .ProjectName }}-v{{ .Version }}-{{ title .Os | tolower }}-{{- .Arch }}'
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  disable: true

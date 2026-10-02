@@ -11,6 +11,9 @@ golangci-lint = "latest"
 vhs = "latest"
 ttyd = "latest"
 
+# Builds the release
+goreleaser = "latest"
+
 [tasks.install]
 description = "Build folio and install it into Go's bin directory"
 run = "go install ./..."
