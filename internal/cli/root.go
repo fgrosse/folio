@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -32,6 +33,10 @@ type Folio struct {
 	quoter portfolio.Quoter // where the prices come from
 	now    func() time.Time
 
+	// buildInfo is what the Go toolchain recorded about this binary when it built it, which is
+	// where the version comes from if no release build has set one.
+	buildInfo func() (*debug.BuildInfo, bool)
+
 	// openTUI runs the interactive views over a store until the user quits. It is the real TUI
 	// unless a test puts something in its place, since the real one needs a terminal.
 	openTUI func(ctx context.Context, store tui.Store) error
@@ -44,8 +49,9 @@ func New() *Folio {
 			Use:   "folio",
 			Short: "Track what your stock is worth, held and still to vest",
 		},
-		quoter: yahoo.New(),
-		now:    time.Now,
+		quoter:    yahoo.New(),
+		now:       time.Now,
+		buildInfo: debug.ReadBuildInfo,
 	}
 	cmd.SilenceErrors = true
 	cmd.openTUI = cmd.runProgram
