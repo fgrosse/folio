@@ -1,13 +1,103 @@
 package tui
 
 import (
+	"errors"
 	"testing"
 
 	"charm.land/bubbles/v2/table"
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/charmbracelet/x/exp/golden"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/fgrosse/folio/internal/portfolio"
 )
+
+// soldPortfolio is the test portfolio after two sales from its first lot, the second of them with a
+// note of two lines.
+func soldPortfolio() Portfolio {
+	p := testPortfolio()
+	p.Lots[0].Sold = dec("3")
+	p.Sales = []portfolio.Sale{
+		{
+			ID: 1, LotID: 1, Date: day("2026-03-02"), Shares: dec("2"), Price: dec("401.5"),
+			Symbol: "PANW", Cost: dec("380.12"), Grant: "Payout",
+		},
+		{
+			ID: 2, LotID: 1, Date: day("2026-09-15"), Shares: dec("1"), Price: dec("410.2"),
+			Note:   "for the kitchen\nsold in the morning",
+			Symbol: "PANW", Cost: dec("380.12"), Grant: "Payout",
+		},
+	}
+
+	return p
+}
+
+// newTestingSales returns a Sales view that has loaded the sold portfolio into a window of 100 by
+// 20, and the store it loaded it from.
+func newTestingSales(t *testing.T) (*SalesModel, *MockStore) {
+	t.Helper()
+
+	store := new(MockStore)
+	store.returns(soldPortfolio())
+
+	m := NewSalesModel(store, DefaultStyle())
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
+	m.Update(runCmd(t, m.Init()))
+
+	return m, store
+}
+
+// TestSalesModel_LoadsPortfolio covers what the Sales view starts from: once started, it loads the
+// portfolio and shows a row for every sale, in the order of their days.
+func TestSalesModel_LoadsPortfolio(t *testing.T) {
+	m, store := newTestingSales(t)
+	assert.Equal(t, "Sales", m.Title())
+
+	p := soldPortfolio()
+	rows := m.table.Rows()
+	require.Len(t, rows, 2)
+	assert.Equal(t, saleRow(p.Sales[0]), rows[0])
+	assert.Equal(t, saleRow(p.Sales[1]), rows[1])
+	store.AssertExpectations(t)
+}
+
+// TestSalesModel_Keys covers the keys the view answers to before it can change anything: q and
+// ctrl+c quit, and every other key is the table's.
+func TestSalesModel_Keys(t *testing.T) {
+	m, _ := newTestingSales(t)
+
+	_, cmd := m.Update(keyPressed("q"))
+	assert.Equal(t, tea.QuitMsg{}, runCmd(t, cmd))
+
+	_, cmd = m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	assert.Equal(t, tea.QuitMsg{}, runCmd(t, cmd))
+
+	require.Equal(t, 0, m.table.Cursor())
+	m.Update(keyPressed("j"))
+	assert.Equal(t, 1, m.table.Cursor(), "j should move the selection down a row")
+}
+
+// TestSalesModel_Render is the frame the Sales view puts on screen, in the shape of the other
+// views': what the sales have realized above the table next to the account values, a row for every
+// sale, and the keys underneath.
+func TestSalesModel_Render(t *testing.T) {
+	m, _ := newTestingSales(t)
+
+	golden.RequireEqual(t, ansi.Strip(m.View().Content))
+}
+
+// TestSalesModel_ShowsErrors covers a load that failed: the view says why where the prices otherwise
+// are and keeps the sales it had on display, as the other views do.
+func TestSalesModel_ShowsErrors(t *testing.T) {
+	m, _ := newTestingSales(t)
+
+	m.Update(PortfolioLoadedMsg{err: errors.New("database is locked")})
+
+	assert.Contains(t, ansi.Strip(m.View().Content), "database is locked")
+	assert.Len(t, m.table.Rows(), 2, "the sales should stay on display")
+}
 
 // TestSaleRow covers how one sale reads as a row of the Sales table: its day, the stock and the
 // grant its lot was from, and the numbers right-aligned - how many shares, what one sold for, what
