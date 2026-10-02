@@ -61,6 +61,7 @@ linters:
     gosec:
       excludes:
         - G304 # Potential file inclusion via variable (the database path is user configured)
+        - G404 # Weak random number generator (the demo account is made up, not kept secret)
 
     staticcheck:
       checks:
