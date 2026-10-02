@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -208,6 +209,25 @@ func TestHoldingsModel_RenderDeleteDialog(t *testing.T) {
 	m.Update(keyPressed("d"))
 
 	golden.RequireEqual(t, ansi.Strip(m.View().Content))
+}
+
+// TestHoldingsModel_ShowsErrors covers what the view does when the store or the prices let it down:
+// it says what went wrong where the prices otherwise are, and keeps showing the account it had,
+// since an account that goes blank reads as shares that are gone. The next load that works takes
+// the error away again.
+func TestHoldingsModel_ShowsErrors(t *testing.T) {
+	m, _ := newTestingHoldings(t)
+
+	m.Update(PortfolioLoadedMsg{err: errors.New("database is locked")})
+
+	frame := ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "database is locked")
+	assert.Contains(t, frame, "8.5 PANW", "the account should stay on display")
+	assert.Len(t, m.table.Rows(), 2)
+
+	m.Update(PortfolioLoadedMsg{portfolio: testPortfolio()})
+
+	assert.NotContains(t, ansi.Strip(m.View().Content), "database is locked")
 }
 
 // TestPositions covers the line the Holdings view puts above its table: how many shares of each

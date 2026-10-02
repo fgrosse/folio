@@ -49,6 +49,7 @@ type HoldingsModel struct {
 	width     int              // width of the table, which the header line is spread across
 	now       func() time.Time // the clock that says what today is
 	portfolio Portfolio        // the account as it was last loaded
+	err       error            // why the last load failed, nil unless it did
 	input     *InputDialog     // the dialog that adds a lot, nil unless it is open
 	confirm   *ConfirmDialog   // the dialog asking whether to delete a lot, nil unless it is open
 }
@@ -122,9 +123,7 @@ func (m *HoldingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table.SetHeight(msg.Height - chromeHeight)
 		return m, nil
 	case PortfolioLoadedMsg:
-		m.portfolio = msg.portfolio
-		m.updateRows()
-		return m, nil
+		return m.handlePortfolioLoaded(msg)
 	case SaveLotMsg:
 		m.input = nil
 		return m, m.saveLotCmd(msg.lot)
@@ -143,6 +142,20 @@ func (m *HoldingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Whatever the view does not handle may be the dialog's, such as its cursor's blink ticks.
 		return m, m.input.Update(msg)
 	}
+
+	return m, nil
+}
+
+// handlePortfolioLoaded takes over the portfolio that was loaded and fills the table with its lots.
+// A load that failed leaves the one on display where it is, and its error to the header.
+func (m *HoldingsModel) handlePortfolioLoaded(msg PortfolioLoadedMsg) (tea.Model, tea.Cmd) {
+	m.err = msg.err
+	if msg.err != nil {
+		return m, nil
+	}
+
+	m.portfolio = msg.portfolio
+	m.updateRows()
 
 	return m, nil
 }
@@ -269,11 +282,15 @@ func (m *HoldingsModel) dialogLayer() *lipgloss.Layer {
 }
 
 // headerView renders the two lines above the table: the positions the lots add up to on the left,
-// with the prices they are valued at underneath, and the account values on the right.
+// with the prices they are valued at underneath, and the account values on the right. If the last
+// load failed, why it did stands where the prices otherwise are.
 func (m *HoldingsModel) headerView() string {
 	p := m.portfolio
 	account := portfolio.NewAccount(p.Lots, p.Grants, p.Quotes)
 	status := m.style.Hint.Render(quoteStatus(portfolio.Symbols(p.Lots, p.Grants), p.Quotes))
+	if m.err != nil {
+		status = m.style.Error.Render(m.err.Error())
+	}
 
 	return accountHeader(positions(p.Lots), status, account, m.width-cellPadding, m.style)
 }
