@@ -105,3 +105,18 @@ func TestSymbols(t *testing.T) {
 	assert.Equal(t, []string{"AAPL", "MSFT", "PANW"}, Symbols(lots, grants))
 	assert.Empty(t, Symbols(nil, nil))
 }
+
+// TestNewAccount_CountsWhatIsLeft covers a lot that shares were sold from: the current value counts
+// the shares that remain of it, since the ones that were sold are money by now, not holdings.
+func TestNewAccount_CountsWhatIsLeft(t *testing.T) {
+	lots := []Lot{
+		{Symbol: "PANW", Shares: shares("250"), Sold: shares("60"), Acquired: day("2025-08-01")},
+		{Symbol: "PANW", Shares: shares("19"), Sold: shares("19"), Acquired: day("2025-09-01")},
+	}
+	quotes := map[string]Quote{"PANW": {Symbol: "PANW", Price: shares("400")}}
+
+	account := NewAccount(lots, nil, quotes)
+
+	// 190 × 400
+	assert.Equal(t, "76000", account.Current.String())
+}

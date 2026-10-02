@@ -10,7 +10,7 @@ import (
 // An Account is what the lots and grants of an account are worth at some set of quotes, in the
 // numbers the bank states for it.
 type Account struct {
-	// Current is the value of the shares that are held, which are the lots.
+	// Current is the value of the shares that are held: what remains of the lots after their sales.
 	Current decimal.Decimal
 
 	// Potential is the value of the shares still to come, which are the vests that have not been
@@ -37,7 +37,7 @@ func NewAccount(lots []Lot, grants []Grant, quotes map[string]Quote) Account {
 
 	var current, potential decimal.Decimal
 	for _, lot := range lots {
-		current = current.Add(value(lot.Symbol, lot.Shares))
+		current = current.Add(value(lot.Symbol, lot.Remaining()))
 	}
 
 	for _, grant := range grants {
