@@ -1,5 +1,7 @@
 # folio
 
+![A tour of folio on a demo account: selling shares, releasing a vest, and the grants and sales views](demo.gif)
+
 A terminal-first tracker for the stock you hold and the stock that is still to vest. It answers
 what the web site of the bank or broker behind your equity plan answers, without logging in there:
 
@@ -10,22 +12,6 @@ what the web site of the bank or broker behind your equity plan answers, without
 It is built for stock that comes from work as RSUs, on a vesting schedule, and also keeps what
 those shares cost and what you sold them for. Everything is in a SQLite database on your machine,
 and prices come from Yahoo Finance.
-
-```
-  21 AAPL · 274 ADBE                                                             Total: $393,342.08
-  AAPL $332.98 ▲ 0.8% · ADBE $237.90 ▼ 1.4%              Current $72,177.08 · Potential $321,165.00
-┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ Acquired    Symbol    From                        Shares        Cost       Price           Value │
-│──────────────────────────────────────────────────────────────────────────────────────────────────│
-│ 2024-11-29  AAPL                                      21     $175.23     $332.98       $6,992.48 │
-│ 2025-04-01  ADBE      New hire grant                  21     $392.73     $237.90       $4,995.90 │
-│ 2025-07-01  ADBE      New hire grant                  42     $386.17     $237.90       $9,991.80 │
-│ 2025-10-01  ADBE      New hire grant                  42     $417.30     $237.90       $9,991.80 │
-└──────────────────────────────────────────────────────────────────────────────────────────────────┘
-↑/k up • ↓/j down • q quit
-a add • e edit • s sell • d delete
-1 Holdings • 2 Vesting • 3 Grants • 4 Sales
-```
 
 ## Getting started
 
@@ -175,11 +161,12 @@ ask for their prices.
 ## Development
 
 ```bash
-mise install          # Go, gopls and golangci-lint
+mise install          # Go, gopls, golangci-lint and vhs
 mise run install      # build and install folio
 mise run test
 mise run lint
 mise run git:hooks    # run the tests and the linter before every push
+vhs demo.tape         # record the demo at the top of this file again, which needs ffmpeg
 ```
 
 See `CLAUDE.md` for how the project is built and why it is the way it is, and `TODO.md` for what is

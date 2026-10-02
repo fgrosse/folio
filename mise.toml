@@ -7,6 +7,10 @@ go = "1.27.0"
 # Linters and formatters
 golangci-lint = "latest"
 
+# Records the demo GIF from demo.tape (ttyd is the terminal vhs records, ffmpeg must be on the system)
+vhs = "latest"
+ttyd = "latest"
+
 [tasks.install]
 description = "Build folio and install it into Go's bin directory"
 run = "go install ./..."
