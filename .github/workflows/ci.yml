@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - 'main'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit_tests:
+    name: "Unit tests"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # Installs the Go version pinned in mise.toml.
+      - name: Set up tools
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          install_args: "go"
+
+      - name: Restore Go modules cache
+        uses: actions/cache@v6
+        with:
+          path: ~/go/pkg/mod
+          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-${{ runner.os }}-
+
+      - name: Test
+        run: mise run test
+
+  lint:
+    name: "Lint"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # Installs the Go and golangci-lint versions pinned in mise.toml. Go is
+      # required here as well because golangci-lint shells out to "go list" to
+      # load the packages it analyses.
+      - name: Set up tools
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          install_args: "go golangci-lint"
+
+      - name: Restore Go modules cache
+        uses: actions/cache@v6
+        with:
+          path: ~/go/pkg/mod
+          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            go-${{ runner.os }}-
+
+      - name: Go mod tidy
+        run: go mod tidy -diff
+
+      - name: golangci-lint
+        run: mise run lint
