@@ -8,10 +8,12 @@ import (
 	"path/filepath"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"github.com/fgrosse/folio/internal/portfolio"
+	"github.com/fgrosse/folio/internal/tui"
 	"github.com/fgrosse/folio/internal/yahoo"
 )
 
@@ -42,12 +44,28 @@ func New() *Folio {
 
 	cmd.PersistentPreRunE = cmd.openStore
 	cmd.PersistentPostRunE = cmd.closeStore
+	cmd.RunE = cmd.runTUI
 
 	cmd.AddCommand(cmd.LotCmd())
 	cmd.AddCommand(cmd.GrantCmd())
 	cmd.AddCommand(cmd.StatusCmd())
 
 	return cmd
+}
+
+// runTUI launches the interactive views. It hangs off the root command rather than a "folio tui"
+// subcommand so that a bare "folio" opens the TUI, while status and friends stay plain scriptable
+// verbs - a status bar widget shells out to those and must never be handed a full-screen program.
+// Because it runs as the root command's own RunE, it still gets the store that PersistentPreRunE
+// opened, and PersistentPostRunE closes it once the program exits.
+func (cmd *Folio) runTUI(c *cobra.Command, _ []string) error {
+	model := tui.New(cmd.store, tui.DefaultStyle())
+	program := tea.NewProgram(model, tea.WithContext(c.Context()))
+	if _, err := program.Run(); err != nil {
+		return fmt.Errorf("run TUI: %w", err)
+	}
+
+	return nil
 }
 
 // Println writes to the command's stdout. It exists because cobra.Command's own Print/Println/

@@ -39,6 +39,15 @@ type KeyCapturer interface {
 	CapturesKeys() bool
 }
 
+// New returns the app that the folio TUI runs: the views over store, all rendered in style. It is the
+// one place that says which views the app has and in what order, so that the tab bar and the digit
+// keys that select them follow from a single list.
+func New(store Store, style Style) *AppModel {
+	return NewAppModel(style,
+		NewHoldingsModel(store, style),
+	)
+}
+
 // NewAppModel returns an AppModel over views, showing the first of them. It panics if there is not
 // at least one view, which is a programming error rather than anything a user can cause.
 func NewAppModel(style Style, views ...ViewModel) *AppModel {
