@@ -41,6 +41,7 @@ func New() *Folio {
 	cmd.PersistentPostRunE = cmd.closeStore
 
 	cmd.AddCommand(cmd.LotCmd())
+	cmd.AddCommand(cmd.GrantCmd())
 
 	return cmd
 }
