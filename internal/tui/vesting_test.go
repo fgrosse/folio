@@ -177,6 +177,66 @@ func TestVestingModel_ReleaseRefused(t *testing.T) {
 	assert.False(t, empty.CapturesKeys(), "there should be no dialog without a vest")
 }
 
+// newTestingRelease returns a Vesting view with the release dialog open on the first vest of the
+// test portfolio, ten shares that were due five days ago.
+func newTestingRelease(t *testing.T) *VestingModel {
+	t.Helper()
+
+	m, _ := newTestingVesting(t)
+	m.now = func() time.Time { return time.Date(2026, time.November, 20, 9, 0, 0, 0, time.UTC) }
+	m.Update(keyPressed("r"))
+	require.True(t, m.CapturesKeys())
+
+	return m
+}
+
+// TestVestingModel_ReleaseDialogRefuses covers what the release dialog does not take for an answer:
+// something that is no number, no shares at all, and more shares than vested. It stays open and says
+// why under its field, rather than leaving it to the store to refuse once the dialog is gone.
+func TestVestingModel_ReleaseDialogRefuses(t *testing.T) {
+	tests := map[string]struct {
+		typed string
+		error string
+	}{
+		"not a number":     {typed: "six", error: `"six" is not a number of shares`},
+		"no shares":        {typed: "0", error: "a vest must release more than 0 shares"},
+		"more than vested": {typed: "12", error: "the vest has 10 shares, not 12"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			m := newTestingRelease(t)
+			m.input.SetValue(tt.typed)
+
+			_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+			assert.Nil(t, cmd)
+			assert.True(t, m.CapturesKeys(), "the dialog should stay open")
+			assert.Contains(t, ansi.Strip(m.View().Content), tt.error)
+		})
+	}
+}
+
+// TestVestingModel_CancelRelease covers leaving the release dialog with esc: it closes, the keys are
+// the view's again, and nothing is released.
+func TestVestingModel_CancelRelease(t *testing.T) {
+	m := newTestingRelease(t)
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	_, cmd = m.Update(runCmd(t, cmd))
+
+	assert.Nil(t, cmd)
+	assert.False(t, m.CapturesKeys(), "the dialog should be closed")
+}
+
+// TestVestingModel_RenderReleaseDialog is the frame while a vest is being released: the dialog in
+// front of the table with the vest's shares in its field, and its keys in the help lines.
+func TestVestingModel_RenderReleaseDialog(t *testing.T) {
+	m := newTestingRelease(t)
+
+	golden.RequireEqual(t, ansi.Strip(m.View().Content))
+}
+
 // TestVestRow covers how one vest reads as a row of the Vesting table: its day and the grant it
 // belongs to, how many shares vest and what they are worth at the latest price, right-aligned like
 // the numbers of the Holdings table, and how far off the day is.

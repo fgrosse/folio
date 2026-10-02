@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/shopspring/decimal"
 
 	"github.com/fgrosse/folio/internal/portfolio"
@@ -112,6 +114,14 @@ func (m *VestingModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ReleaseVestMsg:
 		m.input = nil
 		return m, m.releaseVestCmd(msg.id, msg.shares)
+	case InputCanceledMsg:
+		m.input = nil
+		return m, nil
+	}
+
+	if m.input != nil {
+		// Whatever the view does not handle may be the dialog's, such as its cursor's blink ticks.
+		return m, m.input.Update(msg)
 	}
 
 	return m, nil
@@ -155,10 +165,16 @@ func (m *VestingModel) openRelease() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// The dialog refuses what the store would, so that it can say so while it is still open.
 	submit := func(value string) (tea.Msg, error) {
 		shares, err := decimal.NewFromString(value)
-		if err != nil {
+		switch {
+		case err != nil:
 			return nil, fmt.Errorf("%q is not a number of shares", value)
+		case !shares.IsPositive():
+			return nil, errors.New("a vest must release more than 0 shares")
+		case shares.GreaterThan(vest.Shares):
+			return nil, fmt.Errorf("the vest has %s shares, not %s", vest.Shares, shares)
 		}
 
 		return ReleaseVestMsg{id: vest.ID, shares: shares}, nil
@@ -203,7 +219,17 @@ func (m *VestingModel) View() tea.View {
 		m.style.Table.Render(m.table.View()) + "\n" +
 		m.helpView()
 
-	return tea.NewView(trimTrailingSpace(frame) + "\n")
+	layers := []*lipgloss.Layer{lipgloss.NewLayer(frame)}
+	if m.input != nil {
+		// The dialog floats centered in front of the table, as those of the Holdings view do.
+		dialog := m.input.Layer()
+		dialog.X((lipgloss.Width(frame) - dialog.Width()) / 2)
+		dialog.Y((lipgloss.Height(frame) - dialog.Height()) / 2)
+		layers = append(layers, dialog)
+	}
+
+	c := lipgloss.NewCompositor(layers...)
+	return tea.NewView(trimTrailingSpace(c.Render()) + "\n")
 }
 
 // headerView renders the two lines above the table: what is due and what is to come on the left,
@@ -215,12 +241,21 @@ func (m *VestingModel) headerView() string {
 }
 
 // helpView renders the keys worth knowing in two lines, as every view does: getting around on the
-// first, and what can be done to the table on the second, which is nothing yet and stays empty so
-// that the frame has the height of the other views'.
+// first, and what can be done to the selected vest on the second. While the dialog is open it shows
+// the dialog's keys instead, on one line, and leaves the second empty so that the frame keeps its
+// height.
 func (m *VestingModel) helpView() string {
 	help, nav := m.table.Help, m.table.KeyMap
 
-	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n"
+	if m.input != nil {
+		return help.ShortHelpView([]key.Binding{
+			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "release")),
+			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
+		}) + "\n"
+	}
+
+	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n" +
+		help.ShortHelpView([]key.Binding{m.keys.Release})
 }
 
 // A grantVest is a vest together with what the Vesting view needs to know of the grant it belongs
