@@ -230,6 +230,22 @@ func TestHoldingsModel_ShowsErrors(t *testing.T) {
 	assert.NotContains(t, ansi.Strip(m.View().Content), "database is locked")
 }
 
+// TestHoldingsModel_ShowsQuoteErrors covers a portfolio that was loaded although its quotes could
+// not be refreshed, such as without a network: the view shows the portfolio, at the prices the store
+// still had, and says why they are not fresh where the prices otherwise are.
+func TestHoldingsModel_ShowsQuoteErrors(t *testing.T) {
+	m, _ := newTestingHoldings(t)
+	p := testPortfolio()
+	p.Lots = p.Lots[:1]
+
+	m.Update(PortfolioLoadedMsg{portfolio: p, quotesErr: errors.New("no quote of PANW")})
+
+	frame := ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "no quote of PANW")
+	assert.Contains(t, frame, "6 PANW")
+	assert.Len(t, m.table.Rows(), 1, "the portfolio that came with the error should be on display")
+}
+
 // TestPositions covers the line the Holdings view puts above its table: how many shares of each
 // stock the lots add up to, which no single row says. The stocks are in alphabetical order, and an
 // account without lots says so.

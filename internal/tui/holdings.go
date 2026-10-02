@@ -49,7 +49,7 @@ type HoldingsModel struct {
 	width     int              // width of the table, which the header line is spread across
 	now       func() time.Time // the clock that says what today is
 	portfolio Portfolio        // the account as it was last loaded
-	err       error            // why the last load failed, nil unless it did
+	err       error            // why the last load failed or had no fresh quotes, nil unless it did
 	input     *InputDialog     // the dialog that adds a lot, nil unless it is open
 	confirm   *ConfirmDialog   // the dialog asking whether to delete a lot, nil unless it is open
 }
@@ -154,6 +154,8 @@ func (m *HoldingsModel) handlePortfolioLoaded(msg PortfolioLoadedMsg) (tea.Model
 		return m, nil
 	}
 
+	// Quotes that could not be refreshed do not make the portfolio any less the latest there is.
+	m.err = msg.quotesErr
 	m.portfolio = msg.portfolio
 	m.updateRows()
 
@@ -289,7 +291,8 @@ func (m *HoldingsModel) headerView() string {
 	account := portfolio.NewAccount(p.Lots, p.Grants, p.Quotes)
 	status := m.style.Hint.Render(quoteStatus(portfolio.Symbols(p.Lots, p.Grants), p.Quotes))
 	if m.err != nil {
-		status = m.style.Error.Render(m.err.Error())
+		// Errors of several quotes come joined by newlines, and the header has one line for them.
+		status = m.style.Error.Render(strings.ReplaceAll(m.err.Error(), "\n", " · "))
 	}
 
 	return accountHeader(positions(p.Lots), status, account, m.width-cellPadding, m.style)
