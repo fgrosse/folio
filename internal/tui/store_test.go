@@ -60,6 +60,22 @@ func (m *MockStore) DeleteGrant(id int) error {
 	return m.Called(id).Error(0)
 }
 
+func (m *MockStore) Sales() ([]portfolio.Sale, error) {
+	result := m.Called()
+	if x := result.Get(0); x != nil {
+		return x.([]portfolio.Sale), result.Error(1)
+	}
+	return nil, result.Error(1)
+}
+
+func (m *MockStore) SaveSale(sale portfolio.Sale) error {
+	return m.Called(sale).Error(0)
+}
+
+func (m *MockStore) DeleteSale(id int) error {
+	return m.Called(id).Error(0)
+}
+
 // testPortfolio is the account most tests of the views look at: PANW stock in two lots of 8.5
 // shares in all, and a grant with one vest released into the first of them and two still to come.
 func testPortfolio() Portfolio {
@@ -91,4 +107,5 @@ func (m *MockStore) returns(p Portfolio) {
 	m.On("Lots").Return(p.Lots, nil)
 	m.On("Grants").Return(p.Grants, nil)
 	m.On("Quotes").Return(p.Quotes, nil)
+	m.On("Sales").Return(p.Sales, nil)
 }

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -37,6 +38,11 @@ const (
 	holdingsColumnsWidth = dayColumnWidth + symbolColumnWidth + sharesColumnWidth + 2*priceColumnWidth + valueColumnWidth +
 		6*cellPadding
 
+	// saleFormWidth is how many columns a field of the form that records a sale occupies, and
+	// saleNoteLines how many lines its notes have room for before they scroll.
+	saleFormWidth = 44
+	saleNoteLines = 3
+
 	// lotPlaceholder shows how a lot is written, in the empty field of the dialog that takes one.
 	lotPlaceholder = "12.5 PANW 2026-03-15 @380.12"
 
@@ -62,10 +68,17 @@ type HoldingsModel struct {
 	refreshing      bool           // a RefreshQuotesMsg is on its way, so no load needs to schedule another
 	input           *InputDialog   // the dialog that adds or edits a lot, nil unless it is open
 	confirm         *ConfirmDialog // the dialog asking whether to delete a lot, nil unless it is open
+	form            *FormDialog    // the form that records a sale, nil unless it is open
 }
 
 // RefreshQuotesMsg asks the view to fetch the quotes again, which it does every refreshInterval.
 type RefreshQuotesMsg struct{}
+
+// SaveSaleMsg reports that the form was confirmed with a sale of shares of a lot. The sale has not
+// been saved yet; that is up to whoever receives it.
+type SaveSaleMsg struct {
+	sale portfolio.Sale
+}
 
 // DeleteLotMsg reports that the user confirmed deleting the lot with the given ID.
 type DeleteLotMsg struct {
@@ -122,7 +135,7 @@ func (m *HoldingsModel) Title() string {
 // CapturesKeys implements KeyCapturer: while a dialog is open the keyboard belongs to it, down to
 // the keys that would otherwise switch views. The digits are the shares of the lot being typed.
 func (m *HoldingsModel) CapturesKeys() bool {
-	return m.input != nil || m.confirm != nil
+	return m.input != nil || m.confirm != nil || m.form != nil
 }
 
 // Init implements tea.Model by loading the portfolio as the store has it, which is on screen at
@@ -164,11 +177,20 @@ func (m *HoldingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ConfirmCanceledMsg:
 		m.confirm = nil
 		return m, nil
+	case SaveSaleMsg:
+		m.form = nil
+		return m, m.saveSaleCmd(msg.sale)
+	case FormCanceledMsg:
+		m.form = nil
+		return m, nil
 	}
 
+	// Whatever the view does not handle may be an open dialog's, such as its cursor's blink ticks.
 	if m.input != nil {
-		// Whatever the view does not handle may be the dialog's, such as its cursor's blink ticks.
 		return m, m.input.Update(msg)
+	}
+	if m.form != nil {
+		return m, m.form.Update(msg)
 	}
 
 	return m, nil
@@ -211,12 +233,17 @@ func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 	if m.confirm != nil {
 		return m, m.confirm.HandleKeyPress(msg)
 	}
+	if m.form != nil {
+		return m, m.form.HandleKeyPress(msg)
+	}
 
 	switch {
 	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
 	case key.Matches(msg, m.keys.Delete):
 		return m.askToDelete()
+	case key.Matches(msg, m.keys.Sell):
+		return m.sellSelected()
 	case key.Matches(msg, m.keys.Add):
 		m.input = NewInputDialog("New lot", lotPlaceholder, m.newLot, dialogWidth, m.style)
 		return m, m.input.Init()
@@ -257,6 +284,87 @@ func (m *HoldingsModel) editSelected() (tea.Model, tea.Cmd) {
 	m.input.SetValue(lot.String())
 
 	return m, m.input.Init()
+}
+
+// sellSelected opens the form that records a sale of shares of the selected lot: how many, at what
+// price, on which day, which is today unless it is changed, and notes. Without a lot to select,
+// there is nothing to sell.
+func (m *HoldingsModel) sellSelected() (tea.Model, tea.Cmd) {
+	i := m.table.Cursor()
+	if i < 0 || i >= len(m.lots) {
+		return m, nil
+	}
+
+	lot := m.lots[i]
+	today := portfolio.DayOf(m.now())
+
+	// The placeholders are what is most likely typed: all that is left, at the price of today.
+	price := "410.20"
+	if quote, ok := m.portfolio.Quotes[lot.Symbol]; ok {
+		price = quote.Price.StringFixed(2)
+	}
+
+	title := fmt.Sprintf("Sell %s of %s", lot.Symbol, lot.Acquired.Format(time.DateOnly))
+	fields := []FormField{
+		{Label: "Shares", Placeholder: lot.Remaining().String()},
+		{Label: "Price", Placeholder: price},
+		{Label: "Date", Value: today.Format(time.DateOnly)},
+		{Label: "Notes", Lines: saleNoteLines},
+	}
+	m.form = NewFormDialog(title, fields, newSale(lot, today), saleFormWidth, m.style)
+
+	return m, m.form.Init()
+}
+
+// newSale returns what the sale form of lot does with its values, which are the shares, the price,
+// the day and the notes, in that order. It turns them into the message that asks for the sale to be
+// saved, on today's day if the form has none. The form refuses what the store would, so that it can
+// say so while it is still open.
+func newSale(lot portfolio.Lot, today time.Time) func(values []string) (tea.Msg, error) {
+	return func(values []string) (tea.Msg, error) {
+		shares, err := decimal.NewFromString(values[0])
+		switch {
+		case err != nil:
+			return nil, fmt.Errorf("%q is not a number of shares", values[0])
+		case !shares.IsPositive():
+			return nil, errors.New("a sale must have more than 0 shares")
+		case shares.GreaterThan(lot.Remaining()):
+			return nil, fmt.Errorf("the lot has %s shares left, not %s", lot.Remaining(), shares)
+		}
+
+		// A price is a price with or without the dollar sign in front of it.
+		price, err := decimal.NewFromString(strings.TrimPrefix(values[1], "$"))
+		if err != nil || !price.IsPositive() {
+			return nil, fmt.Errorf("%q is not a price such as 410.20", values[1])
+		}
+
+		date := today
+		if values[2] != "" {
+			date, err = portfolio.ParseDay(values[2])
+			if err != nil {
+				return nil, err
+			}
+		}
+		if date.Before(lot.Acquired) {
+			return nil, fmt.Errorf("the lot was only acquired on %s", lot.Acquired.Format(time.DateOnly))
+		}
+
+		sale := portfolio.Sale{LotID: lot.ID, Date: date, Shares: shares, Price: price, Note: values[3]}
+		return SaveSaleMsg{sale: sale}, nil
+	}
+}
+
+// saveSaleCmd returns a command that saves sale and loads the portfolio again, in which the lot of
+// the sale has that many shares fewer.
+func (m *HoldingsModel) saveSaleCmd(sale portfolio.Sale) tea.Cmd {
+	store := m.store
+	return func() tea.Msg {
+		if err := store.SaveSale(sale); err != nil {
+			return PortfolioLoadedMsg{err: err}
+		}
+
+		return loadPortfolioCmd(store)()
+	}
 }
 
 // askToDelete opens a dialog asking whether to delete the selected lot, which sends a DeleteLotMsg
@@ -357,6 +465,8 @@ func (m *HoldingsModel) dialogLayer() *lipgloss.Layer {
 		return m.input.Layer()
 	case m.confirm != nil:
 		return m.confirm.Layer()
+	case m.form != nil:
+		return m.form.Layer()
 	default:
 		return nil
 	}
@@ -397,10 +507,6 @@ func (m *HoldingsModel) helpView() string {
 // order, such as "3 AAPL · 10 PANW". It is what the Holdings view says above its table, where the
 // rows only have the shares of one lot each.
 func positions(lots []portfolio.Lot) string {
-	if len(lots) == 0 {
-		return "No shares held"
-	}
-
 	shares := make(map[string]decimal.Decimal)
 	for _, lot := range lots {
 		if left := lot.Remaining(); left.IsPositive() {

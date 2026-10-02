@@ -22,14 +22,18 @@ type Store interface {
 	ReleaseVest(id int, shares, cost decimal.Decimal) error
 	SaveGrant(grant portfolio.Grant) error
 	DeleteGrant(id int) error
+	Sales() ([]portfolio.Sale, error)
+	SaveSale(sale portfolio.Sale) error
+	DeleteSale(id int) error
 }
 
 // A Portfolio is everything the views show, as the store had it at one moment: the lots and grants
-// of the account and the quotes they are valued at. Every view holds the latest one it was sent.
+// of the account, the quotes they are valued at, and the sales that took shares out of the lots. Every view holds the latest one it was sent.
 type Portfolio struct {
 	Lots   []portfolio.Lot
 	Grants []portfolio.Grant
 	Quotes map[string]portfolio.Quote
+	Sales  []portfolio.Sale
 }
 
 // PortfolioLoadedMsg reports the result of loading the portfolio from the Store. Every view
@@ -96,5 +100,10 @@ func loadPortfolio(store Store) (Portfolio, error) {
 		return Portfolio{}, err
 	}
 
-	return Portfolio{Lots: lots, Grants: grants, Quotes: quotes}, nil
+	sales, err := store.Sales()
+	if err != nil {
+		return Portfolio{}, err
+	}
+
+	return Portfolio{Lots: lots, Grants: grants, Quotes: quotes, Sales: sales}, nil
 }

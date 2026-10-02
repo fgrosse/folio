@@ -368,6 +368,48 @@ func TestHoldingsModel_ShowsWhatIsLeft(t *testing.T) {
 	assert.Contains(t, ansi.Strip(m.View().Content), "  4 PANW ")
 }
 
+// TestHoldingsModel_SellShares covers recording a sale: s on a lot opens a form that asks how many
+// of its shares were sold, at what price and on which day, which is today unless it is changed, and
+// has room for notes of several lines. Confirming it has the store save the sale against that lot,
+// and the view loads the portfolio again, in which the lot has that many shares fewer.
+func TestHoldingsModel_SellShares(t *testing.T) {
+	m, store := newTestingHoldings(t)
+
+	m.Update(keyPressed("s"))
+	require.True(t, m.CapturesKeys(), "the form should take the keyboard")
+	assert.Equal(t, []string{"", "", "2026-10-02", ""}, m.form.Values())
+
+	press := func(keys ...tea.Msg) {
+		for _, key := range keys {
+			m.Update(key)
+		}
+	}
+	press(keysPressed("4")...)
+	press(tabKey)
+	press(keysPressed("410.2")...)
+	press(tabKey, tabKey)
+	press(keysPressed("for the kitchen")...)
+	press(enterKey)
+	press(keysPressed("in two orders")...)
+	_, cmd := m.Update(saveKey)
+
+	sale := portfolio.Sale{
+		LotID:  1,
+		Date:   day("2026-10-02"),
+		Shares: dec("4"),
+		Price:  dec("410.2"),
+		Note:   "for the kitchen\nin two orders",
+	}
+	msg := runCmd(t, cmd)
+	require.Equal(t, SaveSaleMsg{sale: sale}, msg)
+
+	store.On("SaveSale", sale).Return(nil)
+	_, cmd = m.Update(msg)
+	assert.False(t, m.CapturesKeys(), "the form should be closed")
+	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
+	store.AssertExpectations(t)
+}
+
 // TestPositions covers the line the Holdings view puts above its table: how many shares of each
 // stock the lots add up to, which no single row says. The stocks are in alphabetical order, and an
 // account without lots says so.
