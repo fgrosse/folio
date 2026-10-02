@@ -59,7 +59,7 @@ func New() *Folio {
 // Because it runs as the root command's own RunE, it still gets the store that PersistentPreRunE
 // opened, and PersistentPostRunE closes it once the program exits.
 func (cmd *Folio) runTUI(c *cobra.Command, _ []string) error {
-	model := tui.New(cmd.store, tui.DefaultStyle())
+	model := tui.New(cmd.store, cmd.quoter, tui.DefaultStyle())
 	program := tea.NewProgram(model, tea.WithContext(c.Context()))
 	if _, err := program.Run(); err != nil {
 		return fmt.Errorf("run TUI: %w", err)

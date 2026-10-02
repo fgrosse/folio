@@ -43,6 +43,7 @@ const (
 // latest price of its stock.
 type HoldingsModel struct {
 	store     Store
+	quoter    portfolio.Quoter // where fresh prices come from
 	style     Style
 	keys      keyMap
 	table     table.Model
@@ -65,13 +66,15 @@ type SaveLotMsg struct {
 	lot portfolio.Lot
 }
 
-// NewHoldingsModel returns the Holdings view over store, rendered in style.
-func NewHoldingsModel(store Store, style Style) *HoldingsModel {
+// NewHoldingsModel returns the Holdings view over store, rendered in style. It is the view that
+// keeps the prices fresh, with the quotes it fetches from quoter.
+func NewHoldingsModel(store Store, quoter portfolio.Quoter, style Style) *HoldingsModel {
 	m := &HoldingsModel{
-		store: store,
-		style: style,
-		keys:  defaultKeyMap(),
-		now:   time.Now,
+		store:  store,
+		quoter: quoter,
+		style:  style,
+		keys:   defaultKeyMap(),
+		now:    time.Now,
 		// A real width arrives with the first WindowSizeMsg, which Bubble Tea sends at startup.
 		// Until then the narrowest supported layout is the safest thing to hold.
 		width: minTableWidth,
@@ -105,9 +108,14 @@ func (m *HoldingsModel) CapturesKeys() bool {
 	return m.input != nil || m.confirm != nil
 }
 
-// Init implements tea.Model by loading the portfolio.
+// Init implements tea.Model by loading the portfolio as the store has it, which is on screen at
+// once, and fetching fresh quotes for it at the same time, which takes as long as the network does
+// and loads the portfolio a second time.
 func (m *HoldingsModel) Init() tea.Cmd {
-	return loadPortfolioCmd(m.store)
+	return tea.Batch(
+		loadPortfolioCmd(m.store),
+		refreshQuotesCmd(m.store, m.quoter),
+	)
 }
 
 // Update implements tea.Model by fitting the table to the window, filling it with the lots of the

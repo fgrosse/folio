@@ -17,18 +17,39 @@ import (
 	"github.com/fgrosse/folio/internal/portfolio"
 )
 
-// TestHoldingsModel_LoadsPortfolio covers what the Holdings view starts from: once started, it asks
-// the store for the account and shows a row for every lot, valued at the quote the store has of its
-// stock.
+// TestHoldingsModel_Init covers how the Holdings view starts: with two commands at once. One loads
+// the portfolio as the store has it, which is on screen at once, and the other fetches fresh quotes
+// and loads it again, which takes as long as the network does.
+func TestHoldingsModel_Init(t *testing.T) {
+	store := new(MockStore)
+	store.returns(testPortfolio())
+	store.On("SaveQuote", portfolio.Quote{Symbol: "PANW", Price: dec("401.5"), Currency: "USD"}).Return(nil)
+	m := NewHoldingsModel(store, quotes{"PANW": "401.5"}, DefaultStyle())
+
+	batch, ok := runCmd(t, m.Init()).(tea.BatchMsg)
+	require.True(t, ok, "Init should batch its commands")
+	require.Len(t, batch, 2)
+
+	for _, cmd := range batch {
+		msg, ok := runCmd(t, cmd).(PortfolioLoadedMsg)
+		require.True(t, ok)
+		assert.NoError(t, msg.err)
+		assert.NoError(t, msg.quotesErr)
+	}
+	store.AssertNumberOfCalls(t, "SaveQuote", 1)
+}
+
+// TestHoldingsModel_LoadsPortfolio covers what the Holdings view shows once the portfolio is loaded:
+// a row for every lot, valued at the quote the store has of its stock.
 func TestHoldingsModel_LoadsPortfolio(t *testing.T) {
 	p := testPortfolio()
 	store := new(MockStore)
 	store.returns(p)
 
-	m := NewHoldingsModel(store, DefaultStyle())
+	m := NewHoldingsModel(store, quotes{}, DefaultStyle())
 	assert.Equal(t, "Holdings", m.Title())
 
-	m.Update(runCmd(t, m.Init()))
+	m.Update(runCmd(t, loadPortfolioCmd(store)))
 
 	rows := m.table.Rows()
 	require.Len(t, rows, 2)
@@ -42,9 +63,9 @@ func TestHoldingsModel_LoadsPortfolio(t *testing.T) {
 func TestHoldingsModel_Keys(t *testing.T) {
 	store := new(MockStore)
 	store.returns(testPortfolio())
-	m := NewHoldingsModel(store, DefaultStyle())
+	m := NewHoldingsModel(store, quotes{}, DefaultStyle())
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
-	m.Update(runCmd(t, m.Init()))
+	m.Update(runCmd(t, loadPortfolioCmd(store)))
 
 	_, cmd := m.Update(keyPressed("q"))
 	assert.Equal(t, tea.QuitMsg{}, runCmd(t, cmd))
@@ -64,12 +85,12 @@ func TestHoldingsModel_Keys(t *testing.T) {
 func TestHoldingsModel_Render(t *testing.T) {
 	store := new(MockStore)
 	store.returns(testPortfolio())
-	m := NewHoldingsModel(store, DefaultStyle())
+	m := NewHoldingsModel(store, quotes{}, DefaultStyle())
 
 	// The window size matters as much as the portfolio: without it the table has no width, and a
 	// golden taken without one would lock in an empty frame.
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
-	m.Update(runCmd(t, m.Init()))
+	m.Update(runCmd(t, loadPortfolioCmd(store)))
 
 	// Stripped of styling: the frame is mostly escape sequences otherwise, and this golden is here
 	// for the layout.
@@ -84,10 +105,10 @@ func newTestingHoldings(t *testing.T) (*HoldingsModel, *MockStore) {
 	store := new(MockStore)
 	store.returns(testPortfolio())
 
-	m := NewHoldingsModel(store, DefaultStyle())
+	m := NewHoldingsModel(store, quotes{}, DefaultStyle())
 	m.now = func() time.Time { return time.Date(2026, time.October, 2, 14, 30, 0, 0, time.UTC) }
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
-	m.Update(runCmd(t, m.Init()))
+	m.Update(runCmd(t, loadPortfolioCmd(store)))
 
 	return m, store
 }
@@ -192,9 +213,9 @@ func TestHoldingsModel_CancelDelete(t *testing.T) {
 func TestHoldingsModel_DeleteWithNothingSelected(t *testing.T) {
 	store := new(MockStore)
 	store.returns(Portfolio{})
-	m := NewHoldingsModel(store, DefaultStyle())
+	m := NewHoldingsModel(store, quotes{}, DefaultStyle())
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
-	m.Update(runCmd(t, m.Init()))
+	m.Update(runCmd(t, loadPortfolioCmd(store)))
 
 	_, cmd := m.Update(keyPressed("d"))
 

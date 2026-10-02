@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/fgrosse/folio/internal/portfolio"
 )
 
 // tabGap separates one tab from the next in the tab bar. It is the same bullet the help lines
@@ -39,12 +41,12 @@ type KeyCapturer interface {
 	CapturesKeys() bool
 }
 
-// New returns the app that the folio TUI runs: the views over store, all rendered in style. It is the
-// one place that says which views the app has and in what order, so that the tab bar and the digit
-// keys that select them follow from a single list.
-func New(store Store, style Style) *AppModel {
+// New returns the app that the folio TUI runs: the views over store, valued at the quotes of quoter
+// and all rendered in style. It is the one place that says which views the app has and in what
+// order, so that the tab bar and the digit keys that select them follow from a single list.
+func New(store Store, quoter portfolio.Quoter, style Style) *AppModel {
 	return NewAppModel(style,
-		NewHoldingsModel(store, style),
+		NewHoldingsModel(store, quoter, style),
 	)
 }
 
