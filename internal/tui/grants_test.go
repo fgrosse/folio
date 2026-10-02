@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/exp/golden"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/fgrosse/folio/internal/portfolio"
@@ -79,6 +80,64 @@ func TestGrantsModel_ShowsErrors(t *testing.T) {
 	m.Update(PortfolioLoadedMsg{portfolio: testPortfolio(), quotesErr: errors.New("no quote of PANW")})
 
 	assert.Contains(t, ansi.Strip(m.View().Content), "no quote of PANW")
+}
+
+// TestGrantsModel_AddGrant covers recording a grant in the view: a opens a dialog that takes the
+// keyboard, the spec typed into it becomes a grant on enter, and the view saves that grant and loads
+// the portfolio again to show it. A spec that does not parse keeps the dialog open, with the reason
+// under its field.
+func TestGrantsModel_AddGrant(t *testing.T) {
+	m, store := newTestingGrants(t)
+	assert.False(t, m.CapturesKeys())
+
+	m.Update(keyPressed("a"))
+	require.True(t, m.CapturesKeys(), "the dialog should take the keyboard")
+
+	for _, key := range keysPressed("RSU: 400 PANW quarterly 10/20/30 from 2026-02-20") {
+		m.Update(key)
+	}
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	assert.Nil(t, cmd)
+	assert.Contains(t, ansi.Strip(m.View().Content), "the percentages 10/20/30 add up to 60, not 100")
+
+	const spec = "RSU: 400 PANW quarterly 10/20/30/40 from 2026-02-20"
+	m.input.SetValue(spec)
+	_, cmd = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	grant, err := portfolio.NewGrant(spec)
+	require.NoError(t, err)
+	msg := runCmd(t, cmd)
+	require.Equal(t, SaveGrantMsg{grant: grant}, msg)
+
+	store.On("SaveGrant", grant).Return(nil)
+	_, cmd = m.Update(msg)
+	assert.False(t, m.CapturesKeys(), "the dialog should be closed")
+	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
+	store.AssertExpectations(t)
+}
+
+// TestGrantsModel_CancelAddGrant covers leaving the dialog with esc: it closes, the keys are the
+// view's again, and nothing is saved.
+func TestGrantsModel_CancelAddGrant(t *testing.T) {
+	m, store := newTestingGrants(t)
+	m.Update(keyPressed("a"))
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	_, cmd = m.Update(runCmd(t, cmd))
+
+	assert.Nil(t, cmd)
+	assert.False(t, m.CapturesKeys(), "the dialog should be closed")
+	store.AssertNotCalled(t, "SaveGrant", mock.Anything)
+}
+
+// TestGrantsModel_RenderGrantDialog is the frame while a grant is being typed: the dialog in front
+// of the table, wide enough for a spec, and its keys in the help lines.
+func TestGrantsModel_RenderGrantDialog(t *testing.T) {
+	m, _ := newTestingGrants(t)
+	m.Update(keyPressed("a"))
+	m.input.SetValue("RSU: 400 PANW quarterly 10/20/30/40 from 2026-02-20")
+
+	golden.RequireEqual(t, ansi.Strip(m.View().Content))
 }
 
 // TestGrantRow covers how one grant reads as a row of the Grants table: its name and stock, how many

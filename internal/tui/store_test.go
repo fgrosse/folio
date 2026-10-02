@@ -52,6 +52,10 @@ func (m *MockStore) ReleaseVest(id int, shares decimal.Decimal) error {
 	return m.Called(id, shares).Error(0)
 }
 
+func (m *MockStore) SaveGrant(grant portfolio.Grant) error {
+	return m.Called(grant).Error(0)
+}
+
 // testPortfolio is the account most tests of the views look at: PANW stock in two lots of 8.5
 // shares in all, and a grant with one vest released into the first of them and two still to come.
 func testPortfolio() Portfolio {

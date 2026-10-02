@@ -6,6 +6,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/shopspring/decimal"
 
 	"github.com/fgrosse/folio/internal/portfolio"
@@ -25,9 +26,16 @@ type GrantsModel struct {
 	style     Style
 	keys      keyMap
 	table     table.Model
-	width     int       // width of the table, which the header line is spread across
-	portfolio Portfolio // the account as it was last loaded
-	err       error     // why the last load failed or had no fresh quotes, nil unless it did
+	width     int          // width of the table, which the header line is spread across
+	portfolio Portfolio    // the account as it was last loaded
+	err       error        // why the last load failed or had no fresh quotes, nil unless it did
+	input     *InputDialog // the dialog that adds a grant, nil unless it is open
+}
+
+// SaveGrantMsg reports that the dialog was confirmed with the spec of a grant. The grant has not
+// been saved yet; that is up to whoever receives it.
+type SaveGrantMsg struct {
+	grant portfolio.Grant
 }
 
 // NewGrantsModel returns the Grants view over store, rendered in style.
@@ -62,6 +70,12 @@ func (m *GrantsModel) Title() string {
 	return "Grants"
 }
 
+// CapturesKeys implements KeyCapturer: while the dialog is open the keyboard belongs to it, down to
+// the keys that would otherwise switch views. The digits are part of the spec being typed.
+func (m *GrantsModel) CapturesKeys() bool {
+	return m.input != nil
+}
+
 // Init implements tea.Model by loading the portfolio.
 func (m *GrantsModel) Init() tea.Cmd {
 	return loadPortfolioCmd(m.store)
@@ -88,21 +102,64 @@ func (m *GrantsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateRows()
 		}
 		return m, nil
+	case SaveGrantMsg:
+		m.input = nil
+		return m, m.saveGrantCmd(msg.grant)
+	case InputCanceledMsg:
+		m.input = nil
+		return m, nil
+	}
+
+	if m.input != nil {
+		// Whatever the view does not handle may be the dialog's, such as its cursor's blink ticks.
+		return m, m.input.Update(msg)
 	}
 
 	return m, nil
 }
 
-// handleKeyPress quits on the quit keys and hands every other key to the table, which moves the
-// selection.
+// handleKeyPress quits on the quit keys, opens the dialog for a new grant on the add key, and hands
+// every other key to the table, which moves the selection. While the dialog is open, every key is
+// the dialog's.
 func (m *GrantsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if key.Matches(msg, m.keys.Quit) {
+	if m.input != nil {
+		return m, m.input.HandleKeyPress(msg)
+	}
+
+	switch {
+	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
+	case key.Matches(msg, m.keys.Add):
+		m.input = NewInputDialog("New grant", "Name: 10 PANW monthly x24 from 2026-01-15", newGrant, dialogWidth, m.style)
+		return m, m.input.Init()
 	}
 
 	var cmd tea.Cmd
 	m.table, cmd = m.table.Update(msg)
 	return m, cmd
+}
+
+// newGrant turns the spec typed into the dialog into the message that asks for the grant to be
+// saved.
+func newGrant(spec string) (tea.Msg, error) {
+	grant, err := portfolio.NewGrant(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	return SaveGrantMsg{grant: grant}, nil
+}
+
+// saveGrantCmd returns a command that saves grant and loads the portfolio again, which then has it.
+func (m *GrantsModel) saveGrantCmd(grant portfolio.Grant) tea.Cmd {
+	store := m.store
+	return func() tea.Msg {
+		if err := store.SaveGrant(grant); err != nil {
+			return PortfolioLoadedMsg{err: err}
+		}
+
+		return loadPortfolioCmd(store)()
+	}
 }
 
 // updateRows fills the table with a row for every grant of the portfolio.
@@ -122,7 +179,17 @@ func (m *GrantsModel) View() tea.View {
 		m.style.Table.Render(m.table.View()) + "\n" +
 		m.helpView()
 
-	return tea.NewView(trimTrailingSpace(frame) + "\n")
+	layers := []*lipgloss.Layer{lipgloss.NewLayer(frame)}
+	if m.input != nil {
+		// The dialog floats centered in front of the table, as those of the other views do.
+		dialog := m.input.Layer()
+		dialog.X((lipgloss.Width(frame) - dialog.Width()) / 2)
+		dialog.Y((lipgloss.Height(frame) - dialog.Height()) / 2)
+		layers = append(layers, dialog)
+	}
+
+	c := lipgloss.NewCompositor(layers...)
+	return tea.NewView(trimTrailingSpace(c.Render()) + "\n")
 }
 
 // headerView renders the two lines above the table: how many grants there are on the left, with the
@@ -137,12 +204,21 @@ func (m *GrantsModel) headerView() string {
 }
 
 // helpView renders the keys worth knowing in two lines, as every view does: getting around on the
-// first, and what can be done to the table on the second, which is nothing yet and stays empty so
-// that the frame has the height of the other views'.
+// first, and what can be done to the table on the second. While the dialog is open it shows the
+// dialog's keys instead, on one line, and leaves the second empty so that the frame keeps its
+// height.
 func (m *GrantsModel) helpView() string {
 	help, nav := m.table.Help, m.table.KeyMap
 
-	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n"
+	if m.input != nil {
+		return help.ShortHelpView([]key.Binding{
+			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "save")),
+			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
+		}) + "\n"
+	}
+
+	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n" +
+		help.ShortHelpView([]key.Binding{m.keys.Add})
 }
 
 // grantRow renders a grant as a row of the Grants table: how many of its shares are still to come,
