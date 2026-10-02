@@ -54,16 +54,13 @@ has to be on your `PATH`.
 folio demo
 ```
 
-This makes up an account - two grants, the shares released from them, a sale, some stock that was
-bought - writes it to a database of its own, and prints the command that opens it:
+This opens folio on a made-up account: two grants, the shares released from them, a vest that is
+waiting to be released, a sale, and some stock that was bought. `1`-`4` or `tab` switch between the
+views, and `q` quits.
 
-```bash
-folio --db ~/.local/share/folio/demo.db
-```
-
-`1`-`4` or `tab` switch between the views, and `q` quits. Nothing you do there touches a real
-account. The demo is different every time; `folio demo --seed 7` makes the same one again, and a
-path after `demo` puts the database somewhere else.
+Nothing you do there touches a real account, and the demo account is gone again when you quit. It
+is a different one every time; `folio demo --seed 7` makes the same one again. To keep a demo
+account and come back to it, give it a path: `folio demo ~/folio-demo.db`.
 
 ### 3. Enter your own account
 
@@ -139,7 +136,7 @@ prices it saw, so it works without a network too.
 
 ```bash
 folio                                              # open the TUI
-folio demo                                         # make up an account to try folio with
+folio demo                                         # open the TUI on a made-up account
 folio lot 12.5 PANW 2026-03-15 @380.12
 folio grant "Payout: 10 PANW monthly x24 from 2026-01-15"
 folio grant --vests schedule.txt "Payout: PANW"    # the vests listed, "<YYYY-MM-DD> <shares>" a line

@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +25,10 @@ type Folio struct {
 	store  *portfolio.SQLiteStore
 	quoter portfolio.Quoter // where the prices come from
 	now    func() time.Time
+
+	// openTUI runs the interactive views over a store until the user quits. It is the real TUI
+	// unless a test puts something in its place, since the real one needs a terminal.
+	openTUI func(ctx context.Context, store tui.Store) error
 }
 
 // New builds the folio root command with all its subcommands attached.
@@ -37,6 +42,7 @@ func New() *Folio {
 		now:    time.Now,
 	}
 	cmd.SilenceErrors = true
+	cmd.openTUI = cmd.runProgram
 
 	flags := cmd.PersistentFlags()
 	flags.String("db", defaultDBPath(), "path to the folio SQLite database")
@@ -44,7 +50,9 @@ func New() *Folio {
 
 	cmd.PersistentPreRunE = cmd.openStore
 	cmd.PersistentPostRunE = cmd.closeStore
-	cmd.RunE = cmd.runTUI
+	cmd.RunE = func(c *cobra.Command, _ []string) error {
+		return cmd.openTUI(c.Context(), cmd.store)
+	}
 
 	cmd.AddCommand(cmd.LotCmd())
 	cmd.AddCommand(cmd.GrantCmd())
@@ -55,14 +63,15 @@ func New() *Folio {
 	return cmd
 }
 
-// runTUI launches the interactive views. It hangs off the root command rather than a "folio tui"
-// subcommand so that a bare "folio" opens the TUI, while status and friends stay plain scriptable
-// verbs - a status bar widget shells out to those and must never be handed a full-screen program.
-// Because it runs as the root command's own RunE, it still gets the store that PersistentPreRunE
-// opened, and PersistentPostRunE closes it once the program exits.
-func (cmd *Folio) runTUI(c *cobra.Command, _ []string) error {
-	model := tui.New(cmd.store, cmd.quoter, tui.DefaultStyle())
-	program := tea.NewProgram(model, tea.WithContext(c.Context()))
+// runProgram launches the interactive views over store and returns once the user quits. It hangs
+// off the root command rather than a "folio tui" subcommand so that a bare "folio" opens the TUI,
+// while status and friends stay plain scriptable verbs - a status bar widget shells out to those
+// and must never be handed a full-screen program. Run as the root command's own action, it gets the
+// store that PersistentPreRunE opened, and PersistentPostRunE closes it once the program exits. The
+// demo runs it over a store of its own.
+func (cmd *Folio) runProgram(ctx context.Context, store tui.Store) error {
+	model := tui.New(store, cmd.quoter, tui.DefaultStyle())
+	program := tea.NewProgram(model, tea.WithContext(ctx))
 	if _, err := program.Run(); err != nil {
 		return fmt.Errorf("run TUI: %w", err)
 	}

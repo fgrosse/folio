@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -18,26 +19,31 @@ import (
 func (cmd *Folio) DemoCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "demo [path]",
-		Short: "Make up an account to try folio with",
+		Short: "Try folio with a made-up account",
 		Long: `
-Write a made-up account to a database of its own, to try folio with before entering a real
-one: two grants of a company's stock, the shares released from them, one vest that is
-waiting to be released, a sale and some stock that was bought.
+Open folio on a made-up account, to try it with before entering a real one: two grants of a
+company's stock, the shares released from them, one vest that is waiting to be released, a
+sale and some stock that was bought.
 
 The account is different every time, unless --seed names one. The stock in it is real, so
 folio shows it at today's prices once it has fetched them, and at made-up ones until then.
 
-The database goes to the given path, or next to the one of the real account as demo.db.
-Neither is the database of the real account, which the demo leaves alone. A file that is
-already there is kept, and the demo refuses to run.
+The account is gone again when folio is closed. To keep it, give a path: the demo writes its
+database there and leaves it, and opens what is there the next time it is given that path,
+with whatever was changed since.
+
+The real account is never part of this. The demo has a database of its own, and does not
+open the one that folio otherwise uses.
 `,
 		Example: `
-  # Make up an account, and open it
+  # Look around
   folio demo
-  folio --db ~/.local/share/folio/demo.db
 
   # The same account every time
-  folio demo --seed 7 /tmp/demo.db`,
+  folio demo --seed 7
+
+  # A demo account to come back to
+  folio demo ~/folio-demo.db`,
 		Args: cobra.MaximumNArgs(1),
 		// The verbs share the database of the real account, which the root command opens and
 		// creates before any of them runs. The demo has a database of its own, and must not
@@ -45,11 +51,6 @@ already there is kept, and the demo refuses to run.
 		PersistentPreRunE:  func(*cobra.Command, []string) error { return nil },
 		PersistentPostRunE: func(*cobra.Command, []string) error { return nil },
 		RunE: func(c *cobra.Command, args []string) error {
-			path := defaultDemoPath()
-			if len(args) == 1 {
-				path = args[0]
-			}
-
 			seed, err := c.Flags().GetUint64("seed")
 			if err != nil {
 				return err
@@ -60,12 +61,20 @@ already there is kept, and the demo refuses to run.
 
 			c.SilenceUsage = true // past this point, errors are runtime problems, not misuse
 
-			if err := cmd.writeDemo(path, seed); err != nil {
-				return err
+			if len(args) == 1 {
+				return cmd.runDemo(c.Context(), args[0], seed)
 			}
 
-			cmd.Printf("Wrote a demo account to %s\n\nOpen it with:\n  folio --db %s\n", path, path)
-			return nil
+			// Without a path to keep it at, the account lives in a directory that goes when the
+			// TUI does. A directory rather than a file, since SQLite keeps files of its own next
+			// to the database.
+			dir, err := os.MkdirTemp("", "folio-demo-")
+			if err != nil {
+				return fmt.Errorf("create database directory: %w", err)
+			}
+			defer func() { _ = os.RemoveAll(dir) }()
+
+			return cmd.runDemo(c.Context(), filepath.Join(dir, "demo.db"), seed)
 		},
 	}
 
@@ -74,18 +83,12 @@ already there is kept, and the demo refuses to run.
 	return c
 }
 
-// defaultDemoPath places the demo database next to the one of the real account, under a name that
-// says what it is.
-func defaultDemoPath() string {
-	return filepath.Join(filepath.Dir(defaultDBPath()), "demo.db")
-}
-
-// writeDemo makes a new database at path and fills it with the demo account that seed names. A file
-// that is at path already is left as it is.
-func (cmd *Folio) writeDemo(path string, seed uint64) (err error) {
-	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("%s exists already: remove it, or give the demo another path", path)
-	}
+// runDemo opens the TUI on the demo database at path and returns once the user quits. If there is
+// no database at path yet it makes one first, with the demo account that seed names. One that is
+// there is opened as it is.
+func (cmd *Folio) runDemo(ctx context.Context, path string, seed uint64) (err error) {
+	_, statErr := os.Stat(path)
+	isNew := errors.Is(statErr, fs.ErrNotExist)
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return fmt.Errorf("create database directory: %w", err)
@@ -101,10 +104,12 @@ func (cmd *Folio) writeDemo(path string, seed uint64) (err error) {
 		return fmt.Errorf("migrate database: %w", err)
 	}
 
-	rng := rand.New(rand.NewPCG(seed, seed))
-	if err := demo.Fill(store, rng, portfolio.DayOf(cmd.now())); err != nil {
-		return fmt.Errorf("make up account: %w", err)
+	if isNew {
+		rng := rand.New(rand.NewPCG(seed, seed))
+		if err := demo.Fill(store, rng, portfolio.DayOf(cmd.now())); err != nil {
+			return fmt.Errorf("make up account: %w", err)
+		}
 	}
 
-	return nil
+	return cmd.openTUI(ctx, store)
 }

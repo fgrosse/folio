@@ -11,7 +11,8 @@ and what the two add up to. It is built for stock that comes from work as RSUs, 
 vesting schedule. Stock bought privately fits the same model and matters less for now.
 
 Its user is whoever runs it, about their own account: one person, one database on their machine,
-no server and no login. `folio demo` makes up an account for anyone who wants to look around first.
+no server and no login. `folio demo` opens it on a made-up account for anyone who wants to look
+around first.
 
 It is the sibling of [`tick`](https://github.com/fgrosse/tick), a time tracker, and mirrors its
 structure, its code style and its look: the same packages, the same frame around a table, the same
@@ -102,7 +103,10 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
   in `TODO.md`.
 - **The demo is the one verb with a database of its own.** Every other verb shares the database of
   the real account, which the root command opens and creates before the verb runs. `folio demo`
-  overrides those hooks and writes elsewhere, so that trying folio leaves the real account alone.
+  overrides those hooks, makes up an account in a temporary database, opens the TUI on it and
+  removes it afterwards, so that trying folio leaves nothing behind and the real account alone.
+- **The TUI is started through a hook**, `Folio.openTUI`, which a test replaces: the real one needs
+  a terminal, and the tests of a verb that opens it look at the store it was handed instead.
 
 ## How we build this
 
