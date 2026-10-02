@@ -1,6 +1,7 @@
 package portfolio
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -284,4 +285,21 @@ func TestStore_DeleteGrant(t *testing.T) {
 	assert.Len(t, lots, 1, "the lot of the released vest should stay")
 
 	assert.EqualError(t, s.DeleteGrant(7), "no grant with ID 7")
+}
+
+// TestNewStore_SharesTheDatabase covers what lets the TUI and a status bar widget use one database
+// file at the same time: the store opens it in WAL mode, where a reader does not block a writer, and
+// waits a few seconds for a lock rather than failing at once with "database is locked".
+func TestNewStore_SharesTheDatabase(t *testing.T) {
+	s, err := NewStore(filepath.Join(t.TempDir(), "folio.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s.Close() })
+
+	var mode string
+	require.NoError(t, s.db.Get(&mode, `PRAGMA journal_mode`))
+	assert.Equal(t, "wal", mode)
+
+	var timeout int
+	require.NoError(t, s.db.Get(&timeout, `PRAGMA busy_timeout`))
+	assert.Equal(t, 5000, timeout)
 }

@@ -34,7 +34,8 @@ type SQLiteStore struct {
 // ready to be used against a fresh or outdated database. The returned store keeps a single
 // connection open: SQLite only supports one writer at a time, so pooling multiple connections
 // buys nothing and would, for an in-memory dsn, silently scatter data across unrelated empty
-// databases instead of one shared one.
+// databases instead of one shared one. That one connection is also why the settings NewStore makes
+// on it hold for as long as the store is open.
 func NewStore(dsn string) (*SQLiteStore, error) {
 	db, err := sqlx.Open("sqlite3", dsn)
 	if err != nil {
@@ -43,7 +44,10 @@ func NewStore(dsn string) (*SQLiteStore, error) {
 
 	db.SetMaxOpenConns(1)
 
-	if err := db.Ping(); err != nil {
+	// The TUI and a status bar widget open the same file at the same time, and both save quotes. In
+	// WAL mode a reader does not block a writer, and with a busy timeout a writer waits for the
+	// other to finish instead of failing at once with "database is locked".
+	if _, err := db.Exec(`PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000`); err != nil {
 		return nil, err
 	}
 
