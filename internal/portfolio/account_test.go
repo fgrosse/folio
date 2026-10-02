@@ -22,5 +22,38 @@ func TestNewAccount_Current(t *testing.T) {
 	account := NewAccount(lots, nil, quotes)
 
 	// 8.5 × 396.25 + 3 × 330.32
-	assert.Equal(t, shares("4359.09"), account.Current)
+	assert.Equal(t, "4359.09", account.Current.String())
+}
+
+// TestNewAccount_Potential covers the second value: what the shares still to come are worth, which
+// is every vest that has not been released at the latest price of its grant's stock. That takes in
+// a vest whose day has passed but which is still pending release, as the bank counts it. A released
+// vest is a lot by now, and counts there.
+func TestNewAccount_Potential(t *testing.T) {
+	grants := []Grant{
+		{
+			Name:   "Payout",
+			Symbol: "PANW",
+			Vests: []Vest{
+				{Date: day("2026-01-15"), Shares: shares("10"), Released: true},
+				{Date: day("2026-02-15"), Shares: shares("10")},
+				{Date: day("2026-03-15"), Shares: shares("10")},
+			},
+		},
+		{
+			Name:   "Old plan",
+			Symbol: "AAPL",
+			Vests:  []Vest{{Date: day("2027-01-01"), Shares: shares("1.5")}},
+		},
+	}
+	quotes := map[string]Quote{
+		"PANW": {Symbol: "PANW", Price: shares("396.25")},
+		"AAPL": {Symbol: "AAPL", Price: shares("330.32")},
+	}
+
+	account := NewAccount(nil, grants, quotes)
+
+	// 20 × 396.25 + 1.5 × 330.32
+	assert.Equal(t, "8420.48", account.Potential.String())
+	assert.Equal(t, "0", account.Current.String())
 }
