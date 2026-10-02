@@ -20,3 +20,18 @@ func TestRepeating(t *testing.T) {
 	}
 	assert.Equal(t, expected, vests)
 }
+
+// TestRepeating_EndOfMonth covers a schedule that starts on a day not every month has. Its vests
+// fall on the last day of a shorter month rather than spilling into the next one, and go back to
+// the day of the first vest wherever a month has it.
+func TestRepeating_EndOfMonth(t *testing.T) {
+	vests := Repeating(day("2027-12-31"), 1, 4, shares("10"))
+
+	expected := []Vest{
+		{Date: day("2027-12-31"), Shares: shares("10")},
+		{Date: day("2028-01-31"), Shares: shares("10")},
+		{Date: day("2028-02-29"), Shares: shares("10")},
+		{Date: day("2028-03-31"), Shares: shares("10")},
+	}
+	assert.Equal(t, expected, vests)
+}
