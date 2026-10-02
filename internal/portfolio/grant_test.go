@@ -89,7 +89,8 @@ func TestGraded_WholeShares(t *testing.T) {
 
 // TestNewGrant covers the syntax a grant is typed in, which names it and describes its schedule:
 // "<name>: <shares> <symbol> <interval> x<count> from <YYYY-MM-DD>" for the same number of shares
-// every month, quarter or year, that many times.
+// every month, quarter or year, that many times, and with "<percent>/<percent>/..." in place of the
+// count for a grant that vests a different share of its shares in each year.
 func TestNewGrant(t *testing.T) {
 	tests := map[string]struct {
 		spec     string
@@ -117,6 +118,16 @@ func TestNewGrant(t *testing.T) {
 				Name:   "Retention",
 				Symbol: "PANW",
 				Vests:  Repeating(day("2027-01-01"), 12, 4, shares("100")),
+			},
+		},
+		// The other form gives the shares of the whole grant and the percentage of them that vests
+		// in each year, which is spread over the vests of that year.
+		"a percentage of all shares each year": {
+			spec: "RSU 2025: 400 PANW quarterly 10/20/30/40 from 2026-02-20",
+			expected: Grant{
+				Name:   "RSU 2025",
+				Symbol: "PANW",
+				Vests:  Graded(day("2026-02-20"), 3, shares("400"), []int{10, 20, 30, 40}),
 			},
 		},
 	}

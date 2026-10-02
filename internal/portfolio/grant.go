@@ -37,13 +37,21 @@ var intervals = map[string]int{
 	"yearly":    12,
 }
 
-// NewGrant parses a grant from its spec, which names it and describes its schedule:
+// NewGrant parses a grant from its spec, which names it and describes its schedule in one of two
+// forms:
 //
 //	<name>: <shares> <symbol> <interval> x<count> from <YYYY-MM-DD>
+//	<name>: <shares> <symbol> <interval> <percent>/<percent>/... from <YYYY-MM-DD>
 //
-// The interval is monthly, quarterly or yearly. The grant vests that many shares count times, the
-// first time on the day after "from": "Payout: 10 PANW monthly x24 from 2026-01-15" is 10 shares
-// on the 15th of each of 24 months.
+// The interval is monthly, quarterly or yearly, and the day after "from" is that of the first vest.
+//
+// With a count, the grant vests that many shares count times: "Payout: 10 PANW monthly x24 from
+// 2026-01-15" is 10 shares on the 15th of each of 24 months. See Repeating.
+//
+// With percentages, the shares are those of the whole grant, and each percentage is the part of
+// them that vests in one year, spread evenly over the vests of that year: "RSU: 400 PANW quarterly
+// 10/20/30/40 from 2026-02-20" vests 40 shares over the four quarters of the first year and 160
+// over those of the fourth. See Graded.
 func NewGrant(spec string) (Grant, error) {
 	name, schedule, _ := strings.Cut(spec, ":")
 	fields := strings.Fields(schedule)
@@ -53,21 +61,39 @@ func NewGrant(spec string) (Grant, error) {
 		return Grant{}, err
 	}
 
-	count, err := strconv.Atoi(strings.TrimPrefix(fields[3], "x"))
-	if err != nil {
-		return Grant{}, err
-	}
-
 	first, err := ParseDay(fields[5])
 	if err != nil {
 		return Grant{}, err
 	}
 
-	return Grant{
+	grant := Grant{
 		Name:   strings.TrimSpace(name),
 		Symbol: strings.ToUpper(fields[1]),
-		Vests:  Repeating(first, intervals[strings.ToLower(fields[2])], count, shares),
-	}, nil
+	}
+
+	months := intervals[strings.ToLower(fields[2])]
+	if count, ok := strings.CutPrefix(fields[3], "x"); ok {
+		n, err := strconv.Atoi(count)
+		if err != nil {
+			return Grant{}, err
+		}
+
+		grant.Vests = Repeating(first, months, n, shares)
+		return grant, nil
+	}
+
+	var percentPerYear []int
+	for percent := range strings.SplitSeq(fields[3], "/") {
+		n, err := strconv.Atoi(percent)
+		if err != nil {
+			return Grant{}, err
+		}
+
+		percentPerYear = append(percentPerYear, n)
+	}
+
+	grant.Vests = Graded(first, months, shares, percentPerYear)
+	return grant, nil
 }
 
 // Repeating returns the schedule of a grant that vests the same number of shares count times, the
