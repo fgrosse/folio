@@ -303,3 +303,19 @@ func TestNewStore_SharesTheDatabase(t *testing.T) {
 	require.NoError(t, s.db.Get(&timeout, `PRAGMA busy_timeout`))
 	assert.Equal(t, 5000, timeout)
 }
+
+// TestStore_SaveLotWithCost covers the cost of a lot in the database: a lot saved with one comes
+// back with it, and a lot saved without comes back without, rather than with a cost of nothing.
+func TestStore_SaveLotWithCost(t *testing.T) {
+	s := NewTestingStore()
+	require.NoError(t, s.SaveLot(Lot{Symbol: "PANW", Shares: shares("6"), Acquired: day("2026-01-15"), Cost: shares("380.12")}))
+	require.NoError(t, s.SaveLot(Lot{Symbol: "PANW", Shares: shares("2.5"), Acquired: day("2026-02-15")}))
+
+	lots, err := s.Lots()
+	require.NoError(t, err)
+	expected := []Lot{
+		{ID: 1, Symbol: "PANW", Shares: shares("6"), Acquired: day("2026-01-15"), Cost: shares("380.12")},
+		{ID: 2, Symbol: "PANW", Shares: shares("2.5"), Acquired: day("2026-02-15")},
+	}
+	assert.Equal(t, expected, lots)
+}

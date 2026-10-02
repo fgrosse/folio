@@ -71,15 +71,16 @@ func (s *SQLiteStore) Migrate() error {
 // were saved. A lot that a vest was released into comes with the name of the vest's grant.
 func (s *SQLiteStore) Lots() ([]Lot, error) {
 	var rows []struct {
-		ID       int             `db:"id"`
-		Symbol   string          `db:"symbol"`
-		Shares   decimal.Decimal `db:"shares"`
-		Acquired time.Time       `db:"acquired_on"`
-		Grant    string          `db:"grant_name"`
+		ID       int                 `db:"id"`
+		Symbol   string              `db:"symbol"`
+		Shares   decimal.Decimal     `db:"shares"`
+		Acquired time.Time           `db:"acquired_on"`
+		Cost     decimal.NullDecimal `db:"cost"`
+		Grant    string              `db:"grant_name"`
 	}
 
 	err := s.db.Select(&rows, `
-		SELECT lots.id, lots.symbol, lots.shares, lots.acquired_on, coalesce(grants.name, '') AS grant_name
+		SELECT lots.id, lots.symbol, lots.shares, lots.acquired_on, lots.cost, coalesce(grants.name, '') AS grant_name
 		FROM lots
 			LEFT JOIN vests ON vests.id = lots.vest_id
 			LEFT JOIN grants ON grants.id = vests.grant_id
@@ -90,7 +91,7 @@ func (s *SQLiteStore) Lots() ([]Lot, error) {
 
 	lots := make([]Lot, len(rows))
 	for i, r := range rows {
-		lots[i] = Lot{ID: r.ID, Symbol: r.Symbol, Shares: r.Shares, Acquired: r.Acquired, Grant: r.Grant}
+		lots[i] = Lot{ID: r.ID, Symbol: r.Symbol, Shares: r.Shares, Acquired: r.Acquired, Cost: r.Cost.Decimal, Grant: r.Grant}
 	}
 
 	return lots, nil
@@ -103,11 +104,17 @@ func (s *SQLiteStore) SaveLot(lot Lot) error {
 	}
 
 	_, err := s.db.Exec(
-		`INSERT INTO lots (symbol, shares, acquired_on) VALUES (?, ?, ?)`,
-		lot.Symbol, lot.Shares, lot.Acquired.Format(time.DateOnly),
+		`INSERT INTO lots (symbol, shares, acquired_on, cost) VALUES (?, ?, ?, ?)`,
+		lot.Symbol, lot.Shares, lot.Acquired.Format(time.DateOnly), nullable(lot.Cost),
 	)
 
 	return err
+}
+
+// nullable is cost the way the database holds it: NULL for a cost of zero, which stands for a cost
+// that is not known, so that it does not read as shares that were free.
+func nullable(cost decimal.Decimal) decimal.NullDecimal {
+	return decimal.NullDecimal{Decimal: cost, Valid: !cost.IsZero()}
 }
 
 // DeleteLot deletes the lot with the given ID, which has to exist.
