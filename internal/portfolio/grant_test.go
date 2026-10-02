@@ -215,3 +215,25 @@ func TestNewGrant_Errors(t *testing.T) {
 		})
 	}
 }
+
+// TestParseVests covers a schedule that no rule lays out, such as one with a first vest ten times
+// the size of the others, or one whose vests the plan rounds its own way: it is written down vest
+// by vest, a day and a number of shares to a line, the way the plan's own table lists them. Empty
+// lines and comments are skipped, and the vests come back in the order of their days.
+func TestParseVests(t *testing.T) {
+	vests, err := ParseVests(`
+		# the first vest makes up for the months before the grant
+		2025-08-01 480
+		2025-10-01 41
+
+		2025-09-01 42   # as planned
+	`)
+	require.NoError(t, err)
+
+	expected := []Vest{
+		{Date: day("2025-08-01"), Shares: shares("480")},
+		{Date: day("2025-09-01"), Shares: shares("42")},
+		{Date: day("2025-10-01"), Shares: shares("41")},
+	}
+	assert.Equal(t, expected, vests)
+}

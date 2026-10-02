@@ -3,6 +3,7 @@ package portfolio
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -134,6 +135,36 @@ func newSchedule(field string, first time.Time, months int, shares decimal.Decim
 	}
 
 	return Graded(first, months, shares, percentPerYear), nil
+}
+
+// ParseVests parses a schedule that is written down vest by vest, for a grant that no rule lays out:
+// one vest to a line, as "<YYYY-MM-DD> <shares>". Empty lines are skipped, and so is whatever
+// follows a "#". The vests come back in the order of their days.
+func ParseVests(text string) ([]Vest, error) {
+	var vests []Vest
+	for line := range strings.Lines(text) {
+		line, _, _ = strings.Cut(line, "#")
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+
+		date, err := ParseDay(fields[0])
+		if err != nil {
+			return nil, err
+		}
+
+		shares, err := decimal.NewFromString(fields[1])
+		if err != nil {
+			return nil, err
+		}
+
+		vests = append(vests, Vest{Date: date, Shares: shares})
+	}
+
+	slices.SortStableFunc(vests, func(a, b Vest) int { return a.Date.Compare(b.Date) })
+
+	return vests, nil
 }
 
 // Repeating returns the schedule of a grant that vests the same number of shares count times, the
