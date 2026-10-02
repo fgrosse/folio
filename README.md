@@ -8,8 +8,6 @@
 
 ---
 
-![A tour of folio on a demo account: selling shares, releasing a vest, and the grants and sales views](demo.gif)
-
 `folio` answers what the web site of the bank or broker behind your equity plan answers, without
 logging in there:
 
@@ -21,9 +19,18 @@ It is built for stock that comes from work as RSUs, on a vesting schedule, and a
 those shares cost and what you sold them for. Everything is in a SQLite database on your machine,
 and prices come from Yahoo Finance.
 
-## Getting started
+## Example
 
-### 1. Install
+A tour of `folio` on a made-up account: selling shares of a lot, releasing a vest that is due, and
+the views of the grants and the sales.
+
+![A tour of folio on a demo account: selling shares, releasing a vest, and the grants and sales views](demo.gif)
+
+`folio demo` opens an account like this one for you to look around in.
+
+## Usage
+
+### Install
 
 The quickest way is [mise](https://mise.jdx.dev/), which fetches the Go version folio is built with
 and runs the build:
@@ -49,7 +56,7 @@ go install github.com/fgrosse/folio/cmd/folio@latest
 
 Or build nothing at all: the [releases page][releases] has binaries for Linux, macOS and Windows.
 
-### 2. Look around with a demo account
+### Look around with a demo account
 
 ```bash
 folio demo
@@ -63,7 +70,7 @@ Nothing you do there touches a real account, and the demo account is gone again 
 is a different one every time; `folio demo --seed 7` makes the same one again. To keep a demo
 account and come back to it, give it a path: `folio demo ~/folio-demo.db`.
 
-### 3. Enter your own account
+### Enter your own account
 
 A bare `folio` opens your own account, which is empty to begin with. The fastest way to fill it is
 the command line, from what your plan's web site shows:
@@ -86,7 +93,7 @@ Then open `folio` and carry on there. The sections below explain what each of th
 Every command explains itself: `folio grant --help`, `folio release --help` and the others describe
 the syntax they take, with examples, and list their options.
 
-## How it works
+### How it works
 
 An account is made of four things:
 
@@ -101,7 +108,7 @@ An account is made of four things:
   was acquired with, and what is left of it is that less its sales. What the sales brought in is
   the money that was realized, which is stated apart from the three values.
 
-## The TUI
+### The TUI
 
 A bare `folio` opens it. The header of every view has the three values, and the prices they were
 worked out from. `1`-`4` or `tab` switch views, `q` quits.
@@ -136,7 +143,7 @@ line, `ctrl+s` does. The note of a sale shows above the Sales table while the sa
 Prices are fetched when the TUI starts and every five minutes after that. It opens with the last
 prices it saw, so it works without a network too.
 
-## The command line
+### The command line
 
 ```bash
 folio                                              # open the TUI
@@ -158,7 +165,7 @@ Every verb has a `--help` that says more.
 {"current":"3368.13","potential":"7925.00","total":"11293.13","realized":"0.00","realized_gain":"0.00","currency":"USD","unpriced":[]}
 ```
 
-## Where your data is
+### Where your data is
 
 The database of your account is `$XDG_DATA_HOME/folio/folio.db`, which is
 `~/.local/share/folio/folio.db` unless you set it otherwise. `--db` or the `FOLIO_DB` environment
@@ -166,6 +173,23 @@ variable name another one. It is a single SQLite file: copy it to back it up.
 
 Nothing leaves your machine except the symbols of your stock, which are sent to Yahoo Finance to
 ask for their prices.
+
+## Limitations
+
+- Quotes come from Yahoo Finance's chart endpoint, which needs no API key but is not an official
+  API: it may change or turn requests away without notice, and prices can be delayed.
+- Everything is in USD for now.
+- A grant and a sale cannot be edited yet, only deleted and entered again.
+- folio keeps records and adds them up; it is no tax or investment advice.
+
+## Built With
+
+* [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Bubbles](https://github.com/charmbracelet/bubbles) and [Lip Gloss](https://github.com/charmbracelet/lipgloss) - The TUI framework, its components and its styling
+* [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) - SQLite without cgo
+* [cobra](https://github.com/spf13/cobra) - The commands of the command line
+* [decimal](https://github.com/shopspring/decimal) - Shares and prices that add up exactly
+* [testify](https://github.com/stretchr/testify) - A simple unit test library
+* _[and more][built-with]_
 
 ## Development
 
@@ -175,17 +199,11 @@ mise run install      # build and install folio
 mise run test
 mise run lint
 mise run git:hooks    # run the tests and the linter before every push
-vhs demo.tape         # record the demo at the top of this file again, which needs ffmpeg
+vhs demo.tape         # record the demo of this file again, which needs ffmpeg
 ```
 
 See `CLAUDE.md` for how the project is built and why it is the way it is, and `TODO.md` for what is
 planned.
-
-## Notes
-
-Quotes come from Yahoo Finance's chart endpoint, which needs no API key but is not an official API:
-it may change or turn requests away without notice, and prices can be delayed. Everything is in USD
-for now. folio keeps records and adds them up; it is no tax or investment advice.
 
 ## Contributing
 
@@ -199,8 +217,15 @@ All significant (e.g. breaking) changes are documented in the [CHANGELOG.md](CHA
 A list of all available versions can be found at the [releases page][releases], and
 [RELEASING.md](RELEASING.md) describes how a release is cut.
 
+## Authors
+
+- **Friedrich Große** - *Initial work* - [fgrosse](https://github.com/fgrosse)
+- See also the list of [contributors][contributors] who participated in this project.
+
 ## License
 
-folio is licensed under the BSD 3-Clause License. See [LICENSE](LICENSE) for the full text.
+This project is licensed under the BSD-3-Clause License - see the [LICENSE](LICENSE) file for details.
 
 [releases]: https://github.com/fgrosse/folio/releases
+[contributors]: https://github.com/fgrosse/folio/contributors
+[built-with]: go.mod
