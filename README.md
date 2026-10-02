@@ -157,6 +157,7 @@ folio grant --vests schedule.txt "Payout: PANW"    # the vests listed, "<YYYY-MM
 folio release 2026-01-15 6 @380.12                 # 6 shares arrived, worth $380.12 each that day
 folio status
 folio status --json
+folio version                                      # which release this is
 ```
 
 Every verb has a `--help` that says more.

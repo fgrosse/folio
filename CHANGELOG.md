@@ -14,5 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A TUI with a view each for holdings, vesting, grants and sales
 - The `lot`, `grant`, `release` and `status` commands, and `status --json` for a status bar widget
 - `folio demo` to try folio with a made-up account
+- `folio version` to print the version of folio
 
 [Unreleased]: https://github.com/fgrosse/folio/commits/main
