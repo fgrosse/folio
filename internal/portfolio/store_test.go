@@ -194,3 +194,34 @@ func TestStore_SaveGrant(t *testing.T) {
 	}
 	assert.Equal(t, expected, grants)
 }
+
+// TestStore_ReleaseVest covers the step that turns potential into current: releasing a vest makes a
+// lot of its grant's stock, acquired on the day of the vest, and marks the vest as released. The
+// lot holds the shares that actually arrived, which are fewer than vested whenever some were
+// withheld for tax.
+func TestStore_ReleaseVest(t *testing.T) {
+	s := NewTestingStore()
+	require.NoError(t, s.SaveGrant(Grant{
+		Name:   "Payout",
+		Symbol: "PANW",
+		Vests:  Repeating(day("2026-01-15"), 1, 2, shares("10")),
+	}))
+
+	require.NoError(t, s.ReleaseVest(1, shares("6")))
+
+	lots, err := s.Lots()
+	require.NoError(t, err)
+	expectedLots := []Lot{
+		{ID: 1, Symbol: "PANW", Shares: shares("6"), Acquired: day("2026-01-15")},
+	}
+	assert.Equal(t, expectedLots, lots)
+
+	grants, err := s.Grants()
+	require.NoError(t, err)
+	expectedVests := []Vest{
+		{ID: 1, Date: day("2026-01-15"), Shares: shares("10"), Released: true},
+		{ID: 2, Date: day("2026-02-15"), Shares: shares("10")},
+	}
+	require.Len(t, grants, 1)
+	assert.Equal(t, expectedVests, grants[0].Vests)
+}

@@ -123,20 +123,27 @@ func (s *SQLiteStore) Grants() ([]Grant, error) {
 		return nil, err
 	}
 
+	// A vest is released once a lot points at it.
 	var rows []struct {
-		ID      int             `db:"id"`
-		GrantID int             `db:"grant_id"`
-		Date    time.Time       `db:"vests_on"`
-		Shares  decimal.Decimal `db:"shares"`
+		ID       int             `db:"id"`
+		GrantID  int             `db:"grant_id"`
+		Date     time.Time       `db:"vests_on"`
+		Shares   decimal.Decimal `db:"shares"`
+		Released bool            `db:"released"`
 	}
-	if err := s.db.Select(&rows, `SELECT id, grant_id, vests_on, shares FROM vests ORDER BY vests_on, id`); err != nil {
+	err := s.db.Select(&rows, `
+		SELECT id, grant_id, vests_on, shares, EXISTS (SELECT 1 FROM lots WHERE lots.vest_id = vests.id) AS released
+		FROM vests
+		ORDER BY vests_on, id`)
+	if err != nil {
 		return nil, err
 	}
 
 	for i := range grants {
 		for _, r := range rows {
 			if r.GrantID == grants[i].ID {
-				grants[i].Vests = append(grants[i].Vests, Vest{ID: r.ID, Date: r.Date, Shares: r.Shares})
+				vest := Vest{ID: r.ID, Date: r.Date, Shares: r.Shares, Released: r.Released}
+				grants[i].Vests = append(grants[i].Vests, vest)
 			}
 		}
 	}
@@ -173,6 +180,21 @@ func (s *SQLiteStore) SaveGrant(grant Grant) error {
 	}
 
 	return tx.Commit()
+}
+
+// ReleaseVest turns the vest with the given ID into a lot of its grant's stock, acquired on the day
+// of the vest and holding shares, the number that actually arrived. The vest counts as released from
+// then on, for as long as that lot exists.
+func (s *SQLiteStore) ReleaseVest(id int, shares decimal.Decimal) error {
+	_, err := s.db.Exec(`
+		INSERT INTO lots (symbol, shares, acquired_on, vest_id)
+		SELECT grants.symbol, ?, vests.vests_on, vests.id
+		FROM vests JOIN grants ON grants.id = vests.grant_id
+		WHERE vests.id = ?`,
+		shares, id,
+	)
+
+	return err
 }
 
 // Quotes returns the latest quote the database has of every symbol it has one of, by symbol. The

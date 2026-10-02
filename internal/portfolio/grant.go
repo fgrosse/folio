@@ -29,6 +29,9 @@ type Vest struct {
 	// Date is the calendar day the shares vest, at midnight UTC.
 	Date   time.Time
 	Shares decimal.Decimal
+
+	// Released says that the vest has been turned into a lot, which is what counts from then on.
+	Released bool
 }
 
 // grantSyntax is how a grant is written, for the errors that say so. It shows the simpler of the
