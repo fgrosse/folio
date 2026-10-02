@@ -89,12 +89,44 @@ func (s *SQLiteStore) Lots() ([]Lot, error) {
 		return nil, err
 	}
 
+	sold, err := s.sold()
+	if err != nil {
+		return nil, err
+	}
+
 	lots := make([]Lot, len(rows))
 	for i, r := range rows {
-		lots[i] = Lot{ID: r.ID, Symbol: r.Symbol, Shares: r.Shares, Acquired: r.Acquired, Cost: r.Cost.Decimal, Grant: r.Grant}
+		lots[i] = Lot{
+			ID:       r.ID,
+			Symbol:   r.Symbol,
+			Shares:   r.Shares,
+			Acquired: r.Acquired,
+			Cost:     r.Cost.Decimal,
+			Sold:     sold[r.ID],
+			Grant:    r.Grant,
+		}
 	}
 
 	return lots, nil
+}
+
+// sold returns how many shares have been sold from each lot that has sales, by the ID of the lot.
+// The shares are added up here rather than by the database, which would do it in floating point.
+func (s *SQLiteStore) sold() (map[int]decimal.Decimal, error) {
+	var rows []struct {
+		LotID  int             `db:"lot_id"`
+		Shares decimal.Decimal `db:"shares"`
+	}
+	if err := s.db.Select(&rows, `SELECT lot_id, shares FROM sales`); err != nil {
+		return nil, err
+	}
+
+	sold := make(map[int]decimal.Decimal)
+	for _, r := range rows {
+		sold[r.LotID] = sold[r.LotID].Add(r.Shares)
+	}
+
+	return sold, nil
 }
 
 // SaveLot records a lot, which has to be valid: a new one if its ID is zero, and otherwise it

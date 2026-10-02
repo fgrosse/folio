@@ -409,3 +409,24 @@ func TestStore_SaveSale(t *testing.T) {
 	}
 	assert.Equal(t, expected, sales)
 }
+
+// TestStore_LotsKnowWhatWasSold covers what a sale does to its lot: the lot keeps the shares it was
+// acquired with and says how many of them were sold, in all of its sales, which leaves what remains
+// of it. A lot nothing was sold from has all of its shares left.
+func TestStore_LotsKnowWhatWasSold(t *testing.T) {
+	s := newSalesStore(t)
+	require.NoError(t, s.SaveLot(Lot{Symbol: "PANW", Shares: shares("5"), Acquired: day("2026-01-10")}))
+	require.NoError(t, s.SaveSale(Sale{LotID: 1, Date: day("2026-09-15"), Shares: shares("50"), Price: shares("410.2")}))
+	require.NoError(t, s.SaveSale(Sale{LotID: 1, Date: day("2026-09-20"), Shares: shares("10.5"), Price: shares("400")}))
+
+	lots, err := s.Lots()
+	require.NoError(t, err)
+	require.Len(t, lots, 2)
+
+	assert.Equal(t, "250", lots[0].Shares.String())
+	assert.Equal(t, "60.5", lots[0].Sold.String())
+	assert.Equal(t, "189.5", lots[0].Remaining().String())
+
+	assert.True(t, lots[1].Sold.IsZero())
+	assert.Equal(t, "5", lots[1].Remaining().String())
+}

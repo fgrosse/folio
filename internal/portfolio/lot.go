@@ -26,6 +26,10 @@ type Lot struct {
 	// due. It is zero if it is not known.
 	Cost decimal.Decimal
 
+	// Sold is how many of the shares have been sold since, in all sales of the lot. The store fills
+	// it in when it lists lots, and ignores it when it saves one.
+	Sold decimal.Decimal
+
 	// Grant is the name of the grant the lot was released from, and empty for a lot that was entered
 	// by hand. The store fills it in when it lists lots, and ignores it when it saves one.
 	Grant string
@@ -119,6 +123,12 @@ func ParseCost(s string) (decimal.Decimal, error) {
 	}
 
 	return cost, nil
+}
+
+// Remaining is how many shares of the lot are still held: the ones it was acquired with, less the
+// ones that were sold.
+func (l Lot) Remaining() decimal.Decimal {
+	return l.Shares.Sub(l.Sold)
 }
 
 // String renders the lot as its spec, in the syntax NewLot reads: "<shares> <symbol> <YYYY-MM-DD>",
