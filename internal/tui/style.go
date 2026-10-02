@@ -6,8 +6,7 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// Style holds every lipgloss style the TUI renders with, so the look is defined in one place. It is
-// the look of tick, down to the colors.
+// Style holds every lipgloss style the TUI renders with, so the look is defined in one place.
 type Style struct {
 	// Table is the base style of a view's table.
 	Table lipgloss.Style

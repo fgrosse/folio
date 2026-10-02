@@ -14,11 +14,6 @@ Its user is whoever runs it, about their own account: one person, one database o
 no server and no login. `folio demo` opens it on a made-up account for anyone who wants to look
 around first.
 
-It is the sibling of [`tick`](https://github.com/fgrosse/tick), a time tracker, and mirrors its
-structure, its code style and its look: the same packages, the same frame around a table, the same
-tab bar. When in doubt about how something should be written or look, see how tick does it, if a
-checkout of it is at hand.
-
 The three numbers are the bank's, and so are their definitions:
 
 - **Current account value**: the value of the holdings that can be sold. In folio those are the
@@ -89,9 +84,9 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
   endpoint that needs no key and is no official API. The views show the last quote the database has
   right away and replace it once a fresh one arrives, so the TUI opens without waiting for the
   network and still works without one. Tests never touch the network.
-- **A lot and a grant are typed as one line**, a spec, the way a task is in tick: `12.5 PANW
-  2026-03-15 @380.12` and `Payout: 10 PANW monthly x24 from 2026-01-15`. `NewLot` and `NewGrant` have the
-  grammar in their doc comments, and the CLI verbs and the TUI's dialogs both go through them.
+- **A lot and a grant are typed as one line**, a spec: `12.5 PANW 2026-03-15 @380.12` and
+  `Payout: 10 PANW monthly x24 from 2026-01-15`. `NewLot` and `NewGrant` have the grammar in their
+  doc comments, and the CLI verbs and the TUI's dialogs both go through them.
 - **Realized money is not part of the three values.** Current counts what is left of the lots, and
   what the sales brought in is stated next to the values, never added to the total, which stays
   the bank's.
@@ -132,8 +127,8 @@ a cycle of its own.
 Scaffolding and boilerplate (project layout, tool wiring, config files) are exempt, and so is
 refactoring that keeps the existing tests green. Those are committed on their own.
 
-Commits follow the Go convention of tick's history: `<package>: <what changed>` in the imperative,
-with the package path without `internal/`, and a body that says what was done and why.
+Commits follow the Go convention: `<package>: <what changed>` in the imperative, with the package
+path without `internal/`, and a body that says what was done and why.
 
 ## Tooling
 
@@ -141,8 +136,8 @@ with the package path without `internal/`, and a body that says what was done an
   instead of a Makefile, but only when asked to; don't add tasks speculatively.
 - **Go style**: follow the `go-dev` conventions (Google Go Style Guide + local additions for error
   wrapping, logging, testing, concurrency). Use `go install ./...` over `go build ./...`.
-- **Comments say why.** As in tick, a doc comment explains what a thing is for and why it is the
-  way it is, in full sentences, rather than restating its name.
+- **Comments say why.** A doc comment explains what a thing is for and why it is the way it is, in
+  full sentences, rather than restating its name.
 - **Charm v2 throughout.** Import paths are `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`,
   `charm.land/lipgloss/v2`, *not* `github.com/charmbracelet/...`, which is the v1 line.
 - **Bubble Tea messages are exported**: every `...Msg` type in `internal/tui` gets an exported name,
