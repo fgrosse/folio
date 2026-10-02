@@ -3,6 +3,7 @@ package tui
 import (
 	"testing"
 
+	"charm.land/bubbles/v2/table"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/fgrosse/folio/internal/portfolio"
@@ -40,6 +41,42 @@ func TestUnreleasedVests(t *testing.T) {
 		{grant: "RSU 2025", symbol: "PANW", vest: grants[0].Vests[2]},
 	}
 	assert.Equal(t, expected, unreleasedVests(grants))
+}
+
+// TestVestRow covers how one vest reads as a row of the Vesting table: its day and the grant it
+// belongs to, how many shares vest and what they are worth at the latest price, right-aligned like
+// the numbers of the Holdings table, and how far off the day is.
+func TestVestRow(t *testing.T) {
+	today := day("2026-10-02")
+	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
+
+	tests := map[string]struct {
+		vest     grantVest
+		quote    portfolio.Quote
+		expected table.Row
+	}{
+		"a vest to come": {
+			vest:     grantVest{grant: "Payout", symbol: "PANW", vest: portfolio.Vest{Date: day("2026-11-15"), Shares: dec("10")}},
+			quote:    panw,
+			expected: table.Row{"2026-11-15", "Payout", "        10", "     $3,962.50", "in 44 days"},
+		},
+		"a vest pending release": {
+			vest:     grantVest{grant: "RSU 2025", symbol: "PANW", vest: portfolio.Vest{Date: day("2026-08-20"), Shares: dec("2.5")}},
+			quote:    panw,
+			expected: table.Row{"2026-08-20", "RSU 2025", "       2.5", "       $990.63", "pending"},
+		},
+		"a vest without a quote": {
+			vest:     grantVest{grant: "Old plan", symbol: "SAP.DE", vest: portfolio.Vest{Date: day("2027-01-01"), Shares: dec("5")}},
+			quote:    portfolio.Quote{},
+			expected: table.Row{"2027-01-01", "Old plan", "         5", "             -", "in 2 months"},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, vestRow(tt.vest, tt.quote, today))
+		})
+	}
 }
 
 // TestDueIn covers how far off a vest is, in the words of the last column of the Vesting table. The

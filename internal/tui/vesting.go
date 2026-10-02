@@ -5,6 +5,8 @@ import (
 	"slices"
 	"time"
 
+	"charm.land/bubbles/v2/table"
+
 	"github.com/fgrosse/folio/internal/portfolio"
 )
 
@@ -34,6 +36,24 @@ func unreleasedVests(grants []portfolio.Grant) []grantVest {
 	})
 
 	return vests
+}
+
+// vestRow renders a vest as a row of the Vesting table, valued at quote, which is the zero Quote if
+// there is none of the grant's stock. The numbers are right-aligned and padded out like those of
+// the Holdings table.
+func vestRow(v grantVest, quote portfolio.Quote, today time.Time) table.Row {
+	value := noValue
+	if quote.Symbol != "" {
+		value = portfolio.FormatUSD(v.vest.Shares.Mul(quote.Price))
+	}
+
+	return table.Row{
+		v.vest.Date.Format(time.DateOnly),
+		v.grant,
+		fmt.Sprintf("%*s", sharesColumnWidth, v.vest.Shares),
+		fmt.Sprintf("%*s", valueColumnWidth, value),
+		dueIn(v.vest.Date, today),
+	}
 }
 
 // dueIn says how far off the day of a vest is from today, such as "in 44 days". The nearer the day,
