@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
 	"github.com/shopspring/decimal"
@@ -42,6 +43,7 @@ const (
 type HoldingsModel struct {
 	store     Store
 	style     Style
+	keys      keyMap
 	table     table.Model
 	width     int       // width of the table, which the header line is spread across
 	portfolio Portfolio // the account as it was last loaded
@@ -52,6 +54,7 @@ func NewHoldingsModel(store Store, style Style) *HoldingsModel {
 	m := &HoldingsModel{
 		store: store,
 		style: style,
+		keys:  defaultKeyMap(),
 		// A real width arrives with the first WindowSizeMsg, which Bubble Tea sends at startup.
 		// Until then the narrowest supported layout is the safest thing to hold.
 		width: minTableWidth,
@@ -84,14 +87,37 @@ func (m *HoldingsModel) Init() tea.Cmd {
 	return loadPortfolioCmd(m.store)
 }
 
-// Update implements tea.Model by filling the table with the lots of the portfolio once it is loaded.
+// Update implements tea.Model by fitting the table to the window, filling it with the lots of the
+// portfolio once it is loaded, and moving the selection through it.
 func (m *HoldingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if msg, ok := msg.(PortfolioLoadedMsg); ok {
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		return m.handleKeyPress(msg)
+	case tea.WindowSizeMsg:
+		m.width = tableWidth(msg.Width)
+		m.table.SetColumns(m.columns())
+		m.table.SetWidth(m.width)
+		m.table.SetHeight(msg.Height - chromeHeight)
+		return m, nil
+	case PortfolioLoadedMsg:
 		m.portfolio = msg.portfolio
 		m.updateRows()
+		return m, nil
 	}
 
 	return m, nil
+}
+
+// handleKeyPress quits on the quit keys and hands every other key to the table, which moves the
+// selection.
+func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if key.Matches(msg, m.keys.Quit) {
+		return m, tea.Quit
+	}
+
+	var cmd tea.Cmd
+	m.table, cmd = m.table.Update(msg)
+	return m, cmd
 }
 
 // updateRows fills the table with a row for every lot of the portfolio.
