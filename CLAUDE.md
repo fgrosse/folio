@@ -66,6 +66,9 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
 - **SQLite is the single source of truth**, opened in WAL mode and with a busy timeout. There is no
   daemon: the TUI, the CLI and any widget read and write the database file directly, at the same
   time if it comes to that.
+- **folio builds without cgo.** The SQLite driver is `modernc.org/sqlite`, which is SQLite in Go,
+  so that `go build` is all a release for Linux, macOS and Windows takes and nobody needs a C
+  compiler to install folio. Do not bring in a dependency that needs cgo.
 - **The store owns no clock.** Whatever depends on today, such as whether a vest is due, takes the
   day from its caller, so a test can pick any day.
 - **Shares and prices are decimals, never floats.** `github.com/shopspring/decimal`, stored as text.

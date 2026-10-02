@@ -165,6 +165,24 @@ func TestStore_SaveQuote(t *testing.T) {
 	assert.Equal(t, map[string]Quote{"PANW": panw, "AAPL": aapl}, quotes)
 }
 
+// A time is stored as text, and a database outlives the driver that wrote it: the times in it must
+// read the same to whatever opens the file next, which the format of SQLite's own functions does.
+func TestStore_SaveQuote_TimeFormat(t *testing.T) {
+	s := NewTestingStore()
+
+	require.NoError(t, s.SaveQuote(Quote{
+		Symbol:        "PANW",
+		Price:         shares("396.25"),
+		PreviousClose: shares("397.31"),
+		Currency:      "USD",
+		At:            timestamp("2026-10-02T08:30"),
+	}))
+
+	var stored string
+	require.NoError(t, s.db.Get(&stored, `SELECT CAST(quoted_at AS TEXT) FROM quotes`))
+	assert.Equal(t, "2026-10-02 08:30:00+00:00", stored)
+}
+
 // TestStore_SaveGrant covers recording a grant: it comes back with its vests, each with an ID of
 // its own, and a database that has none returns none.
 func TestStore_SaveGrant(t *testing.T) {

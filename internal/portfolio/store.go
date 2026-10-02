@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3" // the database driver
 	migrate "github.com/rubenv/sql-migrate"
 	"github.com/shopspring/decimal"
+	_ "modernc.org/sqlite" // the database driver, which is SQLite in Go, so that folio builds without a C compiler
 )
 
 //go:embed migrations/*.sql
@@ -37,7 +37,9 @@ type SQLiteStore struct {
 // databases instead of one shared one. That one connection is also why the settings NewStore makes
 // on it hold for as long as the store is open.
 func NewStore(dsn string) (*SQLiteStore, error) {
-	db, err := sqlx.Open("sqlite3", dsn)
+	// Left to itself the driver writes a time the way Go prints one. Asked for SQLite's format it
+	// writes what the driver before it did, so a database reads the same whichever of them wrote it.
+	db, err := sqlx.Open("sqlite", dsn+"?_time_format=sqlite")
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +500,9 @@ func (s *SQLiteStore) Quotes() (map[string]Quote, error) {
 			Price:         r.Price,
 			PreviousClose: r.PreviousClose,
 			Currency:      r.Currency,
-			At:            r.At,
+			// The driver reads the time in a zone of its own that is zero hours off UTC, which is
+			// the same instant and not the same value to compare.
+			At: r.At.UTC(),
 		}
 	}
 
