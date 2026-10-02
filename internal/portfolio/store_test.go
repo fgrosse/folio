@@ -1,6 +1,7 @@
 package portfolio
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -323,6 +324,23 @@ func TestNewStore_SharesTheDatabase(t *testing.T) {
 	var timeout int
 	require.NoError(t, s.db.Get(&timeout, `PRAGMA busy_timeout`))
 	assert.Equal(t, 5000, timeout)
+}
+
+// An account is nobody's business but its owner's, so the database is a file that only they can
+// read, and so are the files that SQLite keeps next to it.
+func TestNewStore_KeepsTheDatabasePrivate(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "folio.db")
+
+	s, err := NewStore(path)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s.Close() })
+	require.NoError(t, s.Migrate())
+
+	for _, file := range []string{path, path + "-wal", path + "-shm"} {
+		info, err := os.Stat(file)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(), file)
+	}
 }
 
 // TestStore_SaveLotWithCost covers the cost of a lot in the database: a lot saved with one comes

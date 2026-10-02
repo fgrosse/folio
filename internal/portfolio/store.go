@@ -7,6 +7,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -37,6 +38,12 @@ type SQLiteStore struct {
 // databases instead of one shared one. That one connection is also why the settings NewStore makes
 // on it hold for as long as the store is open.
 func NewStore(dsn string) (*SQLiteStore, error) {
+	if dsn != ":memory:" {
+		if err := createPrivate(dsn); err != nil {
+			return nil, err
+		}
+	}
+
 	// Left to itself the driver writes a time the way Go prints one. Asked for SQLite's format it
 	// writes what the driver before it did, so a database reads the same whichever of them wrote it.
 	db, err := sqlx.Open("sqlite", dsn+"?_time_format=sqlite")
@@ -54,6 +61,19 @@ func NewStore(dsn string) (*SQLiteStore, error) {
 	}
 
 	return &SQLiteStore{db: db}, nil
+}
+
+// createPrivate makes sure that there is a file at path which only its owner can read and write.
+// SQLite would create the database itself, readable by everyone the umask lets in, and an account
+// is nobody's business but its owner's. The files that SQLite keeps next to the database get the
+// permissions of the database, so they are covered by this as well.
+func createPrivate(path string) error {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // the path is the user's choice of a database
+	if err != nil {
+		return err
+	}
+
+	return file.Close()
 }
 
 // Migrate applies every pending schema migration embedded in the binary; it is a no-op if the
