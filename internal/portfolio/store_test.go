@@ -356,3 +356,56 @@ func TestStore_SaveLotReplaces(t *testing.T) {
 	err = s.SaveLot(Lot{ID: 9, Symbol: "PANW", Shares: shares("1"), Acquired: day("2026-01-16")})
 	assert.EqualError(t, err, "no lot with ID 9")
 }
+
+// newSalesStore returns a store with a grant of PANW whose first vest was released into a lot of 250
+// shares that cost $162.50 each, which is the lot the tests of sales sell from.
+func newSalesStore(t *testing.T) *SQLiteStore {
+	t.Helper()
+
+	s := NewTestingStore()
+	require.NoError(t, s.SaveGrant(Grant{
+		Name:   "Payout",
+		Symbol: "PANW",
+		Vests:  Repeating(day("2025-08-01"), 1, 2, shares("480")),
+	}))
+	require.NoError(t, s.ReleaseVest(1, shares("250"), shares("162.5")))
+
+	return s
+}
+
+// TestStore_SaveSale covers recording that shares of a lot were sold: the sale comes back with an ID
+// of its own and with what the store knows of the lot it was sold from - the stock, what a share of
+// it cost and the grant it came from - which is what the proceeds are a gain against.
+func TestStore_SaveSale(t *testing.T) {
+	s := newSalesStore(t)
+
+	sales, err := s.Sales()
+	require.NoError(t, err)
+	assert.Empty(t, sales)
+
+	err = s.SaveSale(Sale{
+		LotID:  1,
+		Date:   day("2026-09-15"),
+		Shares: shares("50"),
+		Price:  shares("410.2"),
+		Note:   "for the kitchen\nsold in two orders",
+	})
+	require.NoError(t, err)
+
+	sales, err = s.Sales()
+	require.NoError(t, err)
+	expected := []Sale{
+		{
+			ID:     1,
+			LotID:  1,
+			Date:   day("2026-09-15"),
+			Shares: shares("50"),
+			Price:  shares("410.2"),
+			Note:   "for the kitchen\nsold in two orders",
+			Symbol: "PANW",
+			Cost:   shares("162.5"),
+			Grant:  "Payout",
+		},
+	}
+	assert.Equal(t, expected, sales)
+}

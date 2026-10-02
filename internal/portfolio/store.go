@@ -157,6 +157,61 @@ func (s *SQLiteStore) DeleteLot(id int) error {
 	return nil
 }
 
+// Sales lists every sale in the order of their days, and sales of the same day in the order they
+// were saved, each with the stock, the cost and the grant of the lot it was sold from.
+func (s *SQLiteStore) Sales() ([]Sale, error) {
+	var rows []struct {
+		ID     int                 `db:"id"`
+		LotID  int                 `db:"lot_id"`
+		Date   time.Time           `db:"sold_on"`
+		Shares decimal.Decimal     `db:"shares"`
+		Price  decimal.Decimal     `db:"price"`
+		Note   string              `db:"note"`
+		Symbol string              `db:"symbol"`
+		Cost   decimal.NullDecimal `db:"cost"`
+		Grant  string              `db:"grant_name"`
+	}
+
+	err := s.db.Select(&rows, `
+		SELECT sales.id, sales.lot_id, sales.sold_on, sales.shares, sales.price, sales.note,
+			lots.symbol, lots.cost, coalesce(grants.name, '') AS grant_name
+		FROM sales
+			JOIN lots ON lots.id = sales.lot_id
+			LEFT JOIN vests ON vests.id = lots.vest_id
+			LEFT JOIN grants ON grants.id = vests.grant_id
+		ORDER BY sales.sold_on, sales.id`)
+	if err != nil {
+		return nil, err
+	}
+
+	sales := make([]Sale, len(rows))
+	for i, r := range rows {
+		sales[i] = Sale{
+			ID:     r.ID,
+			LotID:  r.LotID,
+			Date:   r.Date,
+			Shares: r.Shares,
+			Price:  r.Price,
+			Note:   r.Note,
+			Symbol: r.Symbol,
+			Cost:   r.Cost.Decimal,
+			Grant:  r.Grant,
+		}
+	}
+
+	return sales, nil
+}
+
+// SaveSale records a new sale of shares of the lot it names.
+func (s *SQLiteStore) SaveSale(sale Sale) error {
+	_, err := s.db.Exec(
+		`INSERT INTO sales (lot_id, sold_on, shares, price, note) VALUES (?, ?, ?, ?, ?)`,
+		sale.LotID, sale.Date.Format(time.DateOnly), sale.Shares, sale.Price, sale.Note,
+	)
+
+	return err
+}
+
 // Grants lists every grant in the order they were saved, each with its vests in the order of
 // their days.
 func (s *SQLiteStore) Grants() ([]Grant, error) {
