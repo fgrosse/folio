@@ -48,6 +48,7 @@ func New() *Folio {
 
 	cmd.AddCommand(cmd.LotCmd())
 	cmd.AddCommand(cmd.GrantCmd())
+	cmd.AddCommand(cmd.ReleaseCmd())
 	cmd.AddCommand(cmd.StatusCmd())
 
 	return cmd
