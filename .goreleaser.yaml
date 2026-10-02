@@ -12,6 +12,9 @@ builds:
       - windows
       - darwin
     main: ./cmd/folio
+    # Leave the paths of the machine that built the release out of the binaries.
+    flags:
+      - -trimpath
 
 archives:
   - formats: [tar.gz]
