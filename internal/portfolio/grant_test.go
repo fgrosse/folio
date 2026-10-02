@@ -140,3 +140,78 @@ func TestNewGrant(t *testing.T) {
 		})
 	}
 }
+
+// TestNewGrant_Errors covers the specs NewGrant refuses, each with an error that says what is wrong
+// with it: the dialog the spec was typed into shows it under its field.
+func TestNewGrant_Errors(t *testing.T) {
+	const syntax = `a grant is written as "<name>: <shares> <symbol> <interval> x<count> from <YYYY-MM-DD>"`
+
+	tests := map[string]struct {
+		spec  string
+		error string
+	}{
+		"empty": {
+			spec:  "",
+			error: syntax,
+		},
+		"no name": {
+			spec:  "10 PANW monthly x3 from 2026-01-15",
+			error: syntax,
+		},
+		"an empty name": {
+			spec:  " : 10 PANW monthly x3 from 2026-01-15",
+			error: "grant has no name",
+		},
+		"a field missing": {
+			spec:  "Payout: 10 PANW monthly from 2026-01-15",
+			error: syntax,
+		},
+		"no from": {
+			spec:  "Payout: 10 PANW monthly x3 on 2026-01-15",
+			error: syntax,
+		},
+		"shares that are not a number": {
+			spec:  "Payout: ten PANW monthly x3 from 2026-01-15",
+			error: `"ten" is not a number of shares`,
+		},
+		"no shares": {
+			spec:  "Payout: 0 PANW monthly x3 from 2026-01-15",
+			error: "grant must have more than 0 shares",
+		},
+		"an unknown interval": {
+			spec:  "Payout: 10 PANW weekly x3 from 2026-01-15",
+			error: `"weekly" is not an interval: use monthly, quarterly or yearly`,
+		},
+		"a count that is not a number": {
+			spec:  "Payout: 10 PANW monthly xmany from 2026-01-15",
+			error: `"xmany" is not a number of vests such as x24`,
+		},
+		"a count of zero": {
+			spec:  "Payout: 10 PANW monthly x0 from 2026-01-15",
+			error: `"x0" is not a number of vests such as x24`,
+		},
+		"neither a count nor percentages": {
+			spec:  "Payout: 10 PANW monthly 24 from 2026-01-15",
+			error: "the percentages 24 add up to 24, not 100",
+		},
+		"percentages that are not numbers": {
+			spec:  "RSU: 400 PANW quarterly 10/some/40 from 2026-02-20",
+			error: `"10/some/40" is neither a count such as x24 nor percentages such as 10/20/30/40`,
+		},
+		"percentages that do not add up": {
+			spec:  "RSU: 400 PANW quarterly 10/20/30 from 2026-02-20",
+			error: "the percentages 10/20/30 add up to 60, not 100",
+		},
+		"a day that is not YYYY-MM-DD": {
+			spec:  "Payout: 10 PANW monthly x3 from January",
+			error: `"January" is not a day written as YYYY-MM-DD`,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := NewGrant(tt.spec)
+			assert.EqualError(t, err, tt.error)
+		})
+	}
+}

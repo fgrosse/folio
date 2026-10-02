@@ -1,6 +1,8 @@
 package portfolio
 
 import (
+	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -29,6 +31,10 @@ type Vest struct {
 	Shares decimal.Decimal
 }
 
+// grantSyntax is how a grant is written, for the errors that say so. It shows the simpler of the
+// two forms, which is enough to see what is missing.
+const grantSyntax = `a grant is written as "<name>: <shares> <symbol> <interval> x<count> from <YYYY-MM-DD>"`
+
 // intervals are the words a grant spec says how often a grant vests with, and how many months each
 // of them is.
 var intervals = map[string]int{
@@ -53,12 +59,31 @@ var intervals = map[string]int{
 // 10/20/30/40 from 2026-02-20" vests 40 shares over the four quarters of the first year and 160
 // over those of the fourth. See Graded.
 func NewGrant(spec string) (Grant, error) {
-	name, schedule, _ := strings.Cut(spec, ":")
+	name, schedule, found := strings.Cut(spec, ":")
 	fields := strings.Fields(schedule)
+	if !found || len(fields) != 6 || fields[4] != "from" {
+		return Grant{}, errors.New(grantSyntax)
+	}
+
+	grant := Grant{
+		Name:   strings.TrimSpace(name),
+		Symbol: strings.ToUpper(fields[1]),
+	}
+	if grant.Name == "" {
+		return Grant{}, errors.New("grant has no name")
+	}
 
 	shares, err := decimal.NewFromString(fields[0])
 	if err != nil {
-		return Grant{}, err
+		return Grant{}, fmt.Errorf("%q is not a number of shares", fields[0])
+	}
+	if !shares.IsPositive() {
+		return Grant{}, errors.New("grant must have more than 0 shares")
+	}
+
+	months, ok := intervals[strings.ToLower(fields[2])]
+	if !ok {
+		return Grant{}, fmt.Errorf("%q is not an interval: use monthly, quarterly or yearly", fields[2])
 	}
 
 	first, err := ParseDay(fields[5])
@@ -66,34 +91,46 @@ func NewGrant(spec string) (Grant, error) {
 		return Grant{}, err
 	}
 
-	grant := Grant{
-		Name:   strings.TrimSpace(name),
-		Symbol: strings.ToUpper(fields[1]),
+	grant.Vests, err = newSchedule(fields[3], first, months, shares)
+	if err != nil {
+		return Grant{}, err
 	}
 
-	months := intervals[strings.ToLower(fields[2])]
-	if count, ok := strings.CutPrefix(fields[3], "x"); ok {
+	return grant, nil
+}
+
+// newSchedule lays out the vests of a grant spec from the field that says how many there are: a
+// count such as "x24" of vests of that many shares each, or the percentages of the shares that vest
+// in each year, such as "10/20/30/40".
+func newSchedule(field string, first time.Time, months int, shares decimal.Decimal) ([]Vest, error) {
+	if count, ok := strings.CutPrefix(field, "x"); ok {
 		n, err := strconv.Atoi(count)
-		if err != nil {
-			return Grant{}, err
+		if err != nil || n < 1 {
+			return nil, fmt.Errorf("%q is not a number of vests such as x24", field)
 		}
 
-		grant.Vests = Repeating(first, months, n, shares)
-		return grant, nil
+		return Repeating(first, months, n, shares), nil
 	}
 
-	var percentPerYear []int
-	for percent := range strings.SplitSeq(fields[3], "/") {
+	var (
+		percentPerYear []int
+		sum            int
+	)
+	for percent := range strings.SplitSeq(field, "/") {
 		n, err := strconv.Atoi(percent)
 		if err != nil {
-			return Grant{}, err
+			return nil, fmt.Errorf("%q is neither a count such as x24 nor percentages such as 10/20/30/40", field)
 		}
 
 		percentPerYear = append(percentPerYear, n)
+		sum += n
 	}
 
-	grant.Vests = Graded(first, months, shares, percentPerYear)
-	return grant, nil
+	if sum != 100 {
+		return nil, fmt.Errorf("the percentages %s add up to %d, not 100", field, sum)
+	}
+
+	return Graded(first, months, shares, percentPerYear), nil
 }
 
 // Repeating returns the schedule of a grant that vests the same number of shares count times, the
