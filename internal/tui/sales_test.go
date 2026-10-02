@@ -47,3 +47,44 @@ func TestSaleRow(t *testing.T) {
 		})
 	}
 }
+
+// TestRealizedSummary covers the line the Sales view puts above its table, which is what tracking
+// sales is for: how much money the sales have brought in, and how much of that is gain. It says so
+// if the gain leaves out sales whose cost is not known, and if nothing was sold yet.
+func TestRealizedSummary(t *testing.T) {
+	gain := portfolio.Sale{Shares: dec("50"), Price: dec("410.2"), Cost: dec("162.5")}
+	loss := portfolio.Sale{Shares: dec("10"), Price: dec("150"), Cost: dec("162.5")}
+	uncosted := portfolio.Sale{Shares: dec("2.5"), Price: dec("330")}
+
+	tests := map[string]struct {
+		sales    []portfolio.Sale
+		expected string
+	}{
+		"nothing sold": {
+			sales:    nil,
+			expected: "Nothing sold yet",
+		},
+		"a gain": {
+			sales:    []portfolio.Sale{gain},
+			expected: "Realized $20,510.00 · gain +$12,385.00",
+		},
+		"a loss overall": {
+			sales:    []portfolio.Sale{loss},
+			expected: "Realized $1,500.00 · gain -$125.00",
+		},
+		"a sale without a cost": {
+			sales:    []portfolio.Sale{gain, uncosted},
+			expected: "Realized $21,335.00 · gain +$12,385.00 without 1 sale of unknown cost",
+		},
+		"only sales without a cost": {
+			sales:    []portfolio.Sale{uncosted, uncosted},
+			expected: "Realized $1,650.00 · gain unknown",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, realizedSummary(tt.sales))
+		})
+	}
+}
