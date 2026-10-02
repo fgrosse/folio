@@ -211,8 +211,9 @@ func TestStore_ReleaseVest(t *testing.T) {
 
 	lots, err := s.Lots()
 	require.NoError(t, err)
+	// The lot says which grant it came from, which a lot entered by hand has nothing to say about.
 	expectedLots := []Lot{
-		{ID: 1, Symbol: "PANW", Shares: shares("6"), Acquired: day("2026-01-15")},
+		{ID: 1, Symbol: "PANW", Shares: shares("6"), Acquired: day("2026-01-15"), Grant: "Payout"},
 	}
 	assert.Equal(t, expectedLots, lots)
 

@@ -19,6 +19,10 @@ type Lot struct {
 
 	// Acquired is the calendar day the shares arrived, at midnight UTC.
 	Acquired time.Time
+
+	// Grant is the name of the grant the lot was released from, and empty for a lot that was entered
+	// by hand. The store fills it in when it lists lots, and ignores it when it saves one.
+	Grant string
 }
 
 // lotSyntax is how a lot is written, for the errors that say so.

@@ -64,22 +64,29 @@ func (s *SQLiteStore) Migrate() error {
 }
 
 // Lots lists every lot in the order they were acquired, and lots of the same day in the order they
-// were saved.
+// were saved. A lot that a vest was released into comes with the name of the vest's grant.
 func (s *SQLiteStore) Lots() ([]Lot, error) {
 	var rows []struct {
 		ID       int             `db:"id"`
 		Symbol   string          `db:"symbol"`
 		Shares   decimal.Decimal `db:"shares"`
 		Acquired time.Time       `db:"acquired_on"`
+		Grant    string          `db:"grant_name"`
 	}
 
-	if err := s.db.Select(&rows, `SELECT id, symbol, shares, acquired_on FROM lots ORDER BY acquired_on, id`); err != nil {
+	err := s.db.Select(&rows, `
+		SELECT lots.id, lots.symbol, lots.shares, lots.acquired_on, coalesce(grants.name, '') AS grant_name
+		FROM lots
+			LEFT JOIN vests ON vests.id = lots.vest_id
+			LEFT JOIN grants ON grants.id = vests.grant_id
+		ORDER BY lots.acquired_on, lots.id`)
+	if err != nil {
 		return nil, err
 	}
 
 	lots := make([]Lot, len(rows))
 	for i, r := range rows {
-		lots[i] = Lot{ID: r.ID, Symbol: r.Symbol, Shares: r.Shares, Acquired: r.Acquired}
+		lots[i] = Lot{ID: r.ID, Symbol: r.Symbol, Shares: r.Shares, Acquired: r.Acquired, Grant: r.Grant}
 	}
 
 	return lots, nil
