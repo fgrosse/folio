@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -12,7 +13,7 @@ import (
 
 // StatusCmd returns the "folio status" command.
 func (cmd *Folio) StatusCmd() *cobra.Command {
-	return &cobra.Command{
+	c := &cobra.Command{
 		Use:   "status",
 		Short: "Show what the account is worth right now",
 		Long: `
@@ -24,6 +25,11 @@ Show the three values of the account at the latest prices:
 `,
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
+			asJSON, err := c.Flags().GetBool("json")
+			if err != nil {
+				return err
+			}
+
 			lots, err := cmd.store.Lots()
 			if err != nil {
 				return err
@@ -39,10 +45,19 @@ Show the three values of the account at the latest prices:
 				return err
 			}
 
-			cmd.printAccount(portfolio.NewAccount(lots, grants, quotes))
+			account := portfolio.NewAccount(lots, grants, quotes)
+			if asJSON {
+				return cmd.printAccountJSON(account)
+			}
+
+			cmd.printAccount(account)
 			return nil
 		},
 	}
+
+	c.Flags().Bool("json", false, "print the values as a JSON object")
+
+	return c
 }
 
 // quotes returns the latest quote of each of symbols: fetched just now where that worked, and saved
@@ -92,4 +107,27 @@ func (cmd *Folio) printAccount(account portfolio.Account) {
 	for _, value := range values {
 		cmd.Printf("%-9s  %*s\n", value.label, width, value.amount)
 	}
+}
+
+// printAccountJSON writes the values of account as one JSON object, the amounts as decimals to the
+// cent in strings, which no reader will take for floats.
+func (cmd *Folio) printAccountJSON(account portfolio.Account) error {
+	unpriced := account.Unpriced
+	if unpriced == nil {
+		unpriced = []string{} // an empty list rather than null
+	}
+
+	return json.NewEncoder(cmd.OutOrStdout()).Encode(struct {
+		Current   string   `json:"current"`
+		Potential string   `json:"potential"`
+		Total     string   `json:"total"`
+		Currency  string   `json:"currency"`
+		Unpriced  []string `json:"unpriced"`
+	}{
+		Current:   account.Current.StringFixed(2),
+		Potential: account.Potential.StringFixed(2),
+		Total:     account.Total().StringFixed(2),
+		Currency:  "USD",
+		Unpriced:  unpriced,
+	})
 }

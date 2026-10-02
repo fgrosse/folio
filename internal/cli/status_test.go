@@ -73,6 +73,22 @@ func TestStatusCmd_FallsBackOnCachedQuotes(t *testing.T) {
 	assert.Equal(t, "Warning: no quote of PANW\n", errOut.String())
 }
 
+// TestStatusCmd_JSON covers status for a program to read, such as a status bar widget: one JSON
+// object with the three values as plain decimals to the cent, their currency, and the symbols that
+// have no price, which is an empty list rather than null when there are none.
+func TestStatusCmd_JSON(t *testing.T) {
+	cmd, dbPath := NewTestingCmd(t, "status", "--json")
+	cmd.quoter = quotes{"PANW": "396.25"}
+	seed(t, dbPath)
+
+	var out strings.Builder
+	cmd.SetOut(&out)
+	require.NoError(t, cmd.Execute())
+
+	expected := `{"current":"3368.13","potential":"7925.00","total":"11293.13","currency":"USD","unpriced":[]}` + "\n"
+	assert.Equal(t, expected, out.String())
+}
+
 // saveQuote saves quote to the database at dbPath, as a quote cached by an earlier run.
 func saveQuote(t *testing.T, dbPath string, quote portfolio.Quote) {
 	t.Helper()
