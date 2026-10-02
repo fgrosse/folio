@@ -81,6 +81,23 @@ func TestVestingModel_LoadsPortfolio(t *testing.T) {
 	store.AssertExpectations(t)
 }
 
+// TestVestingModel_Keys covers the keys the view answers to before it can change anything: q and
+// ctrl+c quit, and every other key is the table's, which moves the selection on the ones it knows.
+func TestVestingModel_Keys(t *testing.T) {
+	m, _ := newTestingVesting(t)
+
+	_, cmd := m.Update(keyPressed("q"))
+	assert.Equal(t, tea.QuitMsg{}, runCmd(t, cmd))
+
+	_, cmd = m.Update(tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl})
+	assert.Equal(t, tea.QuitMsg{}, runCmd(t, cmd))
+
+	require.Equal(t, 0, m.table.Cursor())
+	_, cmd = m.Update(keyPressed("j"))
+	assert.Nil(t, cmd)
+	assert.Equal(t, 1, m.table.Cursor(), "j should move the selection down a row")
+}
+
 // TestVestRow covers how one vest reads as a row of the Vesting table: its day and the grant it
 // belongs to, how many shares vest and what they are worth at the latest price, right-aligned like
 // the numbers of the Holdings table, and how far off the day is.
