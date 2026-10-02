@@ -237,3 +237,40 @@ func TestParseVests(t *testing.T) {
 	}
 	assert.Equal(t, expected, vests)
 }
+
+// TestParseVests_Errors covers the lines ParseVests refuses, each named by its number, since a
+// schedule of a few years is a long list to find a typo in.
+func TestParseVests_Errors(t *testing.T) {
+	tests := map[string]struct {
+		text  string
+		error string
+	}{
+		"a line without shares": {
+			text:  "2025-08-01 480\n2025-09-01\n",
+			error: `line 2: a vest is written as "<YYYY-MM-DD> <shares>"`,
+		},
+		"a line with too much": {
+			text:  "2025-08-01 480 shares\n",
+			error: `line 1: a vest is written as "<YYYY-MM-DD> <shares>"`,
+		},
+		"a day that is not YYYY-MM-DD": {
+			text:  "\n\n01.08.2025 480\n",
+			error: `line 3: "01.08.2025" is not a day written as YYYY-MM-DD`,
+		},
+		"shares that are not a number": {
+			text:  "2025-08-01 many\n",
+			error: `line 1: "many" is not a number of shares`,
+		},
+		"no shares": {
+			text:  "2025-08-01 480\n# all good so far\n2025-09-01 0\n",
+			error: "line 3: a vest must have more than 0 shares",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := ParseVests(tt.text)
+			assert.EqualError(t, err, tt.error)
+		})
+	}
+}

@@ -139,32 +139,55 @@ func newSchedule(field string, first time.Time, months int, shares decimal.Decim
 
 // ParseVests parses a schedule that is written down vest by vest, for a grant that no rule lays out:
 // one vest to a line, as "<YYYY-MM-DD> <shares>". Empty lines are skipped, and so is whatever
-// follows a "#". The vests come back in the order of their days.
+// follows a "#". The vests come back in the order of their days. A line that is not a vest is
+// refused by its number.
 func ParseVests(text string) ([]Vest, error) {
-	var vests []Vest
+	var (
+		vests  []Vest
+		number int
+	)
 	for line := range strings.Lines(text) {
+		number++
+
 		line, _, _ = strings.Cut(line, "#")
-		fields := strings.Fields(line)
-		if len(fields) == 0 {
+		if strings.TrimSpace(line) == "" {
 			continue
 		}
 
-		date, err := ParseDay(fields[0])
+		vest, err := parseVest(line)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("line %d: %w", number, err)
 		}
 
-		shares, err := decimal.NewFromString(fields[1])
-		if err != nil {
-			return nil, err
-		}
-
-		vests = append(vests, Vest{Date: date, Shares: shares})
+		vests = append(vests, vest)
 	}
 
 	slices.SortStableFunc(vests, func(a, b Vest) int { return a.Date.Compare(b.Date) })
 
 	return vests, nil
+}
+
+// parseVest parses one line of a schedule, "<YYYY-MM-DD> <shares>".
+func parseVest(line string) (Vest, error) {
+	fields := strings.Fields(line)
+	if len(fields) != 2 {
+		return Vest{}, errors.New(`a vest is written as "<YYYY-MM-DD> <shares>"`)
+	}
+
+	date, err := ParseDay(fields[0])
+	if err != nil {
+		return Vest{}, err
+	}
+
+	shares, err := decimal.NewFromString(fields[1])
+	if err != nil {
+		return Vest{}, fmt.Errorf("%q is not a number of shares", fields[1])
+	}
+	if !shares.IsPositive() {
+		return Vest{}, errors.New("a vest must have more than 0 shares")
+	}
+
+	return Vest{Date: date, Shares: shares}, nil
 }
 
 // Repeating returns the schedule of a grant that vests the same number of shares count times, the
