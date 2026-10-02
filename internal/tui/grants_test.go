@@ -4,10 +4,40 @@ import (
 	"testing"
 
 	"charm.land/bubbles/v2/table"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/fgrosse/folio/internal/portfolio"
 )
+
+// newTestingGrants returns a Grants view that has loaded the test portfolio into a window of 100 by
+// 20, and the store it loaded it from.
+func newTestingGrants(t *testing.T) (*GrantsModel, *MockStore) {
+	t.Helper()
+
+	store := new(MockStore)
+	store.returns(testPortfolio())
+
+	m := NewGrantsModel(store, DefaultStyle())
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
+	m.Update(runCmd(t, m.Init()))
+
+	return m, store
+}
+
+// TestGrantsModel_LoadsPortfolio covers what the Grants view starts from: once started, it loads the
+// portfolio and shows a row for every grant, valued at the quote the store has of its stock.
+func TestGrantsModel_LoadsPortfolio(t *testing.T) {
+	m, store := newTestingGrants(t)
+	assert.Equal(t, "Grants", m.Title())
+
+	p := testPortfolio()
+	rows := m.table.Rows()
+	require.Len(t, rows, 1)
+	assert.Equal(t, grantRow(p.Grants[0], p.Quotes["PANW"]), rows[0])
+	store.AssertExpectations(t)
+}
 
 // TestGrantRow covers how one grant reads as a row of the Grants table: its name and stock, how many
 // of its shares are still to come and how many it had in all, and what the ones to come are worth,
