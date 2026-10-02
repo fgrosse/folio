@@ -2,9 +2,7 @@ package portfolio
 
 import (
 	"testing"
-	"time"
 
-	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,22 +45,21 @@ func TestStore_SaveLot(t *testing.T) {
 	assert.Equal(t, expected, lots)
 }
 
-// day parses a calendar day written as YYYY-MM-DD.
-func day(s string) time.Time {
-	t, err := time.Parse(time.DateOnly, s)
-	if err != nil {
-		panic(err)
+// TestStore_LotsAreListedByDay covers the order lots come back in: by the day they were acquired,
+// whatever order they were saved in, which is the order an account's history reads in. Lots of the
+// same day stay in the order they were saved.
+func TestStore_LotsAreListedByDay(t *testing.T) {
+	s := NewTestingStore()
+	require.NoError(t, s.SaveLot(Lot{Symbol: "PANW", Shares: shares("3"), Acquired: day("2026-03-15")}))
+	require.NoError(t, s.SaveLot(Lot{Symbol: "AAPL", Shares: shares("1"), Acquired: day("2025-11-02")}))
+	require.NoError(t, s.SaveLot(Lot{Symbol: "PANW", Shares: shares("2"), Acquired: day("2026-03-15")}))
+
+	lots, err := s.Lots()
+	require.NoError(t, err)
+	expected := []Lot{
+		{ID: 2, Symbol: "AAPL", Shares: shares("1"), Acquired: day("2025-11-02")},
+		{ID: 1, Symbol: "PANW", Shares: shares("3"), Acquired: day("2026-03-15")},
+		{ID: 3, Symbol: "PANW", Shares: shares("2"), Acquired: day("2026-03-15")},
 	}
-
-	return t
-}
-
-// shares parses a number of shares, or any other decimal, written the way it reads.
-func shares(s string) decimal.Decimal {
-	d, err := decimal.NewFromString(s)
-	if err != nil {
-		panic(err)
-	}
-
-	return d
+	assert.Equal(t, expected, lots)
 }

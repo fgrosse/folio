@@ -61,7 +61,8 @@ func (s *SQLiteStore) Migrate() error {
 	return nil
 }
 
-// Lots lists every lot.
+// Lots lists every lot in the order they were acquired, and lots of the same day in the order they
+// were saved.
 func (s *SQLiteStore) Lots() ([]Lot, error) {
 	var rows []struct {
 		ID       int             `db:"id"`
@@ -70,7 +71,7 @@ func (s *SQLiteStore) Lots() ([]Lot, error) {
 		Acquired time.Time       `db:"acquired_on"`
 	}
 
-	if err := s.db.Select(&rows, `SELECT id, symbol, shares, acquired_on FROM lots`); err != nil {
+	if err := s.db.Select(&rows, `SELECT id, symbol, shares, acquired_on FROM lots ORDER BY acquired_on, id`); err != nil {
 		return nil, err
 	}
 
