@@ -184,6 +184,40 @@ func (s *SQLiteStore) SaveGrant(grant Grant) error {
 	return tx.Commit()
 }
 
+// DeleteGrant deletes the grant with the given ID, which has to exist, together with its vests. The
+// lots its vests were released into stay, and no longer say which vest they came from.
+func (s *SQLiteStore) DeleteGrant(id int) error {
+	tx, err := s.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }() // does nothing once the transaction is committed
+
+	_, err = tx.Exec(`UPDATE lots SET vest_id = NULL WHERE vest_id IN (SELECT id FROM vests WHERE grant_id = ?)`, id)
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(`DELETE FROM vests WHERE grant_id = ?`, id); err != nil {
+		return err
+	}
+
+	result, err := tx.Exec(`DELETE FROM grants WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+
+	n, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("no grant with ID %d", id)
+	}
+
+	return tx.Commit()
+}
+
 // ReleaseVest turns the vest with the given ID into a lot of its grant's stock, acquired on the day
 // of the vest and holding shares, the number that actually arrived: more than none, and no more than
 // vested. The vest counts as released from then on, for as long as that lot exists, and cannot be

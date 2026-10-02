@@ -246,3 +246,41 @@ func TestStore_ReleaseVestRefusals(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, lots, 1, "a refused release must not make a lot")
 }
+
+// TestStore_DeleteGrant covers taking a grant back: it is gone with all of its vests, and the other
+// grants stay as they were. A lot that one of its vests was released into stays too: those shares
+// are held whether or not folio still knows where they came from.
+func TestStore_DeleteGrant(t *testing.T) {
+	s := NewTestingStore()
+	require.NoError(t, s.SaveGrant(Grant{
+		Name:   "Payout",
+		Symbol: "PANW",
+		Vests:  Repeating(day("2026-01-15"), 1, 2, shares("10")),
+	}))
+	require.NoError(t, s.SaveGrant(Grant{
+		Name:   "Bonus",
+		Symbol: "PANW",
+		Vests:  Repeating(day("2026-06-01"), 12, 1, shares("50")),
+	}))
+	require.NoError(t, s.ReleaseVest(1, shares("6")))
+
+	require.NoError(t, s.DeleteGrant(1))
+
+	grants, err := s.Grants()
+	require.NoError(t, err)
+	expected := []Grant{
+		{
+			ID:     2,
+			Name:   "Bonus",
+			Symbol: "PANW",
+			Vests:  []Vest{{ID: 3, Date: day("2026-06-01"), Shares: shares("50")}},
+		},
+	}
+	assert.Equal(t, expected, grants)
+
+	lots, err := s.Lots()
+	require.NoError(t, err)
+	assert.Len(t, lots, 1, "the lot of the released vest should stay")
+
+	assert.EqualError(t, s.DeleteGrant(7), "no grant with ID 7")
+}
