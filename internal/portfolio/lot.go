@@ -3,6 +3,7 @@ package portfolio
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -18,6 +19,28 @@ type Lot struct {
 
 	// Acquired is the calendar day the shares arrived, at midnight UTC.
 	Acquired time.Time
+}
+
+// NewLot parses a lot from its spec, "<shares> <symbol> [YYYY-MM-DD]", such as "12.5 PANW 2026-03-15".
+// The symbol is written in capitals however it was typed. The day is optional: a lot without one
+// comes back with a zero Acquired for the caller to fill in, who knows what today is.
+func NewLot(spec string) (Lot, error) {
+	fields := strings.Fields(spec)
+
+	shares, err := decimal.NewFromString(fields[0])
+	if err != nil {
+		return Lot{}, err
+	}
+
+	lot := Lot{Symbol: strings.ToUpper(fields[1]), Shares: shares}
+	if len(fields) > 2 {
+		lot.Acquired, err = time.Parse(time.DateOnly, fields[2])
+		if err != nil {
+			return Lot{}, err
+		}
+	}
+
+	return lot, nil
 }
 
 // Validate says what a lot is missing to be worth something: a symbol to look its price up by, more
