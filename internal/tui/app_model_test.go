@@ -1,0 +1,264 @@
+package tui
+
+import (
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// loadedMsg and tickMsg stand in for the messages of real views, which the AppModel passes on
+// without looking at them.
+type (
+	loadedMsg struct{}
+	tickMsg   struct{}
+)
+
+// stubView is a tea.Model that stands in for a real view: it has a title and remembers what it was
+// updated with, but renders nothing.
+type stubView struct {
+	title    string
+	content  string
+	msgs     []tea.Msg
+	captures bool    // what CapturesKeys reports, i.e. whether the view has a dialog open
+	cmd      tea.Cmd // returned from every Update, so a test can follow it back out
+	initCmd  tea.Cmd // returned from Init, for the same reason
+}
+
+func (v *stubView) Title() string { return v.title }
+
+func (v *stubView) CapturesKeys() bool { return v.captures }
+
+func (v *stubView) Init() tea.Cmd { return v.initCmd }
+
+// TestAppModel_InitStartsEveryView covers that starting the app starts all of its views, not only
+// the one on display: the view behind it has to have loaded by the time it is switched to.
+func TestAppModel_InitStartsEveryView(t *testing.T) {
+	holdings := &stubView{title: "Holdings", initCmd: func() tea.Msg { return tickMsg{} }}
+	vesting := &stubView{title: "Vesting", initCmd: func() tea.Msg { return loadedMsg{} }}
+	quiet := &stubView{title: "Quiet"} // a view with nothing to do on startup holds up nothing
+	m := NewAppModel(DefaultStyle(), holdings, vesting, quiet)
+
+	cmd := m.Init()
+	require.NotNil(t, cmd, "the commands of the views are passed on")
+
+	batch, ok := runCmd(t, cmd).(tea.BatchMsg)
+	require.True(t, ok, "Init batches the commands of the views")
+	require.Len(t, batch, 2, "the view without a command adds nothing to the batch")
+
+	msgs := []tea.Msg{runCmd(t, batch[0]), runCmd(t, batch[1])}
+	assert.ElementsMatch(t, []tea.Msg{tickMsg{}, loadedMsg{}}, msgs)
+}
+
+func (v *stubView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	v.msgs = append(v.msgs, msg)
+	return v, v.cmd
+}
+
+func (v *stubView) View() tea.View { return tea.NewView(v.content) }
+
+// TestAppModel_RendersTabBarBelowActiveView covers the frame the app renders:
+// the view on display, then the tab bar, and nothing of the other views.
+func TestAppModel_RendersTabBarBelowActiveView(t *testing.T) {
+	holdings := &stubView{title: "Holdings", content: "the lots"}
+	vesting := &stubView{title: "Vesting", content: "the vests"}
+	m := NewAppModel(DefaultStyle(), holdings, vesting)
+
+	assert.Equal(t, "the lots\n1 Holdings • 2 Vesting", ansi.Strip(m.View().Content))
+
+	m = driveApp(t, m, keyPressed("2"))
+	assert.Equal(t, "the vests\n1 Holdings • 2 Vesting", ansi.Strip(m.View().Content))
+}
+
+// TestAppModel_SwitchView covers the keys that move between views: a digit selects the view with
+// that number, and tab cycles forwards while shift+tab cycles backwards, wrapping at either end.
+// A digit without a view of its own leaves the selection alone.
+func TestAppModel_SwitchView(t *testing.T) {
+	tab := tea.KeyPressMsg{Code: tea.KeyTab}
+	shiftTab := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
+
+	cases := map[string]struct {
+		keys     []tea.Msg
+		expected int
+	}{
+		"nothing pressed yet":     {keys: nil, expected: 0},
+		"2 selects the second":    {keys: keysPressed("2"), expected: 1},
+		"1 selects the first":     {keys: keysPressed("21"), expected: 0},
+		"3 has no view":           {keys: keysPressed("3"), expected: 0},
+		"0 has no view":           {keys: keysPressed("20"), expected: 1},
+		"tab moves on":            {keys: []tea.Msg{tab}, expected: 1},
+		"tab wraps around":        {keys: []tea.Msg{tab, tab}, expected: 0},
+		"shift+tab moves back":    {keys: []tea.Msg{tab, shiftTab}, expected: 0},
+		"shift+tab wraps as well": {keys: []tea.Msg{shiftTab}, expected: 1},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			m := NewAppModel(DefaultStyle(), &stubView{title: "Holdings"}, &stubView{title: "Vesting"})
+			for _, key := range c.keys {
+				updated, _ := m.Update(key)
+				next, ok := updated.(*AppModel)
+				require.True(t, ok, "Update returned %T, which is not a *tui.AppModel", updated)
+				m = next
+			}
+
+			assert.Equal(t, c.expected, m.selected)
+		})
+	}
+}
+
+// TestAppModel_ForwardsKeysToActiveView covers what happens to a key that does not switch views: it
+// goes to the view on display and to no other. The keys that do switch are the AppModel's own and
+// are not passed on, or a digit typed into a view would arrive twice over.
+func TestAppModel_ForwardsKeysToActiveView(t *testing.T) {
+	holdings := &stubView{title: "Holdings"}
+	vesting := &stubView{title: "Vesting"}
+	m := NewAppModel(DefaultStyle(), holdings, vesting)
+
+	m = driveApp(t, m, keyPressed("a"))
+	assert.Equal(t, []tea.Msg{keyPressed("a")}, holdings.msgs, "the view on display gets the key")
+	assert.Empty(t, vesting.msgs, "the other view gets nothing")
+
+	driveApp(t, m, keyPressed("2"), keyPressed("e"))
+	assert.Equal(t, []tea.Msg{keyPressed("a")}, holdings.msgs, "the view left behind gets nothing more")
+	assert.Equal(t, []tea.Msg{keyPressed("e")}, vesting.msgs, "the view switched to gets the key")
+}
+
+// TestAppModel_ForwardsOtherMessagesToEveryView covers messages that are not keys: a view that is
+// not on display still has to see them, or the size it renders at goes stale and the commands it
+// started come back to nobody.
+func TestAppModel_ForwardsOtherMessagesToEveryView(t *testing.T) {
+	holdings := &stubView{title: "Holdings"}
+	vesting := &stubView{title: "Vesting"}
+	m := NewAppModel(DefaultStyle(), holdings, vesting)
+
+	driveApp(t, m, tickMsg{})
+
+	assert.Equal(t, []tea.Msg{tickMsg{}}, holdings.msgs)
+	assert.Equal(t, []tea.Msg{tickMsg{}}, vesting.msgs)
+}
+
+// TestAppModel_ShrinksTheWindowForTheTabBar covers the one message the AppModel does not pass on
+// untouched: the window is a line shorter for a view than it is for the app, because the tab bar
+// sits on that line. A view that rendered to the full height would push the tab bar off the screen.
+func TestAppModel_ShrinksTheWindowForTheTabBar(t *testing.T) {
+	holdings := &stubView{title: "Holdings"}
+	vesting := &stubView{title: "Vesting"}
+	m := NewAppModel(DefaultStyle(), holdings, vesting)
+
+	driveApp(t, m, tea.WindowSizeMsg{Width: 100, Height: 40})
+
+	expected := []tea.Msg{tea.WindowSizeMsg{Width: 100, Height: 39}}
+	assert.Equal(t, expected, holdings.msgs)
+	assert.Equal(t, expected, vesting.msgs)
+}
+
+// TestAppModel_PassesOnCommands covers that a command a view returns is not dropped on the way out
+// of the AppModel's Update.
+func TestAppModel_PassesOnCommands(t *testing.T) {
+	refresh := func() tea.Msg { return tickMsg{} }
+	holdings := &stubView{title: "Holdings", cmd: refresh}
+	m := NewAppModel(DefaultStyle(), holdings, &stubView{title: "Vesting"})
+
+	_, cmd := m.Update(keyPressed("a"))
+	require.NotNil(t, cmd, "the command of the view on display is passed on")
+	assert.IsType(t, tickMsg{}, runCmd(t, cmd))
+}
+
+// driveApp feeds msgs through the AppModel's Update in order and returns the model that comes out
+// the far end, like drive does for the lots.
+func driveApp(t *testing.T, m *AppModel, msgs ...tea.Msg) *AppModel {
+	t.Helper()
+
+	for _, msg := range msgs {
+		updated, _ := m.Update(msg)
+		next, ok := updated.(*AppModel)
+		require.True(t, ok, "Update returned %T, which is not a *tui.AppModel", updated)
+		m = next
+	}
+
+	return m
+}
+
+// TestTabBar covers the text of the tab bar: every view's title after the number that selects it,
+// bulleted like the help lines above it. Which tab is selected only shows in the styling, so the
+// text is the same whichever one it is.
+func TestTabBar(t *testing.T) {
+	cases := map[string]struct {
+		selected int
+		expected string
+	}{
+		"first tab selected": {
+			selected: 0,
+			expected: "1 Holdings • 2 Vesting",
+		},
+		"second tab selected": {
+			selected: 1,
+			expected: "1 Holdings • 2 Vesting",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			bar := tabBar([]string{"Holdings", "Vesting"}, c.selected, DefaultStyle())
+			assert.Equal(t, c.expected, ansi.Strip(bar))
+		})
+	}
+}
+
+// TestTabBar_Styled covers which tab stands out: the selected one, number and all, is rendered in
+// TabSelected and every other tab in Tab. The styles are the test's own, so that they are certain
+// to differ whatever DefaultStyle picks.
+func TestTabBar_Styled(t *testing.T) {
+	style := Style{
+		Tab:         lipgloss.NewStyle().Faint(true),
+		TabSelected: lipgloss.NewStyle().Bold(true),
+	}
+
+	cases := map[string]struct {
+		selected int
+		expected string
+	}{
+		"first tab selected": {
+			selected: 0,
+			expected: style.TabSelected.Render("1 Holdings") + " • " + style.Tab.Render("2 Vesting"),
+		},
+		"second tab selected": {
+			selected: 1,
+			expected: style.Tab.Render("1 Holdings") + " • " + style.TabSelected.Render("2 Vesting"),
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, c.expected, tabBar([]string{"Holdings", "Vesting"}, c.selected, style))
+		})
+	}
+}
+
+// TestAppModel_CapturingViewKeepsTheKeys covers the keys that switch views going to the view on
+// display instead, while that view says it is capturing them. That is what a dialog does: a digit
+// is typed into the spec of a lot or grant, so it may not be spent on the tab bar. The view keeps the keys only while it says so, so the tab bar works again
+// as soon as the dialog closes.
+func TestAppModel_CapturingViewKeepsTheKeys(t *testing.T) {
+	tab := tea.KeyPressMsg{Code: tea.KeyTab}
+	shiftTab := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
+	two := keyPressed("2")
+
+	holdings := &stubView{title: "Holdings", captures: true}
+	vesting := &stubView{title: "Vesting"}
+	m := NewAppModel(DefaultStyle(), holdings, vesting)
+
+	m = driveApp(t, m, tab, shiftTab, two)
+	assert.Equal(t, 0, m.selected, "a capturing view is not switched away from")
+	assert.Equal(t, []tea.Msg{tab, shiftTab, two}, holdings.msgs, "the keys go to the view itself")
+	assert.Empty(t, vesting.msgs, "and to no other view")
+
+	holdings.captures = false
+	m = driveApp(t, m, tab)
+	assert.Equal(t, 1, m.selected, "once the view lets go, tab switches views again")
+	assert.Len(t, holdings.msgs, 3, "and the key that switched is not passed on")
+}
