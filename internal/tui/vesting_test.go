@@ -1,0 +1,37 @@
+package tui
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+// TestDueIn covers how far off a vest is, in the words of the last column of the Vesting table. The
+// nearer the day, the finer the unit: days up to two months out, then whole months, and whole years
+// from two years on, since nobody plans by the day for a vest that is years away. A vest whose day
+// has come and which has not been released is pending, as the bank calls it.
+func TestDueIn(t *testing.T) {
+	today := day("2026-10-02")
+
+	tests := map[string]struct {
+		date     string
+		expected string
+	}{
+		"today":                    {date: "2026-10-02", expected: "pending"},
+		"in the past":              {date: "2026-08-15", expected: "pending"},
+		"tomorrow":                 {date: "2026-10-03", expected: "in 1 day"},
+		"in some days":             {date: "2026-11-15", expected: "in 44 days"},
+		"the last to read in days": {date: "2026-11-30", expected: "in 59 days"},
+		"two months":               {date: "2026-12-02", expected: "in 2 months"},
+		"months are rounded down":  {date: "2027-02-20", expected: "in 4 months"},
+		"almost two years":         {date: "2028-10-01", expected: "in 23 months"},
+		"two years":                {date: "2028-10-02", expected: "in 2 years"},
+		"years are rounded down":   {date: "2030-08-20", expected: "in 3 years"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, dueIn(day(tt.date), today))
+		})
+	}
+}
