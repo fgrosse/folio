@@ -55,6 +55,7 @@ type HoldingsModel struct {
 	width     int              // width of the table, which the header line is spread across
 	now       func() time.Time // the clock that says what today is
 	portfolio Portfolio        // the account as it was last loaded
+	lots      []portfolio.Lot  // the lots on display, as the table shows them: those with shares left
 	err       error            // why the last load failed or had no fresh quotes, nil unless it did
 
 	refreshInterval time.Duration  // how long the quotes are left alone before they are fetched again
@@ -233,11 +234,11 @@ func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 // longer has one. Without a lot to select, there is nothing to edit.
 func (m *HoldingsModel) editSelected() (tea.Model, tea.Cmd) {
 	i := m.table.Cursor()
-	if i < 0 || i >= len(m.portfolio.Lots) {
+	if i < 0 || i >= len(m.lots) {
 		return m, nil
 	}
 
-	lot := m.portfolio.Lots[i]
+	lot := m.lots[i]
 	submit := func(spec string) (tea.Msg, error) {
 		edited, err := portfolio.NewLot(spec)
 		if err != nil {
@@ -262,11 +263,11 @@ func (m *HoldingsModel) editSelected() (tea.Model, tea.Cmd) {
 // if the answer is yes. Without a lot to select, there is nothing to ask.
 func (m *HoldingsModel) askToDelete() (tea.Model, tea.Cmd) {
 	i := m.table.Cursor()
-	if i < 0 || i >= len(m.portfolio.Lots) {
+	if i < 0 || i >= len(m.lots) {
 		return m, nil
 	}
 
-	lot := m.portfolio.Lots[i]
+	lot := m.lots[i]
 	question := fmt.Sprintf("Delete the %s %s of %s?", lot.Shares, lot.Symbol, lot.Acquired.Format(time.DateOnly))
 	m.confirm = NewConfirmDialog("Delete lot", question, DeleteLotMsg{id: lot.ID}, m.style)
 
@@ -313,10 +314,18 @@ func (m *HoldingsModel) saveLotCmd(lot portfolio.Lot) tea.Cmd {
 	}
 }
 
-// updateRows fills the table with a row for every lot of the portfolio.
+// updateRows fills the table with a row for every lot of the portfolio that has shares left. A lot
+// that was sold to the last share is no holding any more, and is found among the sales.
 func (m *HoldingsModel) updateRows() {
-	rows := make([]table.Row, len(m.portfolio.Lots))
-	for i, lot := range m.portfolio.Lots {
+	m.lots = nil
+	for _, lot := range m.portfolio.Lots {
+		if lot.Remaining().IsPositive() {
+			m.lots = append(m.lots, lot)
+		}
+	}
+
+	rows := make([]table.Row, len(m.lots))
+	for i, lot := range m.lots {
 		rows[i] = lotRow(lot, m.portfolio.Quotes[lot.Symbol])
 	}
 
@@ -384,7 +393,7 @@ func (m *HoldingsModel) helpView() string {
 		help.ShortHelpView([]key.Binding{m.keys.Add, m.keys.Edit, m.keys.Delete})
 }
 
-// positions sums up lots as how many shares of each stock they hold, the stocks in alphabetical
+// positions sums up lots as how many shares of each stock are left of them, the stocks in alphabetical
 // order, such as "3 AAPL · 10 PANW". It is what the Holdings view says above its table, where the
 // rows only have the shares of one lot each.
 func positions(lots []portfolio.Lot) string {
@@ -394,7 +403,13 @@ func positions(lots []portfolio.Lot) string {
 
 	shares := make(map[string]decimal.Decimal)
 	for _, lot := range lots {
-		shares[lot.Symbol] = shares[lot.Symbol].Add(lot.Shares)
+		if left := lot.Remaining(); left.IsPositive() {
+			shares[lot.Symbol] = shares[lot.Symbol].Add(left)
+		}
+	}
+
+	if len(shares) == 0 {
+		return "No shares held"
 	}
 
 	var parts []string
@@ -406,7 +421,7 @@ func positions(lots []portfolio.Lot) string {
 }
 
 // lotRow renders a lot as a row of the Holdings table, with the grant it was released from, if any,
-// what a share of it cost, if that is known, and valued at quote, which is the zero Quote if there
+// the shares that are left of it, what one of them cost, if that is known, and valued at quote, which is the zero Quote if there
 // is none of the lot's stock. The numbers are right-aligned for their digits to line up down
 // the column. The table has no alignment of its own, so the values are padded out here.
 func lotRow(lot portfolio.Lot, quote portfolio.Quote) table.Row {
@@ -416,14 +431,14 @@ func lotRow(lot portfolio.Lot, quote portfolio.Quote) table.Row {
 	}
 	if quote.Symbol != "" {
 		price = portfolio.FormatUSD(quote.Price)
-		value = portfolio.FormatUSD(lot.Shares.Mul(quote.Price))
+		value = portfolio.FormatUSD(lot.Remaining().Mul(quote.Price))
 	}
 
 	return table.Row{
 		lot.Acquired.Format(time.DateOnly),
 		lot.Symbol,
 		lot.Grant,
-		fmt.Sprintf("%*s", sharesColumnWidth, lot.Shares),
+		fmt.Sprintf("%*s", sharesColumnWidth, lot.Remaining()),
 		fmt.Sprintf("%*s", priceColumnWidth, cost),
 		fmt.Sprintf("%*s", priceColumnWidth, price),
 		fmt.Sprintf("%*s", valueColumnWidth, value),

@@ -351,6 +351,23 @@ func TestHoldingsModel_EditKeepsTheDay(t *testing.T) {
 	assert.False(t, empty.CapturesKeys(), "there should be no dialog without a lot")
 }
 
+// TestHoldingsModel_ShowsWhatIsLeft covers lots that shares were sold from: a row shows the shares
+// that remain of its lot and what those are worth, and a lot that was sold to the last share is not
+// a holding any more and has no row. The positions above the table count what is left as well.
+func TestHoldingsModel_ShowsWhatIsLeft(t *testing.T) {
+	p := testPortfolio()
+	p.Lots[0].Sold = dec("2")   // of 6
+	p.Lots[1].Sold = dec("2.5") // all of it
+
+	m, _ := newTestingHoldings(t)
+	m.Update(PortfolioLoadedMsg{portfolio: p})
+
+	rows := m.table.Rows()
+	require.Len(t, rows, 1)
+	assert.Equal(t, table.Row{"2026-01-15", "PANW", "Payout", "         4", "   $380.12", "   $396.25", "     $1,585.00"}, rows[0])
+	assert.Contains(t, ansi.Strip(m.View().Content), "  4 PANW ")
+}
+
 // TestPositions covers the line the Holdings view puts above its table: how many shares of each
 // stock the lots add up to, which no single row says. The stocks are in alphabetical order, and an
 // account without lots says so.
