@@ -27,6 +27,27 @@ func Repeating(first time.Time, everyMonths, count int, shares decimal.Decimal) 
 	return vests
 }
 
+// Graded returns the schedule of a grant of total shares that vests a different share of them in
+// each year: percentPerYear has the percentage of every year, in order, which is spread evenly over
+// the vests of that year. The first vest is on the day first, and the others follow every so many
+// months, which have to divide a year.
+func Graded(first time.Time, everyMonths int, total decimal.Decimal, percentPerYear []int) []Vest {
+	vestsPerYear := 12 / everyMonths
+
+	var vests []Vest
+	for year, percent := range percentPerYear {
+		ofYear := total.Mul(decimal.NewFromInt(int64(percent))).Div(decimal.NewFromInt(100))
+		each := ofYear.Div(decimal.NewFromInt(int64(vestsPerYear)))
+
+		for i := range vestsPerYear {
+			months := (year*vestsPerYear + i) * everyMonths
+			vests = append(vests, Vest{Date: addMonths(first, months), Shares: each.Floor()})
+		}
+	}
+
+	return vests
+}
+
 // addMonths returns the day that many months after day: the same day of the month, or the last day
 // of a month that is too short to have it. time.Time.AddDate would spill over into the month after
 // instead, and turn the 31st of January into the 3rd of March.

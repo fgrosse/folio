@@ -35,3 +35,29 @@ func TestRepeating_EndOfMonth(t *testing.T) {
 	}
 	assert.Equal(t, expected, vests)
 }
+
+// TestGraded covers the schedule of a grant that vests more with every year: so many percent of
+// all its shares in each year, spread evenly over the vests of that year.
+func TestGraded(t *testing.T) {
+	vests := Graded(day("2026-02-20"), 3, shares("400"), []int{10, 20, 30, 40})
+
+	expected := []Vest{
+		{Date: day("2026-02-20"), Shares: shares("10")},
+		{Date: day("2026-05-20"), Shares: shares("10")},
+		{Date: day("2026-08-20"), Shares: shares("10")},
+		{Date: day("2026-11-20"), Shares: shares("10")},
+		{Date: day("2027-02-20"), Shares: shares("20")},
+		{Date: day("2027-05-20"), Shares: shares("20")},
+		{Date: day("2027-08-20"), Shares: shares("20")},
+		{Date: day("2027-11-20"), Shares: shares("20")},
+		{Date: day("2028-02-20"), Shares: shares("30")},
+		{Date: day("2028-05-20"), Shares: shares("30")},
+		{Date: day("2028-08-20"), Shares: shares("30")},
+		{Date: day("2028-11-20"), Shares: shares("30")},
+		{Date: day("2029-02-20"), Shares: shares("40")},
+		{Date: day("2029-05-20"), Shares: shares("40")},
+		{Date: day("2029-08-20"), Shares: shares("40")},
+		{Date: day("2029-11-20"), Shares: shares("40")},
+	}
+	assert.Equal(t, expected, vests)
+}
