@@ -20,21 +20,29 @@ type Lot struct {
 	// Acquired is the calendar day the shares arrived, at midnight UTC.
 	Acquired time.Time
 
+	// Cost is what one share of the lot cost when it was acquired: the price it was bought at, or
+	// what it was worth on the day it vested. A gain is measured from it, and with it the tax that is
+	// due. It is zero if it is not known.
+	Cost decimal.Decimal
+
 	// Grant is the name of the grant the lot was released from, and empty for a lot that was entered
 	// by hand. The store fills it in when it lists lots, and ignores it when it saves one.
 	Grant string
 }
 
 // lotSyntax is how a lot is written, for the errors that say so.
-const lotSyntax = `a lot is written as "<shares> <symbol> [YYYY-MM-DD]"`
+const lotSyntax = `a lot is written as "<shares> <symbol> [YYYY-MM-DD] [@<cost>]"`
 
-// NewLot parses a lot from its spec, "<shares> <symbol> [YYYY-MM-DD]", such as "12.5 PANW 2026-03-15".
-// The symbol is written in capitals however it was typed. The day is optional: a lot without one
-// comes back with a zero Acquired for the caller to fill in, who knows what today is. Apart from
-// that day, the lot that comes back is valid.
+// NewLot parses a lot from its spec, "<shares> <symbol> [YYYY-MM-DD] [@<cost>]", such as
+// "12.5 PANW 2026-03-15 @380.12". The symbol is written in capitals however it was typed.
+//
+// The day and the cost are optional, and come in either order. A lot without a day comes back with
+// a zero Acquired for the caller to fill in, who knows what today is, and a lot without a cost with
+// a zero Cost, which says that it is not known. Apart from that day, the lot that comes back is
+// valid.
 func NewLot(spec string) (Lot, error) {
 	fields := strings.Fields(spec)
-	if len(fields) < 2 || len(fields) > 3 {
+	if len(fields) < 2 || len(fields) > 4 {
 		return Lot{}, errors.New(lotSyntax)
 	}
 
@@ -48,14 +56,32 @@ func NewLot(spec string) (Lot, error) {
 		return Lot{}, lot.Validate()
 	}
 
-	if len(fields) == 3 {
-		lot.Acquired, err = ParseDay(fields[2])
+	for _, field := range fields[2:] {
+		switch isCost := strings.HasPrefix(field, "@"); {
+		case isCost && !lot.Cost.IsZero(), !isCost && !lot.Acquired.IsZero():
+			return Lot{}, errors.New(lotSyntax) // a second cost, or a second day
+		case isCost:
+			lot.Cost, err = ParseCost(field)
+		default:
+			lot.Acquired, err = ParseDay(field)
+		}
 		if err != nil {
 			return Lot{}, err
 		}
 	}
 
 	return lot, nil
+}
+
+// ParseCost parses what a share cost, written after an "@" such as "@380.12", which has to be more
+// than nothing.
+func ParseCost(s string) (decimal.Decimal, error) {
+	cost, err := decimal.NewFromString(strings.TrimPrefix(s, "@"))
+	if err != nil || !strings.HasPrefix(s, "@") || !cost.IsPositive() {
+		return decimal.Decimal{}, fmt.Errorf("%q is not a cost such as @380.12", s)
+	}
+
+	return cost, nil
 }
 
 // DayOf returns the calendar day that t falls on where t is, at midnight UTC, which is how every

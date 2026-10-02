@@ -52,15 +52,15 @@ func TestNewLot_Errors(t *testing.T) {
 	}{
 		"empty": {
 			spec:  "",
-			error: `a lot is written as "<shares> <symbol> [YYYY-MM-DD]"`,
+			error: `a lot is written as "<shares> <symbol> [YYYY-MM-DD] [@<cost>]"`,
 		},
 		"only shares": {
 			spec:  "12",
-			error: `a lot is written as "<shares> <symbol> [YYYY-MM-DD]"`,
+			error: `a lot is written as "<shares> <symbol> [YYYY-MM-DD] [@<cost>]"`,
 		},
 		"too many fields": {
-			spec:  "12 PANW 2026-03-15 vested",
-			error: `a lot is written as "<shares> <symbol> [YYYY-MM-DD]"`,
+			spec:  "12 PANW 2026-03-15 @380.12 vested",
+			error: `a lot is written as "<shares> <symbol> [YYYY-MM-DD] [@<cost>]"`,
 		},
 		"shares that are not a number": {
 			spec:  "twelve PANW",
@@ -74,12 +74,60 @@ func TestNewLot_Errors(t *testing.T) {
 			spec:  "0 PANW",
 			error: "lot of PANW must have more than 0 shares",
 		},
+		"two days": {
+			spec:  "12 PANW 2026-03-15 2026-03-16",
+			error: `a lot is written as "<shares> <symbol> [YYYY-MM-DD] [@<cost>]"`,
+		},
+		"two costs": {
+			spec:  "12 PANW @380.12 @381",
+			error: `a lot is written as "<shares> <symbol> [YYYY-MM-DD] [@<cost>]"`,
+		},
+		"a cost that is not a number": {
+			spec:  "12 PANW @cheap",
+			error: `"@cheap" is not a cost such as @380.12`,
+		},
+		"a cost of nothing": {
+			spec:  "12 PANW @0",
+			error: `"@0" is not a cost such as @380.12`,
+		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			_, err := NewLot(tt.spec)
 			assert.EqualError(t, err, tt.error)
+		})
+	}
+}
+
+// TestNewLot_Cost covers the price the shares of a lot were acquired at, which a spec gives after an
+// "@": what a share cost on the day it was bought, or what it was worth on the day it vested. It is
+// what a gain is measured from, and with it what tax is due on. The cost is optional and may come
+// before or after the day.
+func TestNewLot_Cost(t *testing.T) {
+	tests := map[string]struct {
+		spec     string
+		expected Lot
+	}{
+		"a cost after the day": {
+			spec:     "12.5 PANW 2026-03-15 @380.12",
+			expected: Lot{Symbol: "PANW", Shares: shares("12.5"), Acquired: day("2026-03-15"), Cost: shares("380.12")},
+		},
+		"a cost before the day": {
+			spec:     "12.5 PANW @380.12 2026-03-15",
+			expected: Lot{Symbol: "PANW", Shares: shares("12.5"), Acquired: day("2026-03-15"), Cost: shares("380.12")},
+		},
+		"a cost without a day": {
+			spec:     "40 PANW @396",
+			expected: Lot{Symbol: "PANW", Shares: shares("40"), Cost: shares("396")},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			lot, err := NewLot(tt.spec)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, lot)
 		})
 	}
 }
