@@ -1,0 +1,21 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "PANW",
+          "exchangeName": "NMS",
+          "instrumentType": "EQUITY",
+          "regularMarketTime": 1790884800,
+          "regularMarketPrice": 396.25,
+          "regularMarketDayHigh": 398.5,
+          "regularMarketDayLow": 387.02,
+          "longName": "Palo Alto Networks, Inc.",
+          "chartPreviousClose": 397.31
+        }
+      }
+    ],
+    "error": null
+  }
+}
