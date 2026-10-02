@@ -99,6 +99,65 @@ func TestSalesModel_ShowsErrors(t *testing.T) {
 	assert.Len(t, m.table.Rows(), 2, "the sales should stay on display")
 }
 
+// TestSalesModel_DeleteSale covers taking a sale back: d asks before it deletes the selected sale,
+// naming it, and only a y has the store delete it, which gives its shares back to their lot, after
+// which the view loads the portfolio again. A no closes the question and deletes nothing.
+func TestSalesModel_DeleteSale(t *testing.T) {
+	m, store := newTestingSales(t)
+	m.Update(keyPressed("j")) // the second sale
+
+	m.Update(keyPressed("d"))
+	require.True(t, m.CapturesKeys(), "the question should take the keyboard")
+	frame := ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "Delete the sale of 1 PANW on 2026-09-15?")
+	assert.Contains(t, frame, "y delete • n cancel")
+
+	_, cmd := m.Update(keyPressed("n"))
+	_, cmd = m.Update(runCmd(t, cmd))
+	assert.Nil(t, cmd)
+	assert.False(t, m.CapturesKeys(), "a no should close the question")
+
+	m.Update(keyPressed("d"))
+	_, cmd = m.Update(keyPressed("y"))
+	msg := runCmd(t, cmd)
+	require.Equal(t, DeleteSaleMsg{id: 2}, msg)
+
+	store.On("DeleteSale", 2).Return(nil)
+	_, cmd = m.Update(msg)
+	assert.False(t, m.CapturesKeys(), "the question should be closed")
+	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
+	store.AssertExpectations(t)
+}
+
+// TestSalesModel_DeleteWithNothingSelected covers d before anything was sold, where there is nothing
+// to ask about.
+func TestSalesModel_DeleteWithNothingSelected(t *testing.T) {
+	store := new(MockStore)
+	store.returns(Portfolio{})
+	m := NewSalesModel(store, DefaultStyle())
+	m.Update(runCmd(t, m.Init()))
+
+	_, cmd := m.Update(keyPressed("d"))
+
+	assert.Nil(t, cmd)
+	assert.False(t, m.CapturesKeys(), "there should be no question to answer")
+	assert.Contains(t, ansi.Strip(m.View().Content), "Nothing sold yet")
+}
+
+// TestSalesModel_ShowsTheNote covers the notes of a sale, which the table has no column for: the
+// note of the selected sale stands under the summary, where the prices otherwise are, all of its
+// lines on that one. A sale without a note leaves the prices there.
+func TestSalesModel_ShowsTheNote(t *testing.T) {
+	m, _ := newTestingSales(t)
+	assert.Contains(t, ansi.Strip(m.View().Content), "PANW $396.25")
+
+	m.Update(keyPressed("j"))
+
+	frame := ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "for the kitchen · sold in the morning")
+	assert.NotContains(t, frame, "PANW $396.25 ▼")
+}
+
 // TestSaleRow covers how one sale reads as a row of the Sales table: its day, the stock and the
 // grant its lot was from, and the numbers right-aligned - how many shares, what one sold for, what
 // that brought in, and how much of it is gain over what the shares cost. A gain says which way it

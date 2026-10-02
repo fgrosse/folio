@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/shopspring/decimal"
 
 	"github.com/fgrosse/folio/internal/portfolio"
@@ -14,14 +15,36 @@ import (
 // values are on the right. If the portfolio could not be loaded or its quotes not refreshed, err
 // says why, and stands where the prices otherwise are.
 func portfolioHeader(left string, p Portfolio, err error, width int, style Style) string {
+	return notedHeader(left, "", p, err, width, style)
+}
+
+// notedHeader renders the header of a portfolio like portfolioHeader, with note in the place of the
+// prices unless it is empty. A view puts there what it has to say about the row that is selected.
+// An error still comes first, and a note too long for the room left of the account values is cut
+// short.
+func notedHeader(left, note string, p Portfolio, err error, width int, style Style) string {
 	account := portfolio.NewAccount(p.Lots, p.Grants, p.Quotes)
+
 	status := style.Hint.Render(quoteStatus(portfolio.Symbols(p.Lots, p.Grants), p.Quotes))
-	if err != nil {
+	switch {
+	case err != nil:
 		// Errors of several quotes come joined by newlines, and the header has one line for them.
 		status = style.Error.Render(strings.ReplaceAll(err.Error(), "\n", " · "))
+	case note != "":
+		// The values on the right are about as wide as their labels and three amounts.
+		room := width - lipgloss.Width(accountParts(account)) - headerGap
+		status = style.Hint.Render(ansi.Truncate(note, room, "…"))
 	}
 
 	return accountHeader(left, status, account, width, style)
+}
+
+// headerGap is the least space between the two halves of a header line.
+const headerGap = 2
+
+// accountParts renders the two values the total is made of, for the second line of the header.
+func accountParts(account portfolio.Account) string {
+	return "Current " + portfolio.FormatUSD(account.Current) + " · Potential " + portfolio.FormatUSD(account.Potential)
 }
 
 // accountHeader renders the two lines above the table of a view. The right half is the same in
@@ -33,9 +56,7 @@ func portfolioHeader(left string, p Portfolio, err error, width int, style Style
 // last column's do.
 func accountHeader(left, status string, account portfolio.Account, width int, style Style) string {
 	total := style.Total.Render("Total: " + portfolio.FormatUSD(account.Total()))
-	parts := style.Hint.Render(
-		"Current " + portfolio.FormatUSD(account.Current) + " · Potential " + portfolio.FormatUSD(account.Potential),
-	)
+	parts := style.Hint.Render(accountParts(account))
 
 	return spread(left, total, width) + "\n" + spread(status, parts, width)
 }

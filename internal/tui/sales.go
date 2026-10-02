@@ -2,11 +2,13 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/shopspring/decimal"
 
 	"github.com/fgrosse/folio/internal/portfolio"
@@ -24,9 +26,15 @@ type SalesModel struct {
 	style     Style
 	keys      keyMap
 	table     table.Model
-	width     int       // width of the table, which the header line is spread across
-	portfolio Portfolio // the account as it was last loaded
-	err       error     // why the last load failed or had no fresh quotes, nil unless it did
+	width     int            // width of the table, which the header line is spread across
+	portfolio Portfolio      // the account as it was last loaded
+	err       error          // why the last load failed or had no fresh quotes, nil unless it did
+	confirm   *ConfirmDialog // the dialog asking whether to delete a sale, nil unless it is open
+}
+
+// DeleteSaleMsg reports that the user confirmed deleting the sale with the given ID.
+type DeleteSaleMsg struct {
+	id int
 }
 
 // NewSalesModel returns the Sales view over store, rendered in style.
@@ -63,6 +71,12 @@ func (m *SalesModel) Title() string {
 	return "Sales"
 }
 
+// CapturesKeys implements KeyCapturer: while the question is open the keyboard belongs to it, down
+// to the keys that would otherwise switch views.
+func (m *SalesModel) CapturesKeys() bool {
+	return m.confirm != nil
+}
+
 // Init implements tea.Model by loading the portfolio.
 func (m *SalesModel) Init() tea.Cmd {
 	return loadPortfolioCmd(m.store)
@@ -89,21 +103,72 @@ func (m *SalesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateRows()
 		}
 		return m, nil
+	case DeleteSaleMsg:
+		m.confirm = nil
+		return m, m.deleteSaleCmd(msg.id)
+	case ConfirmCanceledMsg:
+		m.confirm = nil
+		return m, nil
 	}
 
 	return m, nil
 }
 
-// handleKeyPress quits on the quit keys and hands every other key to the table, which moves the
-// selection.
+// handleKeyPress quits on the quit keys, asks whether to delete the selected sale on the delete key,
+// and hands every other key to the table, which moves the selection. While the question is open,
+// every key is its own.
 func (m *SalesModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if key.Matches(msg, m.keys.Quit) {
+	if m.confirm != nil {
+		return m, m.confirm.HandleKeyPress(msg)
+	}
+
+	switch {
+	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
+	case key.Matches(msg, m.keys.Delete):
+		return m.askToDelete()
 	}
 
 	var cmd tea.Cmd
 	m.table, cmd = m.table.Update(msg)
 	return m, cmd
+}
+
+// selected returns the sale the selection is on, if there is one.
+func (m *SalesModel) selected() (portfolio.Sale, bool) {
+	i := m.table.Cursor()
+	if i < 0 || i >= len(m.portfolio.Sales) {
+		return portfolio.Sale{}, false
+	}
+
+	return m.portfolio.Sales[i], true
+}
+
+// askToDelete opens a dialog asking whether to delete the selected sale, which sends a DeleteSaleMsg
+// if the answer is yes. Before anything was sold, there is nothing to ask.
+func (m *SalesModel) askToDelete() (tea.Model, tea.Cmd) {
+	sale, ok := m.selected()
+	if !ok {
+		return m, nil
+	}
+
+	question := fmt.Sprintf("Delete the sale of %s %s on %s?", sale.Shares, sale.Symbol, sale.Date.Format(time.DateOnly))
+	m.confirm = NewConfirmDialog("Delete sale", question, DeleteSaleMsg{id: sale.ID}, m.style)
+
+	return m, nil
+}
+
+// deleteSaleCmd returns a command that deletes the sale with the given ID and loads the portfolio
+// again, in which the shares of the sale are their lot's again.
+func (m *SalesModel) deleteSaleCmd(id int) tea.Cmd {
+	store := m.store
+	return func() tea.Msg {
+		if err := store.DeleteSale(id); err != nil {
+			return PortfolioLoadedMsg{err: err}
+		}
+
+		return loadPortfolioCmd(store)()
+	}
 }
 
 // updateRows fills the table with a row for every sale of the portfolio.
@@ -122,22 +187,47 @@ func (m *SalesModel) View() tea.View {
 		m.style.Table.Render(m.table.View()) + "\n" +
 		m.helpView()
 
-	return tea.NewView(trimTrailingSpace(frame) + "\n")
+	layers := []*lipgloss.Layer{lipgloss.NewLayer(frame)}
+	if m.confirm != nil {
+		// The question floats centered in front of the table, as those of the other views do.
+		dialog := m.confirm.Layer()
+		dialog.X((lipgloss.Width(frame) - dialog.Width()) / 2)
+		dialog.Y((lipgloss.Height(frame) - dialog.Height()) / 2)
+		layers = append(layers, dialog)
+	}
+
+	c := lipgloss.NewCompositor(layers...)
+	return tea.NewView(trimTrailingSpace(c.Render()) + "\n")
 }
 
-// headerView renders the two lines above the table: what the sales have realized on the left, with
-// the prices underneath, and the account values on the right.
+// headerView renders the two lines above the table: what the sales have realized on the left, and
+// the account values on the right. Under the summary is the note of the selected sale, which the
+// table has no column for, all of its lines on that one, or the prices if the sale has no note.
 func (m *SalesModel) headerView() string {
-	return portfolioHeader(realizedSummary(m.portfolio.Sales), m.portfolio, m.err, m.width-cellPadding, m.style)
+	var note string
+	if sale, ok := m.selected(); ok {
+		note = strings.Join(strings.Fields(strings.ReplaceAll(sale.Note, "\n", " · ")), " ")
+	}
+
+	return notedHeader(realizedSummary(m.portfolio.Sales), note, m.portfolio, m.err, m.width-cellPadding, m.style)
 }
 
 // helpView renders the keys worth knowing in two lines, as every view does: getting around on the
-// first, and what can be done to the table on the second, which is nothing yet and stays empty so
-// that the frame has the height of the other views'.
+// first, and what can be done to the selected sale on the second. While the question is open it
+// shows the keys that answer it instead, on one line, and leaves the second empty so that the frame
+// keeps its height.
 func (m *SalesModel) helpView() string {
 	help, nav := m.table.Help, m.table.KeyMap
 
-	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n"
+	if m.confirm != nil {
+		return help.ShortHelpView([]key.Binding{
+			key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "delete")),
+			key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "cancel")),
+		}) + "\n"
+	}
+
+	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n" +
+		help.ShortHelpView([]key.Binding{m.keys.Delete})
 }
 
 // realizedSummary sums up sales as the money they brought in and the gain in it, such as "Realized
