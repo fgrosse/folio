@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"charm.land/bubbles/v2/table"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/fgrosse/folio/internal/portfolio"
 )
@@ -12,6 +13,9 @@ import (
 // Column widths of the Holdings table. Every column except the symbol is bounded by its own
 // content, so the symbol is the one that flexes to fill whatever room the window leaves.
 const (
+	// dayColumnWidth fits a day written as YYYY-MM-DD.
+	dayColumnWidth = 10
+
 	// sharesColumnWidth fits a number of shares up to 9,999,999, or fewer with a fraction.
 	sharesColumnWidth = 10
 
@@ -22,9 +26,84 @@ const (
 	// will ever have to add up.
 	valueColumnWidth = 14
 
+	// holdingsColumnsWidth is what every column other than the symbol occupies, padding included.
+	holdingsColumnsWidth = dayColumnWidth + sharesColumnWidth + priceColumnWidth + valueColumnWidth + 4*cellPadding
+
 	// noValue stands where a price or value would be if there was a quote to work it out from.
 	noValue = "-"
 )
+
+// A HoldingsModel is the Holdings view: every lot of the account, with what it is worth at the
+// latest price of its stock.
+type HoldingsModel struct {
+	store     Store
+	style     Style
+	table     table.Model
+	width     int       // width of the table, which the header line is spread across
+	portfolio Portfolio // the account as it was last loaded
+}
+
+// NewHoldingsModel returns the Holdings view over store, rendered in style.
+func NewHoldingsModel(store Store, style Style) *HoldingsModel {
+	m := &HoldingsModel{
+		store: store,
+		style: style,
+		// A real width arrives with the first WindowSizeMsg, which Bubble Tea sends at startup.
+		// Until then the narrowest supported layout is the safest thing to hold.
+		width: minTableWidth,
+	}
+	m.table = newTable(style, m.columns())
+
+	return m
+}
+
+// columns returns the table's columns, the symbol column taking whatever the width leaves. The
+// titles of the number columns are padded like the numbers under them, so that they end where the
+// numbers do.
+func (m *HoldingsModel) columns() []table.Column {
+	return []table.Column{
+		{Title: "Acquired", Width: dayColumnWidth},
+		{Title: "Symbol", Width: m.width - holdingsColumnsWidth - cellPadding},
+		{Title: fmt.Sprintf("%*s", sharesColumnWidth, "Shares"), Width: sharesColumnWidth},
+		{Title: fmt.Sprintf("%*s", priceColumnWidth, "Price"), Width: priceColumnWidth},
+		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Value"), Width: valueColumnWidth},
+	}
+}
+
+// Title implements ViewModel by naming the view in the app's tab bar.
+func (m *HoldingsModel) Title() string {
+	return "Holdings"
+}
+
+// Init implements tea.Model by loading the portfolio.
+func (m *HoldingsModel) Init() tea.Cmd {
+	return loadPortfolioCmd(m.store)
+}
+
+// Update implements tea.Model by filling the table with the lots of the portfolio once it is loaded.
+func (m *HoldingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if msg, ok := msg.(PortfolioLoadedMsg); ok {
+		m.portfolio = msg.portfolio
+		m.updateRows()
+	}
+
+	return m, nil
+}
+
+// updateRows fills the table with a row for every lot of the portfolio.
+func (m *HoldingsModel) updateRows() {
+	rows := make([]table.Row, len(m.portfolio.Lots))
+	for i, lot := range m.portfolio.Lots {
+		rows[i] = lotRow(lot, m.portfolio.Quotes[lot.Symbol])
+	}
+
+	m.table.SetRows(rows)
+}
+
+// View implements tea.Model by rendering the table of lots.
+func (m *HoldingsModel) View() tea.View {
+	return tea.NewView(m.style.Table.Render(m.table.View()))
+}
 
 // lotRow renders a lot as a row of the Holdings table, valued at quote, which is the zero Quote if
 // there is none of the lot's stock. The numbers are right-aligned for their digits to line up down

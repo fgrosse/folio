@@ -5,9 +5,30 @@ import (
 
 	"charm.land/bubbles/v2/table"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/fgrosse/folio/internal/portfolio"
 )
+
+// TestHoldingsModel_LoadsPortfolio covers what the Holdings view starts from: once started, it asks
+// the store for the account and shows a row for every lot, valued at the quote the store has of its
+// stock.
+func TestHoldingsModel_LoadsPortfolio(t *testing.T) {
+	p := testPortfolio()
+	store := new(MockStore)
+	store.returns(p)
+
+	m := NewHoldingsModel(store, DefaultStyle())
+	assert.Equal(t, "Holdings", m.Title())
+
+	m.Update(runCmd(t, m.Init()))
+
+	rows := m.table.Rows()
+	require.Len(t, rows, 2)
+	assert.Equal(t, lotRow(p.Lots[0], p.Quotes["PANW"]), rows[0])
+	assert.Equal(t, lotRow(p.Lots[1], p.Quotes["PANW"]), rows[1])
+	store.AssertExpectations(t)
+}
 
 // TestLotRow covers how one lot reads as a row of the Holdings table: the day it was acquired, its
 // symbol, and then the numbers - how many shares, what one is worth and what all of them are -
