@@ -103,6 +103,29 @@ func NewGrant(spec string) (Grant, error) {
 	return grant, nil
 }
 
+// NewListedGrant returns the grant that spec names, "<name>: <symbol>", with vests as its schedule,
+// for a grant whose vests no rule lays out and which are listed one by one instead. See ParseVests.
+func NewListedGrant(spec string, vests []Vest) (Grant, error) {
+	name, symbol, found := strings.Cut(spec, ":")
+	if !found || len(strings.Fields(symbol)) != 1 {
+		return Grant{}, errors.New(`a grant with listed vests is written as "<name>: <symbol>"`)
+	}
+
+	grant := Grant{
+		Name:   strings.TrimSpace(name),
+		Symbol: strings.ToUpper(strings.TrimSpace(symbol)),
+		Vests:  vests,
+	}
+	switch {
+	case grant.Name == "":
+		return Grant{}, errors.New("grant has no name")
+	case len(vests) == 0:
+		return Grant{}, errors.New("grant has no vests")
+	}
+
+	return grant, nil
+}
+
 // newSchedule lays out the vests of a grant spec from the field that says how many there are: a
 // count such as "x24" of vests of that many shares each, or the percentages of the shares that vest
 // in each year, such as "10/20/30/40".
