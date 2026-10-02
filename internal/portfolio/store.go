@@ -3,7 +3,9 @@
 package portfolio
 
 import (
+	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"time"
 
@@ -183,18 +185,52 @@ func (s *SQLiteStore) SaveGrant(grant Grant) error {
 }
 
 // ReleaseVest turns the vest with the given ID into a lot of its grant's stock, acquired on the day
-// of the vest and holding shares, the number that actually arrived. The vest counts as released from
-// then on, for as long as that lot exists.
+// of the vest and holding shares, the number that actually arrived: more than none, and no more than
+// vested. The vest counts as released from then on, for as long as that lot exists, and cannot be
+// released a second time.
 func (s *SQLiteStore) ReleaseVest(id int, shares decimal.Decimal) error {
-	_, err := s.db.Exec(`
+	if !shares.IsPositive() {
+		return errors.New("a vest must release more than 0 shares")
+	}
+
+	tx, err := s.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }() // does nothing once the transaction is committed
+
+	var vest struct {
+		Date     time.Time       `db:"vests_on"`
+		Shares   decimal.Decimal `db:"shares"`
+		Released bool            `db:"released"`
+	}
+	err = tx.Get(&vest, `
+		SELECT vests_on, shares, EXISTS (SELECT 1 FROM lots WHERE lots.vest_id = vests.id) AS released
+		FROM vests
+		WHERE id = ?`, id)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return fmt.Errorf("no vest with ID %d", id)
+	case err != nil:
+		return err
+	case vest.Released:
+		return fmt.Errorf("the vest of %s is released already", vest.Date.Format(time.DateOnly))
+	case shares.GreaterThan(vest.Shares):
+		return fmt.Errorf("the vest of %s has %s shares, not %s", vest.Date.Format(time.DateOnly), vest.Shares, shares)
+	}
+
+	_, err = tx.Exec(`
 		INSERT INTO lots (symbol, shares, acquired_on, vest_id)
 		SELECT grants.symbol, ?, vests.vests_on, vests.id
 		FROM vests JOIN grants ON grants.id = vests.grant_id
 		WHERE vests.id = ?`,
 		shares, id,
 	)
+	if err != nil {
+		return err
+	}
 
-	return err
+	return tx.Commit()
 }
 
 // Quotes returns the latest quote the database has of every symbol it has one of, by symbol. The

@@ -225,3 +225,24 @@ func TestStore_ReleaseVest(t *testing.T) {
 	require.Len(t, grants, 1)
 	assert.Equal(t, expectedVests, grants[0].Vests)
 }
+
+// TestStore_ReleaseVestRefusals covers the vests that cannot be released: one that does not exist,
+// one that has been released already, and one that would release no shares or more than vested.
+func TestStore_ReleaseVestRefusals(t *testing.T) {
+	s := NewTestingStore()
+	require.NoError(t, s.SaveGrant(Grant{
+		Name:   "Payout",
+		Symbol: "PANW",
+		Vests:  Repeating(day("2026-01-15"), 1, 2, shares("10")),
+	}))
+	require.NoError(t, s.ReleaseVest(1, shares("6")))
+
+	assert.EqualError(t, s.ReleaseVest(9, shares("6")), "no vest with ID 9")
+	assert.EqualError(t, s.ReleaseVest(1, shares("6")), "the vest of 2026-01-15 is released already")
+	assert.EqualError(t, s.ReleaseVest(2, shares("0")), "a vest must release more than 0 shares")
+	assert.EqualError(t, s.ReleaseVest(2, shares("10.5")), "the vest of 2026-02-15 has 10 shares, not 10.5")
+
+	lots, err := s.Lots()
+	require.NoError(t, err)
+	assert.Len(t, lots, 1, "a refused release must not make a lot")
+}
