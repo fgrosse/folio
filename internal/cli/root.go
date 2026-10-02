@@ -12,14 +12,16 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/fgrosse/folio/internal/portfolio"
+	"github.com/fgrosse/folio/internal/yahoo"
 )
 
 // Folio is the root command. It owns the store shared by every subcommand: PersistentPreRunE opens
 // and migrates it before any subcommand runs, PersistentPostRunE closes it afterwards.
 type Folio struct {
 	*cobra.Command
-	store *portfolio.SQLiteStore
-	now   func() time.Time
+	store  *portfolio.SQLiteStore
+	quoter portfolio.Quoter // where the prices come from
+	now    func() time.Time
 }
 
 // New builds the folio root command with all its subcommands attached.
@@ -29,7 +31,8 @@ func New() *Folio {
 			Use:   "folio",
 			Short: "Track what your stock is worth, held and still to vest",
 		},
-		now: time.Now,
+		quoter: yahoo.New(),
+		now:    time.Now,
 	}
 	cmd.SilenceErrors = true
 
@@ -42,6 +45,7 @@ func New() *Folio {
 
 	cmd.AddCommand(cmd.LotCmd())
 	cmd.AddCommand(cmd.GrantCmd())
+	cmd.AddCommand(cmd.StatusCmd())
 
 	return cmd
 }
