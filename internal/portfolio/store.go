@@ -131,7 +131,8 @@ func (s *SQLiteStore) sold() (map[int]decimal.Decimal, error) {
 
 // SaveLot records a lot, which has to be valid: a new one if its ID is zero, and otherwise it
 // replaces the lot with that ID, which has to exist. A lot that a vest was released into stays that
-// vest's whatever else about it is replaced, and with it the grant it is from.
+// vest's whatever else about it is replaced, and with it the grant it is from. A lot cannot be
+// replaced by one with fewer shares than were sold from it.
 func (s *SQLiteStore) SaveLot(lot Lot) error {
 	if err := lot.Validate(); err != nil {
 		return err
@@ -144,6 +145,14 @@ func (s *SQLiteStore) SaveLot(lot Lot) error {
 		)
 
 		return err
+	}
+
+	sold, err := s.sold()
+	if err != nil {
+		return err
+	}
+	if sold[lot.ID].GreaterThan(lot.Shares) {
+		return fmt.Errorf("%s shares of the lot were sold, which is more than %s", sold[lot.ID], lot.Shares)
 	}
 
 	result, err := s.db.Exec(
@@ -171,8 +180,20 @@ func nullable(cost decimal.Decimal) decimal.NullDecimal {
 	return decimal.NullDecimal{Decimal: cost, Valid: !cost.IsZero()}
 }
 
-// DeleteLot deletes the lot with the given ID, which has to exist.
+// DeleteLot deletes the lot with the given ID, which has to exist. A lot that shares were sold from
+// is kept until its sales are deleted: they would be left without the shares they sold.
 func (s *SQLiteStore) DeleteLot(id int) error {
+	var sales int
+	if err := s.db.Get(&sales, `SELECT count(*) FROM sales WHERE lot_id = ?`, id); err != nil {
+		return err
+	}
+	switch {
+	case sales == 1:
+		return errors.New("the lot has 1 sale: delete it first")
+	case sales > 1:
+		return fmt.Errorf("the lot has %d sales: delete them first", sales)
+	}
+
 	result, err := s.db.Exec(`DELETE FROM lots WHERE id = ?`, id)
 	if err != nil {
 		return err
@@ -284,6 +305,24 @@ func (s *SQLiteStore) SaveSale(sale Sale) error {
 	}
 
 	return tx.Commit()
+}
+
+// DeleteSale deletes the sale with the given ID, which has to exist. Its shares are its lot's again.
+func (s *SQLiteStore) DeleteSale(id int) error {
+	result, err := s.db.Exec(`DELETE FROM sales WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+
+	n, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("no sale with ID %d", id)
+	}
+
+	return nil
 }
 
 // Grants lists every grant in the order they were saved, each with its vests in the order of

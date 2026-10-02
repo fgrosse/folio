@@ -481,3 +481,41 @@ func TestStore_SaveSaleRefusals(t *testing.T) {
 	// What is left can be sold to the last share.
 	require.NoError(t, s.SaveSale(Sale{LotID: 1, Date: day("2026-09-20"), Shares: shares("200"), Price: shares("400")}))
 }
+
+// TestStore_DeleteSale covers taking a sale back: it is gone, and its shares are the lot's again. A
+// sale that does not exist cannot be deleted.
+func TestStore_DeleteSale(t *testing.T) {
+	s := newSalesStore(t)
+	require.NoError(t, s.SaveSale(Sale{LotID: 1, Date: day("2026-09-15"), Shares: shares("50"), Price: shares("410.2")}))
+	require.NoError(t, s.SaveSale(Sale{LotID: 1, Date: day("2026-09-20"), Shares: shares("10"), Price: shares("400")}))
+
+	require.NoError(t, s.DeleteSale(1))
+
+	sales, err := s.Sales()
+	require.NoError(t, err)
+	require.Len(t, sales, 1)
+	assert.Equal(t, 2, sales[0].ID)
+
+	lots, err := s.Lots()
+	require.NoError(t, err)
+	assert.Equal(t, "240", lots[0].Remaining().String())
+
+	assert.EqualError(t, s.DeleteSale(7), "no sale with ID 7")
+}
+
+// TestStore_LotsWithSalesAreKept covers what a sale holds its lot to: the lot cannot be deleted
+// while it has sales, which would leave them without the shares they sold, and it cannot be
+// corrected to fewer shares than were sold from it. Once the sales are gone, it can.
+func TestStore_LotsWithSalesAreKept(t *testing.T) {
+	s := newSalesStore(t)
+	require.NoError(t, s.SaveSale(Sale{LotID: 1, Date: day("2026-09-15"), Shares: shares("50"), Price: shares("410.2")}))
+
+	assert.EqualError(t, s.DeleteLot(1), "the lot has 1 sale: delete it first")
+
+	fewer := Lot{ID: 1, Symbol: "PANW", Shares: shares("49"), Acquired: day("2025-08-01"), Cost: shares("162.5")}
+	assert.EqualError(t, s.SaveLot(fewer), "50 shares of the lot were sold, which is more than 49")
+
+	require.NoError(t, s.DeleteSale(1))
+	require.NoError(t, s.SaveLot(fewer))
+	require.NoError(t, s.DeleteLot(1))
+}
