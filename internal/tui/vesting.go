@@ -32,6 +32,7 @@ type VestingModel struct {
 	now       func() time.Time // the clock that says what today is
 	portfolio Portfolio        // the account as it was last loaded
 	vests     []grantVest      // the vests on display, as the table shows them
+	err       error            // why the last load failed or had no fresh quotes, nil unless it did
 }
 
 // NewVestingModel returns the Vesting view over store, rendered in style.
@@ -85,8 +86,13 @@ func (m *VestingModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table.SetHeight(msg.Height - chromeHeight)
 		return m, nil
 	case PortfolioLoadedMsg:
-		m.portfolio = msg.portfolio
-		m.updateRows()
+		m.err = msg.err
+		if msg.err == nil {
+			// Quotes that could not be refreshed do not make the portfolio any less the latest.
+			m.err = msg.quotesErr
+			m.portfolio = msg.portfolio
+			m.updateRows()
+		}
 		return m, nil
 	}
 
@@ -118,9 +124,30 @@ func (m *VestingModel) updateRows() {
 	m.table.SetRows(rows)
 }
 
-// View implements tea.Model by rendering the table of vests.
+// View implements tea.Model by rendering the header above the table of vests, and the keys below it.
 func (m *VestingModel) View() tea.View {
-	return tea.NewView(m.style.Table.Render(m.table.View()))
+	frame := m.headerView() + "\n" +
+		m.style.Table.Render(m.table.View()) + "\n" +
+		m.helpView()
+
+	return tea.NewView(trimTrailingSpace(frame) + "\n")
+}
+
+// headerView renders the two lines above the table: what is due and what is to come on the left,
+// with the prices underneath, and the account values on the right.
+func (m *VestingModel) headerView() string {
+	summary := vestingSummary(m.vests, portfolio.DayOf(m.now()))
+
+	return portfolioHeader(summary, m.portfolio, m.err, m.width-cellPadding, m.style)
+}
+
+// helpView renders the keys worth knowing in two lines, as every view does: getting around on the
+// first, and what can be done to the table on the second, which is nothing yet and stays empty so
+// that the frame has the height of the other views'.
+func (m *VestingModel) helpView() string {
+	help, nav := m.table.Help, m.table.KeyMap
+
+	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n"
 }
 
 // A grantVest is a vest together with what the Vesting view needs to know of the grant it belongs

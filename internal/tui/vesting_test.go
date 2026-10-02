@@ -1,11 +1,14 @@
 package tui
 
 import (
+	"errors"
 	"testing"
 	"time"
 
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/charmbracelet/x/exp/golden"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -96,6 +99,30 @@ func TestVestingModel_Keys(t *testing.T) {
 	_, cmd = m.Update(keyPressed("j"))
 	assert.Nil(t, cmd)
 	assert.Equal(t, 1, m.table.Cursor(), "j should move the selection down a row")
+}
+
+// TestVestingModel_Render is the frame the Vesting view puts on screen, in the shape of the Holdings
+// view's: what is due and what is to come above the table next to the account values, a row for
+// every vest that has not been released, and the keys underneath.
+func TestVestingModel_Render(t *testing.T) {
+	m, _ := newTestingVesting(t)
+
+	golden.RequireEqual(t, ansi.Strip(m.View().Content))
+}
+
+// TestVestingModel_ShowsErrors covers a load that failed: the view says why where the prices
+// otherwise are and keeps the vests it had on display, as the Holdings view does with its lots.
+func TestVestingModel_ShowsErrors(t *testing.T) {
+	m, _ := newTestingVesting(t)
+
+	m.Update(PortfolioLoadedMsg{err: errors.New("database is locked")})
+
+	assert.Contains(t, ansi.Strip(m.View().Content), "database is locked")
+	assert.Len(t, m.table.Rows(), 2, "the vests should stay on display")
+
+	m.Update(PortfolioLoadedMsg{portfolio: testPortfolio(), quotesErr: errors.New("no quote of PANW")})
+
+	assert.Contains(t, ansi.Strip(m.View().Content), "no quote of PANW")
 }
 
 // TestVestRow covers how one vest reads as a row of the Vesting table: its day and the grant it
