@@ -65,7 +65,7 @@ func (m *MockStore) DeleteGrant(id int) error {
 func testPortfolio() Portfolio {
 	return Portfolio{
 		Lots: []portfolio.Lot{
-			{ID: 1, Symbol: "PANW", Shares: dec("6"), Acquired: day("2026-01-15")},
+			{ID: 1, Symbol: "PANW", Shares: dec("6"), Acquired: day("2026-01-15"), Grant: "Payout"},
 			{ID: 2, Symbol: "PANW", Shares: dec("2.5"), Acquired: day("2026-02-15")},
 		},
 		Grants: []portfolio.Grant{

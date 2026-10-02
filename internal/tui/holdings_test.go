@@ -332,9 +332,9 @@ func TestPositions(t *testing.T) {
 }
 
 // TestLotRow covers how one lot reads as a row of the Holdings table: the day it was acquired, its
-// symbol, and then the numbers - how many shares, what one is worth and what all of them are -
-// right-aligned so that their digits line up down the column. The table has no alignment of its
-// own, so the values are padded out to the width of their column.
+// symbol and the grant it was released from, and then the numbers - how many shares, what one is
+// worth and what all of them are - right-aligned so that their digits line up down the column. The
+// table has no alignment of its own, so the values are padded out to the width of their column.
 func TestLotRow(t *testing.T) {
 	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
 
@@ -343,27 +343,28 @@ func TestLotRow(t *testing.T) {
 		quote    portfolio.Quote
 		expected table.Row
 	}{
-		"a lot": {
-			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("6"), Acquired: day("2026-01-15")},
+		"a lot released from a grant": {
+			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("6"), Acquired: day("2026-01-15"), Grant: "Payout"},
 			quote:    panw,
-			expected: table.Row{"2026-01-15", "PANW", "         6", "   $396.25", "     $2,377.50"},
+			expected: table.Row{"2026-01-15", "PANW", "Payout", "         6", "   $396.25", "     $2,377.50"},
 		},
-		"a fraction of a share": {
+		// A lot entered by hand came from no grant, and says nothing about where it is from.
+		"a fraction of a share, entered by hand": {
 			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("2.125"), Acquired: day("2026-02-15")},
 			quote:    panw,
-			expected: table.Row{"2026-02-15", "PANW", "     2.125", "   $396.25", "       $842.03"},
+			expected: table.Row{"2026-02-15", "PANW", "", "     2.125", "   $396.25", "       $842.03"},
 		},
 		"a value in the millions": {
 			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("12000"), Acquired: day("2020-06-01")},
 			quote:    panw,
-			expected: table.Row{"2020-06-01", "PANW", "     12000", "   $396.25", " $4,755,000.00"},
+			expected: table.Row{"2020-06-01", "PANW", "", "     12000", "   $396.25", " $4,755,000.00"},
 		},
 		// Without a quote there is nothing to value the lot at, which reads as a dash rather than
 		// as shares that are worth nothing.
 		"a lot without a quote": {
 			lot:      portfolio.Lot{Symbol: "SAP.DE", Shares: dec("5"), Acquired: day("2026-01-15")},
 			quote:    portfolio.Quote{},
-			expected: table.Row{"2026-01-15", "SAP.DE", "         5", "         -", "             -"},
+			expected: table.Row{"2026-01-15", "SAP.DE", "", "         5", "         -", "             -"},
 		},
 	}
 

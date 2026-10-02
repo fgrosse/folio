@@ -16,8 +16,8 @@ import (
 	"github.com/fgrosse/folio/internal/portfolio"
 )
 
-// Column widths of the Holdings table. Every column except the symbol is bounded by its own
-// content, so the symbol is the one that flexes to fill whatever room the window leaves.
+// Column widths of the Holdings table. Every column except the grant a lot is from is bounded by
+// its own content, so that is the one that flexes to fill whatever room the window leaves.
 const (
 	// dayColumnWidth fits a day written as YYYY-MM-DD.
 	dayColumnWidth = 10
@@ -32,8 +32,9 @@ const (
 	// will ever have to add up.
 	valueColumnWidth = 14
 
-	// holdingsColumnsWidth is what every column other than the symbol occupies, padding included.
-	holdingsColumnsWidth = dayColumnWidth + sharesColumnWidth + priceColumnWidth + valueColumnWidth + 4*cellPadding
+	// holdingsColumnsWidth is what every column other than the grant occupies, padding included.
+	holdingsColumnsWidth = dayColumnWidth + symbolColumnWidth + sharesColumnWidth + priceColumnWidth + valueColumnWidth +
+		5*cellPadding
 
 	// noValue stands where a price or value would be if there was a quote to work it out from.
 	noValue = "-"
@@ -93,13 +94,14 @@ func NewHoldingsModel(store Store, quoter portfolio.Quoter, style Style) *Holdin
 	return m
 }
 
-// columns returns the table's columns, the symbol column taking whatever the width leaves. The
+// columns returns the table's columns, the column of the grant taking whatever the width leaves. The
 // titles of the number columns are padded like the numbers under them, so that they end where the
 // numbers do.
 func (m *HoldingsModel) columns() []table.Column {
 	return []table.Column{
 		{Title: "Acquired", Width: dayColumnWidth},
-		{Title: "Symbol", Width: m.width - holdingsColumnsWidth - cellPadding},
+		{Title: "Symbol", Width: symbolColumnWidth},
+		{Title: "From", Width: m.width - holdingsColumnsWidth - cellPadding},
 		{Title: fmt.Sprintf("%*s", sharesColumnWidth, "Shares"), Width: sharesColumnWidth},
 		{Title: fmt.Sprintf("%*s", priceColumnWidth, "Price"), Width: priceColumnWidth},
 		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Value"), Width: valueColumnWidth},
@@ -366,8 +368,8 @@ func positions(lots []portfolio.Lot) string {
 	return strings.Join(parts, " · ")
 }
 
-// lotRow renders a lot as a row of the Holdings table, valued at quote, which is the zero Quote if
-// there is none of the lot's stock. The numbers are right-aligned for their digits to line up down
+// lotRow renders a lot as a row of the Holdings table, with the grant it was released from, if any,
+// and valued at quote, which is the zero Quote if there is none of the lot's stock. The numbers are right-aligned for their digits to line up down
 // the column. The table has no alignment of its own, so the values are padded out here.
 func lotRow(lot portfolio.Lot, quote portfolio.Quote) table.Row {
 	price, value := noValue, noValue
@@ -379,6 +381,7 @@ func lotRow(lot portfolio.Lot, quote portfolio.Quote) table.Row {
 	return table.Row{
 		lot.Acquired.Format(time.DateOnly),
 		lot.Symbol,
+		lot.Grant,
 		fmt.Sprintf("%*s", sharesColumnWidth, lot.Shares),
 		fmt.Sprintf("%*s", priceColumnWidth, price),
 		fmt.Sprintf("%*s", valueColumnWidth, value),
