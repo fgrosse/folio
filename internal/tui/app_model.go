@@ -49,6 +49,7 @@ func New(store Store, quoter portfolio.Quoter, style Style) *AppModel {
 		NewHoldingsModel(store, quoter, style),
 		NewVestingModel(store, style),
 		NewGrantsModel(store, style),
+		NewSalesModel(store, style),
 	)
 }
 

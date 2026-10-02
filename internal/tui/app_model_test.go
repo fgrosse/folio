@@ -294,7 +294,9 @@ func TestNew_TabsAreTheSameHeight(t *testing.T) {
 	m = driveApp(t, m, PortfolioLoadedMsg{portfolio: testPortfolio()})
 
 	height := lipgloss.Height(m.View().Content)
-	for _, key := range []string{"2", "3"} {
+	assert.Contains(t, ansi.Strip(m.View().Content), "1 Holdings • 2 Vesting • 3 Grants • 4 Sales")
+
+	for _, key := range []string{"2", "3", "4"} {
 		m = driveApp(t, m, keyPressed(key))
 		assert.Equal(t, height, lipgloss.Height(m.View().Content), "tab %s should be as tall as the first", key)
 	}
