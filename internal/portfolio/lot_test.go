@@ -42,3 +42,44 @@ func TestNewLot(t *testing.T) {
 		})
 	}
 }
+
+// TestNewLot_Errors covers the specs NewLot refuses, each with an error that says what to type
+// instead: it is shown under the field of the dialog the spec was typed into.
+func TestNewLot_Errors(t *testing.T) {
+	tests := map[string]struct {
+		spec  string
+		error string
+	}{
+		"empty": {
+			spec:  "",
+			error: `a lot is written as "<shares> <symbol> [YYYY-MM-DD]"`,
+		},
+		"only shares": {
+			spec:  "12",
+			error: `a lot is written as "<shares> <symbol> [YYYY-MM-DD]"`,
+		},
+		"too many fields": {
+			spec:  "12 PANW 2026-03-15 vested",
+			error: `a lot is written as "<shares> <symbol> [YYYY-MM-DD]"`,
+		},
+		"shares that are not a number": {
+			spec:  "twelve PANW",
+			error: `"twelve" is not a number of shares`,
+		},
+		"a day that is not YYYY-MM-DD": {
+			spec:  "12 PANW 15.03.2026",
+			error: `"15.03.2026" is not a day written as YYYY-MM-DD`,
+		},
+		"no shares": {
+			spec:  "0 PANW",
+			error: "lot of PANW must have more than 0 shares",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := NewLot(tt.spec)
+			assert.EqualError(t, err, tt.error)
+		})
+	}
+}
