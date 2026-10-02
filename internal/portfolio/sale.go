@@ -49,3 +49,53 @@ func (s Sale) Validate() error {
 
 	return nil
 }
+
+// Proceeds is what the sale brought in: its shares at the price they sold for.
+func (s Sale) Proceeds() decimal.Decimal {
+	return s.Shares.Mul(s.Price)
+}
+
+// Gain is how much of the proceeds is more than the shares cost, or less, as a negative gain. It is
+// only known if the cost of the lot is.
+func (s Sale) Gain() (gain decimal.Decimal, known bool) {
+	if s.Cost.IsZero() {
+		return decimal.Decimal{}, false
+	}
+
+	return s.Shares.Mul(s.Price.Sub(s.Cost)), true
+}
+
+// Realized is what sales have turned shares into: money, as opposed to the value of what is still
+// held.
+type Realized struct {
+	// Proceeds is what the sales brought in.
+	Proceeds decimal.Decimal
+
+	// Gain is how much of the proceeds is more than the shares cost, of the sales whose cost is
+	// known.
+	Gain decimal.Decimal
+
+	// Uncosted is how many sales have no known cost. Their gain is missing from Gain.
+	Uncosted int
+}
+
+// NewRealized adds up what sales brought in and the gain in it, each to the cent.
+func NewRealized(sales []Sale) Realized {
+	var r Realized
+	for _, sale := range sales {
+		r.Proceeds = r.Proceeds.Add(sale.Proceeds())
+
+		gain, known := sale.Gain()
+		if !known {
+			r.Uncosted++
+			continue
+		}
+
+		r.Gain = r.Gain.Add(gain)
+	}
+
+	r.Proceeds = r.Proceeds.Round(2)
+	r.Gain = r.Gain.Round(2)
+
+	return r
+}
