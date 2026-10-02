@@ -121,6 +121,14 @@ func (m *HoldingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SaveLotMsg:
 		m.input = nil
 		return m, m.saveLotCmd(msg.lot)
+	case InputCanceledMsg:
+		m.input = nil
+		return m, nil
+	}
+
+	if m.input != nil {
+		// Whatever the view does not handle may be the dialog's, such as its cursor's blink ticks.
+		return m, m.input.Update(msg)
 	}
 
 	return m, nil

@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/exp/golden"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/fgrosse/folio/internal/portfolio"
@@ -113,6 +114,23 @@ func TestHoldingsModel_AddLot(t *testing.T) {
 	assert.False(t, m.CapturesKeys(), "the dialog should be closed")
 	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
 	store.AssertExpectations(t)
+}
+
+// TestHoldingsModel_CancelAddLot covers leaving the dialog without a lot: esc closes it, the keys
+// are the view's again, and nothing is saved.
+func TestHoldingsModel_CancelAddLot(t *testing.T) {
+	m, store := newTestingHoldings(t)
+	m.Update(keyPressed("a"))
+	for _, key := range keysPressed("12 PANW") {
+		m.Update(key)
+	}
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	_, cmd = m.Update(runCmd(t, cmd))
+
+	assert.Nil(t, cmd)
+	assert.False(t, m.CapturesKeys(), "the dialog should be closed")
+	store.AssertNotCalled(t, "SaveLot", mock.Anything)
 }
 
 // TestPositions covers the line the Holdings view puts above its table: how many shares of each
