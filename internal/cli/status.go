@@ -22,6 +22,9 @@ Show the three values of the account at the latest prices:
   Current    what the shares you hold would sell for
   Potential  what the shares that are still to vest, or vested and not released, are worth
   Total      the two added up
+
+Once shares were sold, what the sales brought in is stated after them as Realized. It is
+money that has left the account, and no part of the three values.
 `,
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
@@ -45,12 +48,18 @@ Show the three values of the account at the latest prices:
 				return err
 			}
 
-			account := portfolio.NewAccount(lots, grants, quotes)
-			if asJSON {
-				return cmd.printAccountJSON(account)
+			sales, err := cmd.store.Sales()
+			if err != nil {
+				return err
 			}
 
-			cmd.printAccount(account)
+			account := portfolio.NewAccount(lots, grants, quotes)
+			realized := portfolio.NewRealized(sales)
+			if asJSON {
+				return cmd.printAccountJSON(account, realized)
+			}
+
+			cmd.printAccount(account, realized, len(sales) > 0)
 			return nil
 		},
 	}
@@ -88,46 +97,60 @@ func (cmd *Folio) quotes(ctx context.Context, symbols []string) (map[string]port
 }
 
 // printAccount writes the three values of account, one to a line, the amounts lined up on the right
-// the way a column of figures is.
-func (cmd *Folio) printAccount(account portfolio.Account) {
-	values := []struct {
+// the way a column of figures is. If anything was sold, what the sales realized follows them, set
+// apart by an empty line, since it is no part of what the account is worth.
+func (cmd *Folio) printAccount(account portfolio.Account, realized portfolio.Realized, sold bool) {
+	type value struct {
 		label  string
 		amount string
-	}{
+	}
+
+	values := []value{
 		{"Current", portfolio.FormatUSD(account.Current)},
 		{"Potential", portfolio.FormatUSD(account.Potential)},
 		{"Total", portfolio.FormatUSD(account.Total())},
 	}
-
-	var width int
-	for _, value := range values {
-		width = max(width, len(value.amount))
+	if sold {
+		values = append(values, value{"Realized", portfolio.FormatUSD(realized.Proceeds)})
 	}
 
-	for _, value := range values {
-		cmd.Printf("%-9s  %*s\n", value.label, width, value.amount)
+	var width int
+	for _, v := range values {
+		width = max(width, len(v.amount))
+	}
+
+	for _, v := range values {
+		if v.label == "Realized" {
+			cmd.Println()
+		}
+
+		cmd.Printf("%-9s  %*s\n", v.label, width, v.amount)
 	}
 }
 
-// printAccountJSON writes the values of account as one JSON object, the amounts as decimals to the
-// cent in strings, which no reader will take for floats.
-func (cmd *Folio) printAccountJSON(account portfolio.Account) error {
+// printAccountJSON writes the values of account and what the sales realized as one JSON object, the
+// amounts as decimals to the cent in strings, which no reader will take for floats.
+func (cmd *Folio) printAccountJSON(account portfolio.Account, realized portfolio.Realized) error {
 	unpriced := account.Unpriced
 	if unpriced == nil {
 		unpriced = []string{} // an empty list rather than null
 	}
 
 	return json.NewEncoder(cmd.OutOrStdout()).Encode(struct {
-		Current   string   `json:"current"`
-		Potential string   `json:"potential"`
-		Total     string   `json:"total"`
-		Currency  string   `json:"currency"`
-		Unpriced  []string `json:"unpriced"`
+		Current      string   `json:"current"`
+		Potential    string   `json:"potential"`
+		Total        string   `json:"total"`
+		Realized     string   `json:"realized"`
+		RealizedGain string   `json:"realized_gain"`
+		Currency     string   `json:"currency"`
+		Unpriced     []string `json:"unpriced"`
 	}{
-		Current:   account.Current.StringFixed(2),
-		Potential: account.Potential.StringFixed(2),
-		Total:     account.Total().StringFixed(2),
-		Currency:  "USD",
-		Unpriced:  unpriced,
+		Current:      account.Current.StringFixed(2),
+		Potential:    account.Potential.StringFixed(2),
+		Total:        account.Total().StringFixed(2),
+		Realized:     realized.Proceeds.StringFixed(2),
+		RealizedGain: realized.Gain.StringFixed(2),
+		Currency:     "USD",
+		Unpriced:     unpriced,
 	})
 }

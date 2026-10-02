@@ -85,8 +85,63 @@ func TestStatusCmd_JSON(t *testing.T) {
 	cmd.SetOut(&out)
 	require.NoError(t, cmd.Execute())
 
-	expected := `{"current":"3368.13","potential":"7925.00","total":"11293.13","currency":"USD","unpriced":[]}` + "\n"
+	expected := `{"current":"3368.13","potential":"7925.00","total":"11293.13",` +
+		`"realized":"0.00","realized_gain":"0.00","currency":"USD","unpriced":[]}` + "\n"
 	assert.Equal(t, expected, out.String())
+}
+
+// TestStatusCmd_Realized covers status once shares were sold: the current value counts what is left
+// of the lots, and what the sales brought in is stated on a line of its own, apart from the three
+// values, since it is money that has left the account rather than a part of what the account is
+// worth. The JSON output has it too, with the gain in it.
+func TestStatusCmd_Realized(t *testing.T) {
+	sell := func(t *testing.T, dbPath string) {
+		t.Helper()
+
+		store, err := portfolio.NewStore(dbPath)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = store.Close() })
+
+		// The first lot of the seeded account has no cost, so only the release has a gain to state.
+		require.NoError(t, store.ReleaseVest(1, decimal.RequireFromString("10"), decimal.RequireFromString("380")))
+		require.NoError(t, store.SaveSale(portfolio.Sale{
+			LotID: 1, Date: day("2026-09-15"), Shares: decimal.RequireFromString("2"), Price: decimal.RequireFromString("410.2"),
+		}))
+		require.NoError(t, store.SaveSale(portfolio.Sale{
+			LotID: 3, Date: day("2026-11-20"), Shares: decimal.RequireFromString("4"), Price: decimal.RequireFromString("400"),
+		}))
+	}
+
+	cmd, dbPath := NewTestingCmd(t, "status")
+	cmd.quoter = quotes{"PANW": "396.25"}
+	seed(t, dbPath)
+	sell(t, dbPath)
+
+	var out strings.Builder
+	cmd.SetOut(&out)
+	require.NoError(t, cmd.Execute())
+
+	// 12.5 shares are left of 8.5 + 10 - 6, and one vest of 10: 2 × 410.20 + 4 × 400 were realized.
+	expected := "" +
+		"Current    $4,953.13\n" +
+		"Potential  $3,962.50\n" +
+		"Total      $8,915.63\n" +
+		"\n" +
+		"Realized   $2,420.40\n"
+	assert.Equal(t, expected, out.String())
+
+	cmd, dbPath = NewTestingCmd(t, "status", "--json")
+	cmd.quoter = quotes{"PANW": "396.25"}
+	seed(t, dbPath)
+	sell(t, dbPath)
+
+	out.Reset()
+	cmd.SetOut(&out)
+	require.NoError(t, cmd.Execute())
+
+	expectedJSON := `{"current":"4953.13","potential":"3962.50","total":"8915.63",` +
+		`"realized":"2420.40","realized_gain":"80.00","currency":"USD","unpriced":[]}` + "\n"
+	assert.Equal(t, expectedJSON, out.String())
 }
 
 // saveQuote saves quote to the database at dbPath, as a quote cached by an earlier run.
