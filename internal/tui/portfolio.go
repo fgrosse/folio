@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/shopspring/decimal"
 
 	"github.com/fgrosse/folio/internal/portfolio"
 )
@@ -18,6 +19,7 @@ type Store interface {
 	SaveLot(lot portfolio.Lot) error
 	DeleteLot(id int) error
 	SaveQuote(quote portfolio.Quote) error
+	ReleaseVest(id int, shares decimal.Decimal) error
 }
 
 // A Portfolio is everything the views show, as the store had it at one moment: the lots and grants

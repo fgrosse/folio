@@ -125,6 +125,35 @@ func TestVestingModel_ShowsErrors(t *testing.T) {
 	assert.Contains(t, ansi.Strip(m.View().Content), "no quote of PANW")
 }
 
+// TestVestingModel_ReleaseVest covers what there is to do in the view: r on a vest that is due opens
+// a dialog that asks how many shares arrived, with all of the vest's in its field, since that is the
+// usual answer. Enter has the store release the vest with that many shares, which makes a lot of
+// them, and the view loads the portfolio again.
+func TestVestingModel_ReleaseVest(t *testing.T) {
+	m, store := newTestingVesting(t)
+	// A few days after the first of the two vests, which is pending release by then.
+	m.now = func() time.Time { return time.Date(2026, time.November, 20, 9, 0, 0, 0, time.UTC) }
+
+	m.Update(keyPressed("r"))
+	require.True(t, m.CapturesKeys(), "the dialog should take the keyboard")
+	assert.Equal(t, "10", m.input.Value())
+
+	// Four of the ten shares were withheld for tax.
+	m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	m.Update(keyPressed("6"))
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	msg := runCmd(t, cmd)
+	require.Equal(t, ReleaseVestMsg{id: 2, shares: dec("6")}, msg)
+
+	store.On("ReleaseVest", 2, dec("6")).Return(nil)
+	_, cmd = m.Update(msg)
+	assert.False(t, m.CapturesKeys(), "the dialog should be closed")
+	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
+	store.AssertExpectations(t)
+}
+
 // TestVestRow covers how one vest reads as a row of the Vesting table: its day and the grant it
 // belongs to, how many shares vest and what they are worth at the latest price, right-aligned like
 // the numbers of the Holdings table, and how far off the day is.

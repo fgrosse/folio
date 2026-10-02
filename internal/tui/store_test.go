@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/fgrosse/folio/internal/portfolio"
@@ -45,6 +46,10 @@ func (m *MockStore) DeleteLot(id int) error {
 
 func (m *MockStore) SaveQuote(quote portfolio.Quote) error {
 	return m.Called(quote).Error(0)
+}
+
+func (m *MockStore) ReleaseVest(id int, shares decimal.Decimal) error {
+	return m.Called(id, shares).Error(0)
 }
 
 // testPortfolio is the account most tests of the views look at: PANW stock in two lots of 8.5

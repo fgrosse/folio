@@ -9,6 +9,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	"github.com/shopspring/decimal"
 
 	"github.com/fgrosse/folio/internal/portfolio"
 )
@@ -33,6 +34,14 @@ type VestingModel struct {
 	portfolio Portfolio        // the account as it was last loaded
 	vests     []grantVest      // the vests on display, as the table shows them
 	err       error            // why the last load failed or had no fresh quotes, nil unless it did
+	input     *InputDialog     // the dialog that releases a vest, nil unless it is open
+}
+
+// ReleaseVestMsg reports that the dialog was confirmed with the number of shares that arrived from
+// the vest with the given ID. The vest has not been released yet; that is up to whoever receives it.
+type ReleaseVestMsg struct {
+	id     int
+	shares decimal.Decimal
 }
 
 // NewVestingModel returns the Vesting view over store, rendered in style.
@@ -68,6 +77,12 @@ func (m *VestingModel) Title() string {
 	return "Vesting"
 }
 
+// CapturesKeys implements KeyCapturer: while the dialog is open the keyboard belongs to it, down to
+// the keys that would otherwise switch views. The digits are the shares being typed.
+func (m *VestingModel) CapturesKeys() bool {
+	return m.input != nil
+}
+
 // Init implements tea.Model by loading the portfolio.
 func (m *VestingModel) Init() tea.Cmd {
 	return loadPortfolioCmd(m.store)
@@ -94,21 +109,67 @@ func (m *VestingModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateRows()
 		}
 		return m, nil
+	case ReleaseVestMsg:
+		m.input = nil
+		return m, m.releaseVestCmd(msg.id, msg.shares)
 	}
 
 	return m, nil
 }
 
-// handleKeyPress quits on the quit keys and hands every other key to the table, which moves the
-// selection.
+// handleKeyPress quits on the quit keys, opens the dialog that releases the selected vest on the
+// release key, and hands every other key to the table, which moves the selection. While the dialog
+// is open, every key is the dialog's.
 func (m *VestingModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if key.Matches(msg, m.keys.Quit) {
+	if m.input != nil {
+		return m, m.input.HandleKeyPress(msg)
+	}
+
+	switch {
+	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
+	case key.Matches(msg, m.keys.Release):
+		return m.openRelease()
 	}
 
 	var cmd tea.Cmd
 	m.table, cmd = m.table.Update(msg)
 	return m, cmd
+}
+
+// openRelease opens the dialog that releases the selected vest, which asks how many of its shares
+// arrived. All of them are in the field to begin with, since that is the usual answer, and fewer
+// when some were withheld for tax.
+func (m *VestingModel) openRelease() (tea.Model, tea.Cmd) {
+	vest := m.vests[m.table.Cursor()].vest
+
+	submit := func(value string) (tea.Msg, error) {
+		shares, err := decimal.NewFromString(value)
+		if err != nil {
+			return nil, fmt.Errorf("%q is not a number of shares", value)
+		}
+
+		return ReleaseVestMsg{id: vest.ID, shares: shares}, nil
+	}
+
+	title := "Shares released on " + vest.Date.Format(time.DateOnly)
+	m.input = NewInputDialog(title, vest.Shares.String(), submit, dialogWidth, m.style)
+	m.input.SetValue(vest.Shares.String())
+
+	return m, m.input.Init()
+}
+
+// releaseVestCmd returns a command that releases the vest with the given ID into a lot of that many
+// shares and loads the portfolio again, which then has the lot in place of the vest.
+func (m *VestingModel) releaseVestCmd(id int, shares decimal.Decimal) tea.Cmd {
+	store := m.store
+	return func() tea.Msg {
+		if err := store.ReleaseVest(id, shares); err != nil {
+			return PortfolioLoadedMsg{err: err}
+		}
+
+		return loadPortfolioCmd(store)()
+	}
 }
 
 // updateRows fills the table with a row for every vest of the portfolio that has not been released.
