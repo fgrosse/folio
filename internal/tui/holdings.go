@@ -318,15 +318,7 @@ func (m *HoldingsModel) dialogLayer() *lipgloss.Layer {
 // with the prices they are valued at underneath, and the account values on the right. If the last
 // load failed, why it did stands where the prices otherwise are.
 func (m *HoldingsModel) headerView() string {
-	p := m.portfolio
-	account := portfolio.NewAccount(p.Lots, p.Grants, p.Quotes)
-	status := m.style.Hint.Render(quoteStatus(portfolio.Symbols(p.Lots, p.Grants), p.Quotes))
-	if m.err != nil {
-		// Errors of several quotes come joined by newlines, and the header has one line for them.
-		status = m.style.Error.Render(strings.ReplaceAll(m.err.Error(), "\n", " · "))
-	}
-
-	return accountHeader(positions(p.Lots), status, account, m.width-cellPadding, m.style)
+	return portfolioHeader(positions(m.portfolio.Lots), m.portfolio, m.err, m.width-cellPadding, m.style)
 }
 
 // helpView renders the keys worth knowing in two lines, as every view does: getting around on the

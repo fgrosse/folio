@@ -9,6 +9,21 @@ import (
 	"github.com/fgrosse/folio/internal/portfolio"
 )
 
+// portfolioHeader renders the two lines above the table of a view from the portfolio it shows: left
+// is the view's own line, with the prices the portfolio is valued at under it, and the account
+// values are on the right. If the portfolio could not be loaded or its quotes not refreshed, err
+// says why, and stands where the prices otherwise are.
+func portfolioHeader(left string, p Portfolio, err error, width int, style Style) string {
+	account := portfolio.NewAccount(p.Lots, p.Grants, p.Quotes)
+	status := style.Hint.Render(quoteStatus(portfolio.Symbols(p.Lots, p.Grants), p.Quotes))
+	if err != nil {
+		// Errors of several quotes come joined by newlines, and the header has one line for them.
+		status = style.Error.Render(strings.ReplaceAll(err.Error(), "\n", " · "))
+	}
+
+	return accountHeader(left, status, account, width, style)
+}
+
 // accountHeader renders the two lines above the table of a view. The right half is the same in
 // every view and is what folio is for: the total account value on the first line, in the one accent
 // of the header, and the current and potential value it is made of underneath. The left half is the
