@@ -224,7 +224,8 @@ func (m *HoldingsModel) scheduleRefreshCmd() tea.Cmd {
 }
 
 // handleKeyPress quits on the quit keys, opens the dialog for a new lot on the add key and for the
-// selected one on the edit key, asks whether to delete the selected lot on the delete key, and hands every other key to the table, which moves
+// selected one on the edit key, the form for a sale of its shares on the sell key, asks whether to
+// delete the selected lot on the delete key, and hands every other key to the table, which moves
 // the selection. While a dialog is open, every key is the dialog's.
 func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.input != nil {
@@ -497,10 +498,22 @@ func (m *HoldingsModel) helpView() string {
 			key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "delete")),
 			key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "cancel")),
 		}) + "\n"
+	case m.form != nil:
+		// In the notes enter starts a new line, so there it is ctrl+s that saves.
+		save := key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "save"))
+		if m.form.OnMultiline() {
+			save = key.NewBinding(key.WithKeys("ctrl+s"), key.WithHelp("ctrl+s", "save"))
+		}
+
+		return help.ShortHelpView([]key.Binding{
+			save,
+			key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next field")),
+			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
+		}) + "\n"
 	}
 
 	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n" +
-		help.ShortHelpView([]key.Binding{m.keys.Add, m.keys.Edit, m.keys.Delete})
+		help.ShortHelpView([]key.Binding{m.keys.Add, m.keys.Edit, m.keys.Sell, m.keys.Delete})
 }
 
 // positions sums up lots as how many shares of each stock are left of them, the stocks in alphabetical

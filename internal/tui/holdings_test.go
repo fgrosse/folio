@@ -410,6 +410,89 @@ func TestHoldingsModel_SellShares(t *testing.T) {
 	store.AssertExpectations(t)
 }
 
+// TestHoldingsModel_SaleFormRefuses covers what the sale form does not take: shares that are no
+// number, none, or more than the lot has left, a price that is none, and a day that is no day or
+// before the lot was acquired. The form stays open and says why under its fields.
+func TestHoldingsModel_SaleFormRefuses(t *testing.T) {
+	tests := map[string]struct {
+		shares, price, date string
+		error               string
+	}{
+		"shares not a number":         {shares: "some", price: "410.2", date: "2026-10-02", error: `"some" is not a number of shares`},
+		"no shares":                   {shares: "0", price: "410.2", date: "2026-10-02", error: "a sale must have more than 0 shares"},
+		"more shares than are left":   {shares: "6.5", price: "410.2", date: "2026-10-02", error: "the lot has 6 shares left, not 6.5"},
+		"no price":                    {shares: "4", price: "", date: "2026-10-02", error: `"" is not a price such as 410.20`},
+		"a price of nothing":          {shares: "4", price: "0", date: "2026-10-02", error: `"0" is not a price such as 410.20`},
+		"a day that is no day":        {shares: "4", price: "410.2", date: "yesterday", error: `"yesterday" is not a day written as YYYY-MM-DD`},
+		"before the lot was acquired": {shares: "4", price: "410.2", date: "2026-01-14", error: "the lot was only acquired on 2026-01-15"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			m, _ := newTestingHoldings(t)
+
+			msg, err := newSale(m.lots[0], day("2026-10-02"))([]string{tt.shares, tt.price, tt.date, ""})
+
+			assert.Nil(t, msg)
+			assert.EqualError(t, err, tt.error)
+		})
+	}
+
+	// A price may have its dollar sign, and a form without a day is of today.
+	m, _ := newTestingHoldings(t)
+	msg, err := newSale(m.lots[0], day("2026-10-02"))([]string{"4", "$410.20", "", ""})
+	require.NoError(t, err)
+	sale := msg.(SaveSaleMsg).sale
+	assert.Equal(t, "410.2", sale.Price.String())
+	assert.Equal(t, day("2026-10-02"), sale.Date)
+}
+
+// TestHoldingsModel_CancelSale covers leaving the sale form with esc: it closes, the keys are the
+// view's again, and nothing is saved. In an account without lots there is nothing to sell, and s
+// opens no form.
+func TestHoldingsModel_CancelSale(t *testing.T) {
+	m, store := newTestingHoldings(t)
+	m.Update(keyPressed("s"))
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	_, cmd = m.Update(runCmd(t, cmd))
+
+	assert.Nil(t, cmd)
+	assert.False(t, m.CapturesKeys(), "the form should be closed")
+	store.AssertNotCalled(t, "SaveSale", mock.Anything)
+
+	emptyStore := new(MockStore)
+	emptyStore.returns(Portfolio{})
+	empty := NewHoldingsModel(emptyStore, quotes{}, DefaultStyle())
+	empty.Update(runCmd(t, loadPortfolioCmd(emptyStore)))
+
+	_, cmd = empty.Update(keyPressed("s"))
+	assert.Nil(t, cmd)
+	assert.False(t, empty.CapturesKeys(), "there should be no form without a lot")
+}
+
+// TestHoldingsModel_RenderSaleForm is the frame while a sale is being entered: the form in front of
+// the table, its fields under each other after their labels, and the keys of the form in the help
+// lines, where the one that saves depends on the field: enter, or ctrl+s in the notes, in which
+// enter starts a new line. The frame is as tall as it is without the form.
+func TestHoldingsModel_RenderSaleForm(t *testing.T) {
+	m, _ := newTestingHoldings(t)
+	without := m.View().Content
+
+	m.Update(keyPressed("s"))
+	for _, key := range keysPressed("4") {
+		m.Update(key)
+	}
+
+	frame := ansi.Strip(m.View().Content)
+	assert.Equal(t, lipgloss.Height(without), lipgloss.Height(frame), "the form should not change the height of the frame")
+	assert.Contains(t, frame, "enter save • tab next field • esc cancel")
+	golden.RequireEqual(t, frame)
+
+	m.Update(shiftTabKey) // around to the notes
+	assert.Contains(t, ansi.Strip(m.View().Content), "ctrl+s save • tab next field • esc cancel")
+}
+
 // TestPositions covers the line the Holdings view puts above its table: how many shares of each
 // stock the lots add up to, which no single row says. The stocks are in alphabetical order, and an
 // account without lots says so.
