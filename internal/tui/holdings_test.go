@@ -151,6 +151,27 @@ func TestHoldingsModel_RenderLotDialog(t *testing.T) {
 	golden.RequireEqual(t, frame)
 }
 
+// TestHoldingsModel_DeleteLot covers taking a lot back: d asks before it deletes the selected lot,
+// naming it, and only a y has the store delete it, after which the view loads the portfolio again.
+func TestHoldingsModel_DeleteLot(t *testing.T) {
+	m, store := newTestingHoldings(t)
+	m.Update(keyPressed("j")) // select the second lot
+
+	m.Update(keyPressed("d"))
+	assert.True(t, m.CapturesKeys(), "the question should take the keyboard")
+	assert.Contains(t, ansi.Strip(m.View().Content), "Delete the 2.5 PANW of 2026-02-15?")
+
+	_, cmd := m.Update(keyPressed("y"))
+	msg := runCmd(t, cmd)
+	require.Equal(t, DeleteLotMsg{id: 2}, msg)
+
+	store.On("DeleteLot", 2).Return(nil)
+	_, cmd = m.Update(msg)
+	assert.False(t, m.CapturesKeys(), "the question should be closed")
+	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
+	store.AssertExpectations(t)
+}
+
 // TestPositions covers the line the Holdings view puts above its table: how many shares of each
 // stock the lots add up to, which no single row says. The stocks are in alphabetical order, and an
 // account without lots says so.

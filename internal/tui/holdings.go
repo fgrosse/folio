@@ -50,6 +50,12 @@ type HoldingsModel struct {
 	now       func() time.Time // the clock that says what today is
 	portfolio Portfolio        // the account as it was last loaded
 	input     *InputDialog     // the dialog that adds a lot, nil unless it is open
+	confirm   *ConfirmDialog   // the dialog asking whether to delete a lot, nil unless it is open
+}
+
+// DeleteLotMsg reports that the user confirmed deleting the lot with the given ID.
+type DeleteLotMsg struct {
+	id int
 }
 
 // SaveLotMsg reports that the dialog was confirmed with the spec of a lot. The lot has not been saved
@@ -92,10 +98,10 @@ func (m *HoldingsModel) Title() string {
 	return "Holdings"
 }
 
-// CapturesKeys implements KeyCapturer: while the dialog is open the keyboard belongs to it, down to
+// CapturesKeys implements KeyCapturer: while a dialog is open the keyboard belongs to it, down to
 // the keys that would otherwise switch views. The digits are the shares of the lot being typed.
 func (m *HoldingsModel) CapturesKeys() bool {
-	return m.input != nil
+	return m.input != nil || m.confirm != nil
 }
 
 // Init implements tea.Model by loading the portfolio.
@@ -125,6 +131,9 @@ func (m *HoldingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case InputCanceledMsg:
 		m.input = nil
 		return m, nil
+	case DeleteLotMsg:
+		m.confirm = nil
+		return m, m.deleteLotCmd(msg.id)
 	}
 
 	if m.input != nil {
@@ -135,17 +144,22 @@ func (m *HoldingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleKeyPress quits on the quit keys, opens the dialog for a new lot on the add key, and hands
-// every other key to the table, which moves the selection. While the dialog is open, every key is
-// the dialog's.
+// handleKeyPress quits on the quit keys, opens the dialog for a new lot on the add key, asks whether
+// to delete the selected lot on the delete key, and hands every other key to the table, which moves
+// the selection. While a dialog is open, every key is the dialog's.
 func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.input != nil {
 		return m, m.input.HandleKeyPress(msg)
+	}
+	if m.confirm != nil {
+		return m, m.confirm.HandleKeyPress(msg)
 	}
 
 	switch {
 	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
+	case key.Matches(msg, m.keys.Delete):
+		return m.askToDelete()
 	case key.Matches(msg, m.keys.Add):
 		m.input = NewInputDialog("New lot", "12.5 PANW 2026-03-15", m.newLot, dialogWidth, m.style)
 		return m, m.input.Init()
@@ -154,6 +168,29 @@ func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 	var cmd tea.Cmd
 	m.table, cmd = m.table.Update(msg)
 	return m, cmd
+}
+
+// askToDelete opens a dialog asking whether to delete the selected lot, which sends a DeleteLotMsg
+// if the answer is yes.
+func (m *HoldingsModel) askToDelete() (tea.Model, tea.Cmd) {
+	lot := m.portfolio.Lots[m.table.Cursor()]
+	question := fmt.Sprintf("Delete the %s %s of %s?", lot.Shares, lot.Symbol, lot.Acquired.Format(time.DateOnly))
+	m.confirm = NewConfirmDialog("Delete lot", question, DeleteLotMsg{id: lot.ID}, m.style)
+
+	return m, nil
+}
+
+// deleteLotCmd returns a command that deletes the lot with the given ID and loads the portfolio
+// again, which then no longer has it.
+func (m *HoldingsModel) deleteLotCmd(id int) tea.Cmd {
+	store := m.store
+	return func() tea.Msg {
+		if err := store.DeleteLot(id); err != nil {
+			return PortfolioLoadedMsg{err: err}
+		}
+
+		return loadPortfolioCmd(store)()
+	}
 }
 
 // newLot turns the spec typed into the dialog into the message that asks for the lot to be saved. A
@@ -200,9 +237,8 @@ func (m *HoldingsModel) View() tea.View {
 		m.helpView()
 
 	layers := []*lipgloss.Layer{lipgloss.NewLayer(frame)}
-	if m.input != nil {
+	if dialog := m.dialogLayer(); dialog != nil {
 		// The dialog floats centered in front of everything else.
-		dialog := m.input.Layer()
 		dialog.X((lipgloss.Width(frame) - dialog.Width()) / 2)
 		dialog.Y((lipgloss.Height(frame) - dialog.Height()) / 2)
 		layers = append(layers, dialog)
@@ -210,6 +246,18 @@ func (m *HoldingsModel) View() tea.View {
 
 	c := lipgloss.NewCompositor(layers...)
 	return tea.NewView(trimTrailingSpace(c.Render()) + "\n")
+}
+
+// dialogLayer renders whichever dialog is open, or returns nil if none is.
+func (m *HoldingsModel) dialogLayer() *lipgloss.Layer {
+	switch {
+	case m.input != nil:
+		return m.input.Layer()
+	case m.confirm != nil:
+		return m.confirm.Layer()
+	default:
+		return nil
+	}
 }
 
 // headerView renders the two lines above the table: the positions the lots add up to on the left,

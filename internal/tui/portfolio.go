@@ -12,6 +12,7 @@ type Store interface {
 	Grants() ([]portfolio.Grant, error)
 	Quotes() (map[string]portfolio.Quote, error)
 	SaveLot(lot portfolio.Lot) error
+	DeleteLot(id int) error
 }
 
 // A Portfolio is everything the views show, as the store had it at one moment: the lots and grants
