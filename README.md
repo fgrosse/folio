@@ -55,7 +55,7 @@ worked out from. `1`-`3` or `tab` switch views, `q` quits.
 
 | View | Shows | Keys |
 |---|---|---|
-| Holdings | Every lot and what it is worth | `a` add a lot, `d` delete |
+| Holdings | Every lot and what it is worth | `a` add a lot, `e` edit, `d` delete |
 | Vesting | Every vest that has not been released, in the order of their days | `r` release a vest that is due |
 | Grants | Every grant, with the shares still to come | `a` add a grant, `d` delete |
 

@@ -8,9 +8,12 @@ a changelog. Anything that stays true once the work is done belongs elsewhere: d
 
 Roughly in the order worth doing.
 
-- **Edit what was entered.** A lot, a grant and a single vest can only be deleted and entered
-  again. The vest matters most: a plan that vests differently than the spec laid it out, a share
-  more here or a day later there, should be corrected on the row in the Vesting view.
+- **Edit a grant and its vests.** A lot can be edited, but a grant and a single vest can only be
+  deleted and entered again. The vest matters most: a plan that vests differently than it was
+  entered, a share more here or a day later there, should be corrected on the row in the Vesting
+  view.
+- **Check an edited lot against its vest.** A lot that a vest was released into can be edited to
+  hold more shares than vested, or another symbol than its grant's, which a release would refuse.
 - **Catch up on vests that are pending.** A grant entered with a first vest in the past leaves a
   row to release for every vest since, one dialog each. Releasing all pending vests of a grant in
   one go, with the shares that arrived as a percentage, would make that a single step.
