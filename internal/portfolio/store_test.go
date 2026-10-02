@@ -63,3 +63,41 @@ func TestStore_LotsAreListedByDay(t *testing.T) {
 	}
 	assert.Equal(t, expected, lots)
 }
+
+// TestStore_SaveLotRefusesInvalidLots covers what a lot has to have to be worth anything: a symbol
+// to look its price up by, shares to multiply it with, and the day they arrived.
+func TestStore_SaveLotRefusesInvalidLots(t *testing.T) {
+	tests := map[string]struct {
+		lot   Lot
+		error string
+	}{
+		"no symbol": {
+			lot:   Lot{Shares: shares("1"), Acquired: day("2026-03-15")},
+			error: "lot has no symbol",
+		},
+		"no shares": {
+			lot:   Lot{Symbol: "PANW", Acquired: day("2026-03-15")},
+			error: "lot of PANW must have more than 0 shares",
+		},
+		"negative shares": {
+			lot:   Lot{Symbol: "PANW", Shares: shares("-2"), Acquired: day("2026-03-15")},
+			error: "lot of PANW must have more than 0 shares",
+		},
+		"no day": {
+			lot:   Lot{Symbol: "PANW", Shares: shares("1")},
+			error: "lot of PANW has no day it was acquired on",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			s := NewTestingStore()
+
+			assert.EqualError(t, s.SaveLot(tt.lot), tt.error)
+
+			lots, err := s.Lots()
+			require.NoError(t, err)
+			assert.Empty(t, lots)
+		})
+	}
+}

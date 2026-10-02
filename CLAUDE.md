@@ -90,7 +90,9 @@ red, green, refactor, and it is small:
 4. **Commit.** One commit for the cycle, the test together with the code that makes it pass.
 
 Then the next cycle. One test at a time: not a batch of tests written ahead of the code, and no
-behavior without a test that asked for it. A table-driven test grows a case per cycle.
+behavior without a test that asked for it. A table-driven test is one test as long as its cases are
+the same behavior, such as the ways a lot can be invalid; a case that needs new code of its own is
+a cycle of its own.
 
 Scaffolding and boilerplate (project layout, tool wiring, config files) are exempt, and so is
 refactoring that keeps the existing tests green. Those are committed on their own.

@@ -83,8 +83,12 @@ func (s *SQLiteStore) Lots() ([]Lot, error) {
 	return lots, nil
 }
 
-// SaveLot records a new lot.
+// SaveLot records a new lot, which has to be valid.
 func (s *SQLiteStore) SaveLot(lot Lot) error {
+	if err := lot.Validate(); err != nil {
+		return err
+	}
+
 	_, err := s.db.Exec(
 		`INSERT INTO lots (symbol, shares, acquired_on) VALUES (?, ?, ?)`,
 		lot.Symbol, lot.Shares, lot.Acquired.Format(time.DateOnly),
