@@ -2,9 +2,12 @@ package tui
 
 import (
 	"testing"
+	"time"
 
 	"charm.land/bubbles/v2/table"
+	tea "charm.land/bubbletea/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/fgrosse/folio/internal/portfolio"
 )
@@ -41,6 +44,41 @@ func TestUnreleasedVests(t *testing.T) {
 		{grant: "RSU 2025", symbol: "PANW", vest: grants[0].Vests[2]},
 	}
 	assert.Equal(t, expected, unreleasedVests(grants))
+}
+
+// newTestingVesting returns a Vesting view that has loaded the test portfolio into a window of 100
+// by 20 on the 2nd of October 2026, and the store it loaded it from.
+func newTestingVesting(t *testing.T) (*VestingModel, *MockStore) {
+	t.Helper()
+
+	store := new(MockStore)
+	store.returns(testPortfolio())
+
+	m := NewVestingModel(store, DefaultStyle())
+	m.now = func() time.Time { return time.Date(2026, time.October, 2, 14, 30, 0, 0, time.UTC) }
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
+	m.Update(runCmd(t, m.Init()))
+
+	return m, store
+}
+
+// TestVestingModel_LoadsPortfolio covers what the Vesting view starts from: once started, it loads
+// the portfolio and shows a row for every vest that has not been released, valued at the quote the
+// store has of its grant's stock.
+func TestVestingModel_LoadsPortfolio(t *testing.T) {
+	m, store := newTestingVesting(t)
+	assert.Equal(t, "Vesting", m.Title())
+
+	p := testPortfolio()
+	today := day("2026-10-02")
+	vests := unreleasedVests(p.Grants)
+	require.Len(t, vests, 2)
+
+	rows := m.table.Rows()
+	require.Len(t, rows, 2)
+	assert.Equal(t, vestRow(vests[0], p.Quotes["PANW"], today), rows[0])
+	assert.Equal(t, vestRow(vests[1], p.Quotes["PANW"], today), rows[1])
+	store.AssertExpectations(t)
 }
 
 // TestVestRow covers how one vest reads as a row of the Vesting table: its day and the grant it
