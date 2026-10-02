@@ -134,6 +134,9 @@ func (m *HoldingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case DeleteLotMsg:
 		m.confirm = nil
 		return m, m.deleteLotCmd(msg.id)
+	case ConfirmCanceledMsg:
+		m.confirm = nil
+		return m, nil
 	}
 
 	if m.input != nil {
@@ -171,9 +174,14 @@ func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 }
 
 // askToDelete opens a dialog asking whether to delete the selected lot, which sends a DeleteLotMsg
-// if the answer is yes.
+// if the answer is yes. Without a lot to select, there is nothing to ask.
 func (m *HoldingsModel) askToDelete() (tea.Model, tea.Cmd) {
-	lot := m.portfolio.Lots[m.table.Cursor()]
+	i := m.table.Cursor()
+	if i < 0 || i >= len(m.portfolio.Lots) {
+		return m, nil
+	}
+
+	lot := m.portfolio.Lots[i]
 	question := fmt.Sprintf("Delete the %s %s of %s?", lot.Shares, lot.Symbol, lot.Acquired.Format(time.DateOnly))
 	m.confirm = NewConfirmDialog("Delete lot", question, DeleteLotMsg{id: lot.ID}, m.style)
 
@@ -271,21 +279,27 @@ func (m *HoldingsModel) headerView() string {
 }
 
 // helpView renders the keys worth knowing in two lines, as every view does: getting around on the
-// first, and what can be done to the table on the second. While the dialog is open it shows the
+// first, and what can be done to the table on the second. While a dialog is open it shows the
 // dialog's keys instead, since none of the others reach the view in that state anyway. Those take a
 // single line, and the second is left empty so that the frame keeps its height.
 func (m *HoldingsModel) helpView() string {
 	help, nav := m.table.Help, m.table.KeyMap
 
-	if m.input != nil {
+	switch {
+	case m.input != nil:
 		return help.ShortHelpView([]key.Binding{
 			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "save")),
 			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
 		}) + "\n"
+	case m.confirm != nil:
+		return help.ShortHelpView([]key.Binding{
+			key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "delete")),
+			key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "cancel")),
+		}) + "\n"
 	}
 
 	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n" +
-		help.ShortHelpView([]key.Binding{m.keys.Add})
+		help.ShortHelpView([]key.Binding{m.keys.Add, m.keys.Delete})
 }
 
 // positions sums up lots as how many shares of each stock they hold, the stocks in alphabetical

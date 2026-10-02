@@ -172,6 +172,44 @@ func TestHoldingsModel_DeleteLot(t *testing.T) {
 	store.AssertExpectations(t)
 }
 
+// TestHoldingsModel_CancelDelete covers a no to the question: the dialog closes, the lot stays, and
+// the keys are the view's again.
+func TestHoldingsModel_CancelDelete(t *testing.T) {
+	m, store := newTestingHoldings(t)
+	m.Update(keyPressed("d"))
+
+	_, cmd := m.Update(keyPressed("n"))
+	_, cmd = m.Update(runCmd(t, cmd))
+
+	assert.Nil(t, cmd)
+	assert.False(t, m.CapturesKeys(), "the question should be closed")
+	store.AssertNotCalled(t, "DeleteLot", mock.Anything)
+}
+
+// TestHoldingsModel_DeleteWithNothingSelected covers d in an account without lots, where there is
+// nothing to ask about.
+func TestHoldingsModel_DeleteWithNothingSelected(t *testing.T) {
+	store := new(MockStore)
+	store.returns(Portfolio{})
+	m := NewHoldingsModel(store, DefaultStyle())
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
+	m.Update(runCmd(t, m.Init()))
+
+	_, cmd := m.Update(keyPressed("d"))
+
+	assert.Nil(t, cmd)
+	assert.False(t, m.CapturesKeys(), "there should be no question to answer")
+}
+
+// TestHoldingsModel_RenderDeleteDialog is the frame while the view asks whether to delete a lot: the
+// question in front of the table, and the keys that answer it in the help lines.
+func TestHoldingsModel_RenderDeleteDialog(t *testing.T) {
+	m, _ := newTestingHoldings(t)
+	m.Update(keyPressed("d"))
+
+	golden.RequireEqual(t, ansi.Strip(m.View().Content))
+}
+
 // TestPositions covers the line the Holdings view puts above its table: how many shares of each
 // stock the lots add up to, which no single row says. The stocks are in alphabetical order, and an
 // account without lots says so.
