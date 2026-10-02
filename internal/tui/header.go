@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+	"github.com/shopspring/decimal"
 
 	"github.com/fgrosse/folio/internal/portfolio"
 )
@@ -22,6 +23,39 @@ func accountHeader(left, status string, account portfolio.Account, width int, st
 	)
 
 	return spread(left, total, width) + "\n" + spread(status, parts, width)
+}
+
+// quoteStatus renders the price of each of symbols and how it moved since the previous close, such
+// as "PANW $396.25 ▼ 0.3%". A symbol that quotes has none of says so instead.
+func quoteStatus(symbols []string, quotes map[string]portfolio.Quote) string {
+	parts := make([]string, len(symbols))
+	for i, symbol := range symbols {
+		quote, ok := quotes[symbol]
+		if !ok {
+			parts[i] = symbol + " has no price"
+			continue
+		}
+
+		parts[i] = symbol + " " + portfolio.FormatUSD(quote.Price) + dayChange(quote)
+	}
+
+	return strings.Join(parts, " · ")
+}
+
+// dayChange renders how far the price of quote is from the previous close, as an arrow and a
+// percentage to follow the price, or nothing if the quote has no previous close.
+func dayChange(quote portfolio.Quote) string {
+	if quote.PreviousClose.IsZero() {
+		return ""
+	}
+
+	change := quote.Price.Sub(quote.PreviousClose).Div(quote.PreviousClose).Mul(decimal.NewFromInt(100))
+	arrow := "▲"
+	if change.IsNegative() {
+		arrow = "▼"
+	}
+
+	return " " + arrow + " " + change.Abs().StringFixed(1) + "%"
 }
 
 // spread renders left and right at either end of a header line of the given width, indented like
