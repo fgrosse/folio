@@ -25,7 +25,8 @@ const (
 	// sharesColumnWidth fits a number of shares up to 9,999,999, or fewer with a fraction.
 	sharesColumnWidth = 10
 
-	// priceColumnWidth fits the price of one share up to $99,999.99.
+	// priceColumnWidth fits the price of one share up to $99,999.99, which is what both its cost
+	// and its price now are.
 	priceColumnWidth = 10
 
 	// valueColumnWidth fits a value up to $9,999,999.99, which is as much as the header's total
@@ -33,10 +34,10 @@ const (
 	valueColumnWidth = 14
 
 	// holdingsColumnsWidth is what every column other than the grant occupies, padding included.
-	holdingsColumnsWidth = dayColumnWidth + symbolColumnWidth + sharesColumnWidth + priceColumnWidth + valueColumnWidth +
-		5*cellPadding
+	holdingsColumnsWidth = dayColumnWidth + symbolColumnWidth + sharesColumnWidth + 2*priceColumnWidth + valueColumnWidth +
+		6*cellPadding
 
-	// noValue stands where a price or value would be if there was a quote to work it out from.
+	// noValue stands where a cost, price or value would be if it was known.
 	noValue = "-"
 )
 
@@ -103,6 +104,7 @@ func (m *HoldingsModel) columns() []table.Column {
 		{Title: "Symbol", Width: symbolColumnWidth},
 		{Title: "From", Width: m.width - holdingsColumnsWidth - cellPadding},
 		{Title: fmt.Sprintf("%*s", sharesColumnWidth, "Shares"), Width: sharesColumnWidth},
+		{Title: fmt.Sprintf("%*s", priceColumnWidth, "Cost"), Width: priceColumnWidth},
 		{Title: fmt.Sprintf("%*s", priceColumnWidth, "Price"), Width: priceColumnWidth},
 		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Value"), Width: valueColumnWidth},
 	}
@@ -369,10 +371,14 @@ func positions(lots []portfolio.Lot) string {
 }
 
 // lotRow renders a lot as a row of the Holdings table, with the grant it was released from, if any,
-// and valued at quote, which is the zero Quote if there is none of the lot's stock. The numbers are right-aligned for their digits to line up down
+// what a share of it cost, if that is known, and valued at quote, which is the zero Quote if there
+// is none of the lot's stock. The numbers are right-aligned for their digits to line up down
 // the column. The table has no alignment of its own, so the values are padded out here.
 func lotRow(lot portfolio.Lot, quote portfolio.Quote) table.Row {
-	price, value := noValue, noValue
+	cost, price, value := noValue, noValue, noValue
+	if !lot.Cost.IsZero() {
+		cost = portfolio.FormatUSD(lot.Cost)
+	}
 	if quote.Symbol != "" {
 		price = portfolio.FormatUSD(quote.Price)
 		value = portfolio.FormatUSD(lot.Shares.Mul(quote.Price))
@@ -383,6 +389,7 @@ func lotRow(lot portfolio.Lot, quote portfolio.Quote) table.Row {
 		lot.Symbol,
 		lot.Grant,
 		fmt.Sprintf("%*s", sharesColumnWidth, lot.Shares),
+		fmt.Sprintf("%*s", priceColumnWidth, cost),
 		fmt.Sprintf("%*s", priceColumnWidth, price),
 		fmt.Sprintf("%*s", valueColumnWidth, value),
 	}

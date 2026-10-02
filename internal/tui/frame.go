@@ -23,8 +23,9 @@ const (
 
 	// minTableWidth is the point at which the table stops shrinking. A window narrower than this
 	// wraps rather than squeezing the flexible column away to nothing, which is the more useful
-	// failure of the two - the table skips zero-width columns entirely.
-	minTableWidth = 60
+	// failure of the two - the table skips zero-width columns entirely. It is as wide as it is for
+	// the Holdings table, whose number columns alone take most of it.
+	minTableWidth = 80
 
 	// maxTableWidth stops the table from spanning an ultra-wide display, where the eye has to
 	// travel the whole screen to get from the start of a row to its value.
