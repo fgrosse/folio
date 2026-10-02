@@ -58,8 +58,9 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
   `internal/tui`.
 - **The TUI is the primary interface.** Bare `folio` launches it. The plain verbs stay scriptable:
   a status bar widget shells out to `folio status --json` and must never need a TTY.
-- **SQLite is the single source of truth**, opened in WAL mode where it matters. There is no
-  daemon: the CLI and any widget read and write the database file directly.
+- **SQLite is the single source of truth**, opened in WAL mode and with a busy timeout. There is no
+  daemon: the TUI, the CLI and any widget read and write the database file directly, at the same
+  time if it comes to that.
 - **The store owns no clock.** Whatever depends on today, such as whether a vest is due, takes the
   day from its caller, so a test can pick any day.
 - **Shares and prices are decimals, never floats.** `github.com/shopspring/decimal`, stored as text.
@@ -71,9 +72,17 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
   one day on which some of them do. A vest stays potential until it is *released*, which is what
   turns it into a lot - with the number of shares that actually arrived, which is fewer than vested
   whenever some were withheld for tax.
-- **Prices come from behind an interface and are cached in the database.** The views show the last
-  quote the database has right away and replace it once a fresh one arrives, so the TUI opens
-  without waiting for the network and still works without one. Tests never touch the network.
+- **Prices come from behind an interface and are cached in the database.** `portfolio.Quoter` is
+  what the domain asks of a source of prices, and `internal/yahoo` is the one there is, over an
+  endpoint that needs no key and is no official API. The views show the last quote the database has
+  right away and replace it once a fresh one arrives, so the TUI opens without waiting for the
+  network and still works without one. Tests never touch the network.
+- **A lot and a grant are typed as one line**, a spec, the way a task is in tick: `12.5 PANW
+  2026-03-15` and `Payout: 10 PANW monthly x24 from 2026-01-15`. `NewLot` and `NewGrant` have the
+  grammar in their doc comments, and the CLI verbs and the TUI's dialogs both go through them.
+- **Every view shows the same account.** They all receive the one `PortfolioLoadedMsg`, whichever
+  of them asked for the load, and each renders the same header with the three values. The Holdings
+  view is the one that keeps the quotes fresh: it fetches them on start and every five minutes.
 - **Everything is in USD for now**, the currency the stock trades in. Showing EUR is in `TODO.md`.
 
 ## How we build this

@@ -8,12 +8,21 @@ a changelog. Anything that stays true once the work is done belongs elsewhere: d
 
 Roughly in the order worth doing.
 
-- **Lots**: the shares that are held, in the store and as the Holdings view.
-- **Quotes**: the price of a symbol, fetched from behind an interface and cached in the database.
-- **Grants and their vests**: an award of shares and the days on which they vest, as the Vesting
-  view, with releasing a vest into a lot.
-- **The account values**: current, potential and total, in the header of every view and from
-  `folio status`, with `--json` for a status bar widget.
+- **Edit what was entered.** A lot, a grant and a single vest can only be deleted and entered
+  again. The vest matters most: a plan that vests differently than the spec laid it out, a share
+  more here or a day later there, should be corrected on the row in the Vesting view.
+- **Catch up on vests that are pending.** A grant entered with a first vest in the past leaves a
+  row to release for every vest since, one dialog each. Releasing all pending vests of a grant in
+  one go, with the shares that arrived as a percentage, would make that a single step.
+- **Say how old the prices are.** The header shows the prices but not when they are from, which
+  matters at a weekend and without a network. The time of the quote is stored already.
+- **A key that fetches the quotes now**, rather than waiting for the five minutes to pass.
+- **`folio status` should say when stock has no price.** `Account.Unpriced` names it, and the JSON
+  output lists it, but the plain output shows values that leave it out without a word.
+- **The released vests** have no place in the TUI once they are lots. A key in the Vesting view
+  that shows them, dimmed, would make it the whole schedule of a grant.
+- **How the account moved today**: the change of the total since the previous close, next to it
+  in the header.
 
 ## Later
 
@@ -27,3 +36,5 @@ Roughly in the order worth doing.
 - **The account value over time**, as a chart or a table by month.
 - **The Omarchy bar widget of `~/src/stock-ticker`** could show the account value from
   `folio status --json` next to the price.
+- **A vesting schedule with a cliff** that is not a whole year, and intervals other than monthly,
+  quarterly and yearly, if a grant ever needs them.
