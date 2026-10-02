@@ -73,7 +73,9 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
   is *released*, which is what turns it into a lot - with the number of shares that actually
   arrived, which is fewer than vested whenever some were withheld for tax, and at the value of a
   share on that day as the lot's cost. The vest keeps the number that vested, so both are there for
-  a tax estimate to work from.
+  a tax estimate to work from. A *sale* is shares of one lot sold on one day at one price. It is a
+  record of its own rather than fewer shares on the lot: the lot keeps what it was acquired with,
+  and what is held is that less its sales. The user says which lot a sale is from.
 - **Prices come from behind an interface and are cached in the database.** `portfolio.Quoter` is
   what the domain asks of a source of prices, and `internal/yahoo` is the one there is, over an
   endpoint that needs no key and is no official API. The views show the last quote the database has
@@ -82,6 +84,13 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
 - **A lot and a grant are typed as one line**, a spec, the way a task is in tick: `12.5 PANW
   2026-03-15 @380.12` and `Payout: 10 PANW monthly x24 from 2026-01-15`. `NewLot` and `NewGrant` have the
   grammar in their doc comments, and the CLI verbs and the TUI's dialogs both go through them.
+- **Realized money is not part of the three values.** Current counts what is left of the lots, and
+  what the sales brought in is stated next to the values, never added to the total, which stays
+  the bank's.
+- **A form for what one line cannot say.** A lot, a grant and a release are a spec in an
+  `InputDialog`. A sale has notes of several lines, so it is entered in a `FormDialog`, which has a
+  field for each value. Both hand what was typed to a function of the view's and know nothing of
+  what it means.
 - **Every view shows the same account.** They all receive the one `PortfolioLoadedMsg`, whichever
   of them asked for the load, and each renders the same header with the three values. The Holdings
   view is the one that keeps the quotes fresh: it fetches them on start and every five minutes.

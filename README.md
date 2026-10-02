@@ -39,7 +39,7 @@ or `FOLIO_DB` for another one.
 
 ## How it works
 
-An account is made of three things:
+An account is made of four things:
 
 - A **lot** is shares that you hold: a number of shares of one stock, the day they arrived and
   what one of them cost that day. Lots are what the current value counts.
@@ -48,16 +48,21 @@ An account is made of three things:
   until each is **released** into a lot - with the number of shares that actually arrived, which
   is fewer than vested when some were withheld for tax, and what a share was worth that day.
 
+- A **sale** is shares of one lot that were sold on one day, at one price. The lot keeps what it
+  was acquired with, and what is left of it is that less its sales. What the sales brought in is
+  the money that was realized, which is stated apart from the three values.
+
 ## The TUI
 
 A bare `folio` opens it. The header of every view has the three values, and the prices they were
-worked out from. `1`-`3` or `tab` switch views, `q` quits.
+worked out from. `1`-`4` or `tab` switch views, `q` quits.
 
 | View | Shows | Keys |
 |---|---|---|
-| Holdings | Every lot and what it is worth | `a` add a lot, `e` edit, `d` delete |
+| Holdings | Every lot that has shares left, and what they are worth | `a` add a lot, `e` edit, `s` sell shares of it, `d` delete |
 | Vesting | Every vest that has not been released, in the order of their days | `r` release a vest that is due |
 | Grants | Every grant, with the shares still to come | `a` add a grant, `d` delete |
+| Sales | Every sale, with what it brought in and gained | `d` delete |
 
 A lot and a grant are typed as one line:
 
@@ -69,6 +74,10 @@ RSU 2025: 400 PANW quarterly 10/20/30/40 from 2026-02-20   400 shares over four 
 
 In a lot, the day defaults to today and the cost may be left out. Releasing a vest asks for the
 shares that arrived and their cost the same way: `6 @380.12`.
+
+Selling opens a form with a field each for the shares, the price, the day and notes of several
+lines. `tab` moves between the fields, `enter` saves, and in the notes, where `enter` starts a new
+line, `ctrl+s` does. The note of a sale shows above the Sales table while the sale is selected.
 
 In a grant, the interval is `monthly`, `quarterly` or `yearly`, and the day after `from` is that
 of the first vest. With percentages, the shares are those of the whole grant, and each percentage
@@ -89,10 +98,11 @@ folio status
 folio status --json
 ```
 
-`folio status` prints the three values, and with `--json` as an object for a status bar widget:
+`folio status` prints the three values, and what was realized once something was sold. With
+`--json` it prints an object for a status bar widget:
 
 ```json
-{"current":"3368.13","potential":"7925.00","total":"11293.13","currency":"USD","unpriced":[]}
+{"current":"3368.13","potential":"7925.00","total":"11293.13","realized":"0.00","realized_gain":"0.00","currency":"USD","unpriced":[]}
 ```
 
 ## Development

@@ -17,10 +17,16 @@ Roughly in the order worth doing.
 - **Catch up on vests that are pending.** A grant entered with a first vest in the past leaves a
   row to release for every vest since, one dialog each. Releasing all pending vests of a grant in
   one go, with the shares that arrived as a percentage, would make that a single step.
+- **Finish the sales.** A sale cannot be edited, only deleted and entered again. It has no fee, so
+  its proceeds are before costs, and it is in USD like everything else, while the money that
+  arrives is in EUR. There is no verb to record a sale from the command line. A sale that spans
+  several lots is entered once per lot, and folio could spread it over the lots oldest first, the
+  way the tax office counts.
 - **Record the whole of a release.** A release confirmation states more than folio keeps: the
   shares that were sold to cover tax, which folio can work out, and the price they sold at, which
   it cannot. That sale is a taxable event of its own, with a gain or loss against the value of the
-  shares on the day of the vest. The confirmation itself, a PDF, could be attached to the release
+  shares on the day of the vest. With sales in place, that one could be a sale like any other, of shares that were never
+  held. The confirmation itself, a PDF, could be attached to the release
   and kept in the database, so that every number has its source next to it.
 - **Say how old the prices are.** The header shows the prices but not when they are from, which
   matters at a weekend and without a network. The time of the quote is stored already.
@@ -41,7 +47,6 @@ Roughly in the order worth doing.
   cost, which is recorded, and the tax on it if it was sold. Costs are in USD, and a German tax
   return wants them in EUR at the rate of the day, so this needs the exchange rate of a past day.
 - **The gain of a lot** in the Holdings view, now that it has a cost: per lot and in the header.
-- **Sales**: selling shares takes them out of a lot, and what they sold for is worth keeping.
 - **The account value over time**, as a chart or a table by month.
 - **The Omarchy bar widget of `~/src/stock-ticker`** could show the account value from
   `folio status --json` next to the price.
