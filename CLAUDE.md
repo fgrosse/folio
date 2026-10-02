@@ -1,18 +1,22 @@
 # folio
 
-A terminal-first tracker for the stock Friedrich holds and is still to be given, written in Go and
-storing its state in a local SQLite database.
+A terminal-first tracker for the stock someone holds and is still to be given by their employer,
+written in Go and storing its state in a local SQLite database.
 
 ## What this is
 
-`folio` answers what the account at the bank's web site answers, without logging in there: what the
-shares held are worth today, what the shares still to vest are worth, and what the two add up to.
-It is built for stock that comes from work as RSUs, which arrive on a vesting schedule. Stock bought
-privately fits the same model and matters less for now.
+`folio` answers what the web site of the bank or broker that holds an equity plan answers, without
+logging in there: what the shares held are worth today, what the shares still to vest are worth,
+and what the two add up to. It is built for stock that comes from work as RSUs, which arrive on a
+vesting schedule. Stock bought privately fits the same model and matters less for now.
 
-It is the sibling of `tick` (`~/src/tick`), the time tracker, and mirrors its structure, its code
-style and its look: the same packages, the same frame around a table, the same tab bar. When in
-doubt about how something should be written or look, see how tick does it.
+Its user is whoever runs it, about their own account: one person, one database on their machine,
+no server and no login. `folio demo` makes up an account for anyone who wants to look around first.
+
+It is the sibling of [`tick`](https://github.com/fgrosse/tick), a time tracker, and mirrors its
+structure, its code style and its look: the same packages, the same frame around a table, the same
+tab bar. When in doubt about how something should be written or look, see how tick does it, if a
+checkout of it is at hand.
 
 The three numbers are the bank's, and so are their definitions:
 
@@ -94,7 +98,11 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
 - **Every view shows the same account.** They all receive the one `PortfolioLoadedMsg`, whichever
   of them asked for the load, and each renders the same header with the three values. The Holdings
   view is the one that keeps the quotes fresh: it fetches them on start and every five minutes.
-- **Everything is in USD for now**, the currency the stock trades in. Showing EUR is in `TODO.md`.
+- **Everything is in USD for now**, the currency the stock trades in. Showing another currency is
+  in `TODO.md`.
+- **The demo is the one verb with a database of its own.** Every other verb shares the database of
+  the real account, which the root command opens and creates before the verb runs. `folio demo`
+  overrides those hooks and writes elsewhere, so that trying folio leaves the real account alone.
 
 ## How we build this
 

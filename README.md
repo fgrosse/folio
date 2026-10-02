@@ -1,53 +1,101 @@
 # folio
 
 A terminal-first tracker for the stock you hold and the stock that is still to vest. It answers
-what the account at your broker's web site answers, without logging in there:
+what the web site of the bank or broker behind your equity plan answers, without logging in there:
 
 - **Current**: what the shares you hold would sell for.
 - **Potential**: what the shares that are still to vest, or vested and not released yet, are worth.
 - **Total**: the two added up.
 
-It is built for stock that comes from work as RSUs, on a vesting schedule. Everything is kept in a
-local SQLite database, and prices come from Yahoo Finance.
+It is built for stock that comes from work as RSUs, on a vesting schedule, and also keeps what
+those shares cost and what you sold them for. Everything is in a SQLite database on your machine,
+and prices come from Yahoo Finance.
 
 ```
-  8.5 PANW                                                                       Total: $11,293.13
-  PANW $396.25 ▼ 0.3%                                      Current $3,368.13 · Potential $7,925.00
+  21 AAPL · 274 ADBE                                                             Total: $393,342.08
+  AAPL $332.98 ▲ 0.8% · ADBE $237.90 ▼ 1.4%              Current $72,177.08 · Potential $321,165.00
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
 │ Acquired    Symbol    From                        Shares        Cost       Price           Value │
 │──────────────────────────────────────────────────────────────────────────────────────────────────│
-│ 2026-01-15  PANW      Payout                           6     $380.12     $396.25       $2,377.50 │
-│ 2026-02-15  PANW                                     2.5           -     $396.25         $990.63 │
+│ 2024-11-29  AAPL                                      21     $175.23     $332.98       $6,992.48 │
+│ 2025-04-01  ADBE      New hire grant                  21     $392.73     $237.90       $4,995.90 │
+│ 2025-07-01  ADBE      New hire grant                  42     $386.17     $237.90       $9,991.80 │
+│ 2025-10-01  ADBE      New hire grant                  42     $417.30     $237.90       $9,991.80 │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘
 ↑/k up • ↓/j down • q quit
-a add • d delete
-1 Holdings • 2 Vesting • 3 Grants
+a add • e edit • s sell • d delete
+1 Holdings • 2 Vesting • 3 Grants • 4 Sales
 ```
 
-## Install
+## Getting started
 
-Requires Go and a C compiler (for SQLite).
+### 1. Install
+
+folio needs [Go](https://go.dev/dl/) and a C compiler, which SQLite is built with.
 
 ```bash
-git clone <this repo> ~/src/folio
-cd ~/src/folio
+go install github.com/fgrosse/folio/cmd/folio@latest
+```
+
+Or from a checkout:
+
+```bash
+git clone https://github.com/fgrosse/folio
+cd folio
 go install ./...
 ```
 
-The database lives at `$XDG_DATA_HOME/folio/folio.db` (`~/.local/share/folio/folio.db`). Use `--db`
-or `FOLIO_DB` for another one.
+Either way the `folio` binary ends up in Go's bin directory (`go env GOBIN`, or `~/go/bin`), which
+has to be on your `PATH`.
+
+### 2. Look around with a demo account
+
+```bash
+folio demo
+```
+
+This makes up an account - two grants, the shares released from them, a sale, some stock that was
+bought - writes it to a database of its own, and prints the command that opens it:
+
+```bash
+folio --db ~/.local/share/folio/demo.db
+```
+
+`1`-`4` or `tab` switch between the views, and `q` quits. Nothing you do there touches a real
+account. The demo is different every time; `folio demo --seed 7` makes the same one again, and a
+path after `demo` puts the database somewhere else.
+
+### 3. Enter your own account
+
+A bare `folio` opens your own account, which is empty to begin with. The fastest way to fill it is
+the command line, from what your plan's web site shows:
+
+```bash
+# A grant: 400 shares over four years, vesting every quarter, more with every year
+folio grant "RSU 2025: 400 PANW quarterly 10/20/30/40 from 2026-02-20"
+
+# A vest that has happened: of its 10 shares 6 arrived, worth $380.12 each that day
+folio release 2026-02-20 6 @380.12
+
+# Shares you bought yourself
+folio lot 15 AAPL 2025-06-02 @201.50
+
+folio status
+```
+
+Then open `folio` and carry on there. The sections below explain what each of these is.
 
 ## How it works
 
 An account is made of four things:
 
-- A **lot** is shares that you hold: a number of shares of one stock, the day they arrived and
-  what one of them cost that day. Lots are what the current value counts.
 - A **grant** is an award of shares that vest over time, such as a grant of RSUs.
 - A **vest** is one day on which shares of a grant vest. Vests are what the potential value counts,
   until each is **released** into a lot - with the number of shares that actually arrived, which
-  is fewer than vested when some were withheld for tax, and what a share was worth that day.
-
+  is fewer than vested when some were sold or withheld for tax, and what a share was worth that
+  day.
+- A **lot** is shares that you hold: a number of shares of one stock, the day they arrived and
+  what one of them cost that day. Lots are what the current value counts.
 - A **sale** is shares of one lot that were sold on one day, at one price. The lot keeps what it
   was acquired with, and what is left of it is that less its sales. What the sales brought in is
   the money that was realized, which is stated apart from the three values.
@@ -64,25 +112,25 @@ worked out from. `1`-`4` or `tab` switch views, `q` quits.
 | Grants | Every grant, with the shares still to come | `a` add a grant, `d` delete |
 | Sales | Every sale, with what it brought in and gained | `d` delete |
 
-A lot and a grant are typed as one line:
+A lot, a grant and a release are typed as one line:
 
 ```
 12.5 PANW 2026-03-15 @380.12                               a lot: shares, day and cost of a share
-Payout: 10 PANW monthly x24 from 2026-01-15                10 shares each month, 24 times
-RSU 2025: 400 PANW quarterly 10/20/30/40 from 2026-02-20   400 shares over four years
+Payout: 10 PANW monthly x24 from 2026-01-15                a grant: 10 shares each month, 24 times
+RSU 2025: 400 PANW quarterly 10/20/30/40 from 2026-02-20   a grant: 400 shares over four years
+6 @380.12                                                  a release: shares that arrived, and their cost
 ```
 
-In a lot, the day defaults to today and the cost may be left out. Releasing a vest asks for the
-shares that arrived and their cost the same way: `6 @380.12`.
-
-Selling opens a form with a field each for the shares, the price, the day and notes of several
-lines. `tab` moves between the fields, `enter` saves, and in the notes, where `enter` starts a new
-line, `ctrl+s` does. The note of a sale shows above the Sales table while the sale is selected.
+In a lot, the day defaults to today and the cost may be left out.
 
 In a grant, the interval is `monthly`, `quarterly` or `yearly`, and the day after `from` is that
 of the first vest. With percentages, the shares are those of the whole grant, and each percentage
 is the part of them that vests in one year, spread evenly over the vests of that year in whole
-shares.
+shares. A schedule that follows neither rule can be listed vest by vest, see `folio grant --help`.
+
+Selling opens a form with a field each for the shares, the price, the day and notes of several
+lines. `tab` moves between the fields, `enter` saves, and in the notes, where `enter` starts a new
+line, `ctrl+s` does. The note of a sale shows above the Sales table while the sale is selected.
 
 Prices are fetched when the TUI starts and every five minutes after that. It opens with the last
 prices it saw, so it works without a network too.
@@ -90,6 +138,8 @@ prices it saw, so it works without a network too.
 ## The command line
 
 ```bash
+folio                                              # open the TUI
+folio demo                                         # make up an account to try folio with
 folio lot 12.5 PANW 2026-03-15 @380.12
 folio grant "Payout: 10 PANW monthly x24 from 2026-01-15"
 folio grant --vests schedule.txt "Payout: PANW"    # the vests listed, "<YYYY-MM-DD> <shares>" a line
@@ -98,12 +148,23 @@ folio status
 folio status --json
 ```
 
+Every verb has a `--help` that says more.
+
 `folio status` prints the three values, and what was realized once something was sold. With
 `--json` it prints an object for a status bar widget:
 
 ```json
 {"current":"3368.13","potential":"7925.00","total":"11293.13","realized":"0.00","realized_gain":"0.00","currency":"USD","unpriced":[]}
 ```
+
+## Where your data is
+
+The database of your account is `$XDG_DATA_HOME/folio/folio.db`, which is
+`~/.local/share/folio/folio.db` unless you set it otherwise. `--db` or the `FOLIO_DB` environment
+variable name another one. It is a single SQLite file: copy it to back it up.
+
+Nothing leaves your machine except the symbols of your stock, which are sent to Yahoo Finance to
+ask for their prices.
 
 ## Development
 
@@ -121,4 +182,4 @@ planned.
 
 Quotes come from Yahoo Finance's chart endpoint, which needs no API key but is not an official API:
 it may change or turn requests away without notice, and prices can be delayed. Everything is in USD
-for now.
+for now. folio keeps records and adds them up; it is no tax or investment advice.

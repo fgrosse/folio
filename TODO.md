@@ -19,15 +19,15 @@ Roughly in the order worth doing.
   one go, with the shares that arrived as a percentage, would make that a single step.
 - **Finish the sales.** A sale cannot be edited, only deleted and entered again. It has no fee, so
   its proceeds are before costs, and it is in USD like everything else, while the money that
-  arrives is in EUR. There is no verb to record a sale from the command line. A sale that spans
+  arrives may be in another currency. There is no verb to record a sale from the command line. A sale that spans
   several lots is entered once per lot, and folio could spread it over the lots oldest first, the
   way the tax office counts.
 - **Record the whole of a release.** A release confirmation states more than folio keeps: the
   shares that were sold to cover tax, which folio can work out, and the price they sold at, which
   it cannot. That sale is a taxable event of its own, with a gain or loss against the value of the
-  shares on the day of the vest. With sales in place, that one could be a sale like any other, of shares that were never
-  held. The confirmation itself, a PDF, could be attached to the release
-  and kept in the database, so that every number has its source next to it.
+  shares on the day of the vest. With sales in place, that one could be a sale like any other, of
+  shares that were never held. The confirmation itself, a PDF, could be attached to the release and
+  kept in the database, so that every number has its source next to it.
 - **Say how old the prices are.** The header shows the prices but not when they are from, which
   matters at a weekend and without a network. The time of the quote is stored already.
 - **A key that fetches the quotes now**, rather than waiting for the five minutes to pass.
@@ -40,15 +40,16 @@ Roughly in the order worth doing.
 
 ## Later
 
-- **Show values in EUR**, toggled with a key in the TUI and a flag on `folio status`. It needs an
+- **Show values in another currency**, such as EUR, toggled with a key in the TUI and a flag on `folio status`. It needs an
   exchange rate, fetched and cached like a quote.
 - **Tax estimates**: what is left of a vest after tax, from a rate that is configured, and the
   potential value after tax next to the one before. For what is held, the gain of a lot since its
-  cost, which is recorded, and the tax on it if it was sold. Costs are in USD, and a German tax
-  return wants them in EUR at the rate of the day, so this needs the exchange rate of a past day.
+  cost, which is recorded, and the tax on it if it was sold. Costs are in USD, and a tax
+  return outside the US wants them in its own currency at the rate of the day, so this needs the
+  exchange rate of a past day.
 - **The gain of a lot** in the Holdings view, now that it has a cost: per lot and in the header.
 - **The account value over time**, as a chart or a table by month.
-- **The Omarchy bar widget of `~/src/stock-ticker`** could show the account value from
-  `folio status --json` next to the price.
+- **A status bar widget**, such as a module for Waybar, that shows the account value from
+  `folio status --json`.
 - **A vesting schedule with a cliff** that is not a whole year, and intervals other than monthly,
   quarterly and yearly, if a grant ever needs them.
