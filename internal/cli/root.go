@@ -22,6 +22,12 @@ import (
 // and migrates it before any subcommand runs, PersistentPostRunE closes it afterwards.
 type Folio struct {
 	*cobra.Command
+
+	// BuildVersion is the version this binary was released as, such as "1.0.0". The build of a
+	// release sets it, and "folio version" prints it. It is not cobra's Version, which would add
+	// a --version flag: folio says its version through a verb, as go does.
+	BuildVersion string
+
 	store  *portfolio.SQLiteStore
 	quoter portfolio.Quoter // where the prices come from
 	now    func() time.Time
@@ -59,6 +65,7 @@ func New() *Folio {
 	cmd.AddCommand(cmd.ReleaseCmd())
 	cmd.AddCommand(cmd.StatusCmd())
 	cmd.AddCommand(cmd.DemoCmd())
+	cmd.AddCommand(cmd.VersionCmd())
 
 	return cmd
 }
