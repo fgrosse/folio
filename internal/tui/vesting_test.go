@@ -9,7 +9,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/exp/golden"
-	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -128,8 +127,9 @@ func TestVestingModel_ShowsErrors(t *testing.T) {
 
 // TestVestingModel_ReleaseVest covers what there is to do in the view: r on a vest that is due opens
 // a dialog that asks how many shares arrived, with all of the vest's in its field, since that is the
-// usual answer. Enter has the store release the vest with that many shares, which makes a lot of
-// them, and the view loads the portfolio again.
+// usual answer, and what a share was worth that day, after an "@". Enter has the store release the
+// vest with that many shares at that cost, which makes a lot of them, and the view loads the
+// portfolio again.
 func TestVestingModel_ReleaseVest(t *testing.T) {
 	m, store := newTestingVesting(t)
 	// A few days after the first of the two vests, which is pending release by then.
@@ -142,17 +142,33 @@ func TestVestingModel_ReleaseVest(t *testing.T) {
 	// Four of the ten shares were withheld for tax.
 	m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
-	m.Update(keyPressed("6"))
+	for _, key := range keysPressed("6 @380.12") {
+		m.Update(key)
+	}
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	msg := runCmd(t, cmd)
-	require.Equal(t, ReleaseVestMsg{id: 2, shares: dec("6")}, msg)
+	require.Equal(t, ReleaseVestMsg{id: 2, shares: dec("6"), cost: dec("380.12")}, msg)
 
-	store.On("ReleaseVest", 2, dec("6"), decimal.Zero).Return(nil)
+	store.On("ReleaseVest", 2, dec("6"), dec("380.12")).Return(nil)
 	_, cmd = m.Update(msg)
 	assert.False(t, m.CapturesKeys(), "the dialog should be closed")
 	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
 	store.AssertExpectations(t)
+}
+
+// TestVestingModel_ReleaseWithoutCost covers a release that only says how many shares arrived, which
+// is as much as is known when the confirmation of the vest is not at hand: the vest is released at
+// no cost, which the store takes for one that is not known.
+func TestVestingModel_ReleaseWithoutCost(t *testing.T) {
+	m := newTestingRelease(t)
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	msg, ok := runCmd(t, cmd).(ReleaseVestMsg)
+	require.True(t, ok)
+	assert.Equal(t, "10", msg.shares.String())
+	assert.True(t, msg.cost.IsZero(), "a release without a cost should have none")
 }
 
 // TestVestingModel_ReleaseRefused covers r where there is nothing to release: on a vest whose day
@@ -199,9 +215,12 @@ func TestVestingModel_ReleaseDialogRefuses(t *testing.T) {
 		typed string
 		error string
 	}{
-		"not a number":     {typed: "six", error: `"six" is not a number of shares`},
-		"no shares":        {typed: "0", error: "a vest must release more than 0 shares"},
-		"more than vested": {typed: "12", error: "the vest has 10 shares, not 12"},
+		"not a number":      {typed: "six", error: `"six" is not a number of shares`},
+		"no shares":         {typed: "0", error: "a vest must release more than 0 shares"},
+		"more than vested":  {typed: "12", error: "the vest has 10 shares, not 12"},
+		"a cost without @":  {typed: "6 380.12", error: `"380.12" is not a cost such as @380.12`},
+		"a cost of nothing": {typed: "6 @0", error: `"@0" is not a cost such as @380.12`},
+		"too much":          {typed: "6 @380.12 net", error: `a release is written as "<shares> [@<cost>]"`},
 	}
 
 	for name, tt := range tests {

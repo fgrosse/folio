@@ -44,6 +44,7 @@ type VestingModel struct {
 type ReleaseVestMsg struct {
 	id     int
 	shares decimal.Decimal
+	cost   decimal.Decimal // what one share was worth on the day of the vest, zero if not known
 }
 
 // NewVestingModel returns the Vesting view over store, rendered in style.
@@ -113,7 +114,7 @@ func (m *VestingModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case ReleaseVestMsg:
 		m.input = nil
-		return m, m.releaseVestCmd(msg.id, msg.shares)
+		return m, m.releaseVestCmd(msg.id, msg.shares, msg.cost)
 	case InputCanceledMsg:
 		m.input = nil
 		return m, nil
@@ -148,8 +149,8 @@ func (m *VestingModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 }
 
 // openRelease opens the dialog that releases the selected vest, which asks how many of its shares
-// arrived. All of them are in the field to begin with, since that is the usual answer, and fewer
-// when some were withheld for tax.
+// arrived and what one was worth that day. All of its shares are in the field to begin with, since
+// that is the usual answer, and fewer when some were withheld for tax.
 //
 // Without a vest to select there is nothing to release, and neither is there on a vest whose day has
 // not come: its shares have not arrived, and the header says so instead.
@@ -165,34 +166,53 @@ func (m *VestingModel) openRelease() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// The dialog refuses what the store would, so that it can say so while it is still open.
-	submit := func(value string) (tea.Msg, error) {
-		shares, err := decimal.NewFromString(value)
+	title := "Shares released on " + vest.Date.Format(time.DateOnly)
+	placeholder := vest.Shares.String() + " @380.12"
+	m.input = NewInputDialog(title, placeholder, newRelease(vest), dialogWidth, m.style)
+	m.input.SetValue(vest.Shares.String())
+
+	return m, m.input.Init()
+}
+
+// newRelease returns what the release dialog of vest does with the text typed into it, which is
+// written as "<shares> [@<cost>]": the shares that arrived, and what one of them was worth that day.
+// It turns the text into the message that asks for the vest to be released, at no cost if the text
+// has none. The dialog refuses what the store would, so that it can say so while it is still open.
+func newRelease(vest portfolio.Vest) func(value string) (tea.Msg, error) {
+	return func(value string) (tea.Msg, error) {
+		fields := strings.Fields(value)
+		if len(fields) > 2 {
+			return nil, errors.New(`a release is written as "<shares> [@<cost>]"`)
+		}
+
+		shares, err := decimal.NewFromString(fields[0])
 		switch {
 		case err != nil:
-			return nil, fmt.Errorf("%q is not a number of shares", value)
+			return nil, fmt.Errorf("%q is not a number of shares", fields[0])
 		case !shares.IsPositive():
 			return nil, errors.New("a vest must release more than 0 shares")
 		case shares.GreaterThan(vest.Shares):
 			return nil, fmt.Errorf("the vest has %s shares, not %s", vest.Shares, shares)
 		}
 
-		return ReleaseVestMsg{id: vest.ID, shares: shares}, nil
+		cost := decimal.Zero
+		if len(fields) == 2 {
+			cost, err = portfolio.ParseCost(fields[1])
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return ReleaseVestMsg{id: vest.ID, shares: shares, cost: cost}, nil
 	}
-
-	title := "Shares released on " + vest.Date.Format(time.DateOnly)
-	m.input = NewInputDialog(title, vest.Shares.String(), submit, dialogWidth, m.style)
-	m.input.SetValue(vest.Shares.String())
-
-	return m, m.input.Init()
 }
 
 // releaseVestCmd returns a command that releases the vest with the given ID into a lot of that many
-// shares and loads the portfolio again, which then has the lot in place of the vest.
-func (m *VestingModel) releaseVestCmd(id int, shares decimal.Decimal) tea.Cmd {
+// shares at that cost and loads the portfolio again, which then has the lot in place of the vest.
+func (m *VestingModel) releaseVestCmd(id int, shares, cost decimal.Decimal) tea.Cmd {
 	store := m.store
 	return func() tea.Msg {
-		if err := store.ReleaseVest(id, shares, decimal.Zero); err != nil {
+		if err := store.ReleaseVest(id, shares, cost); err != nil {
 			return PortfolioLoadedMsg{err: err}
 		}
 
