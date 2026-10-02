@@ -31,22 +31,28 @@ a add • e edit • s sell • d delete
 
 ### 1. Install
 
-folio needs [Go](https://go.dev/dl/) and a C compiler, which SQLite is built with.
-
-```bash
-go install github.com/fgrosse/folio/cmd/folio@latest
-```
-
-Or from a checkout:
+The quickest way is [mise](https://mise.jdx.dev/), which fetches the Go version folio is built with
+and runs the build:
 
 ```bash
 git clone https://github.com/fgrosse/folio
 cd folio
-go install ./...
+mise install        # Go, and the tools used to develop folio
+mise run install    # build folio and install it
 ```
 
-Either way the `folio` binary ends up in Go's bin directory (`go env GOBIN`, or `~/go/bin`), which
-has to be on your `PATH`.
+mise may ask you to trust the `mise.toml` of the checkout first (`mise trust`). The one thing it
+does not bring is a C compiler such as `gcc`, which SQLite is built with and most systems have.
+
+Inside the checkout, `folio` is on your `PATH` from then on. To have it everywhere, make that Go
+your global one (`mise use -g go@1.27.0`), or copy the binary from `go env GOBIN` to a directory
+that is on your `PATH`.
+
+Without mise, any Go from 1.27 on does the same:
+
+```bash
+go install github.com/fgrosse/folio/cmd/folio@latest
+```
 
 ### 2. Look around with a demo account
 
@@ -81,6 +87,9 @@ folio status
 ```
 
 Then open `folio` and carry on there. The sections below explain what each of these is.
+
+Every command explains itself: `folio grant --help`, `folio release --help` and the others describe
+the syntax they take, with examples, and list their options.
 
 ## How it works
 
@@ -167,9 +176,10 @@ ask for their prices.
 
 ```bash
 mise install          # Go, gopls and golangci-lint
+mise run install      # build and install folio
 mise run test
 mise run lint
-mise run git:hooks    # run both before every push
+mise run git:hooks    # run the tests and the linter before every push
 ```
 
 See `CLAUDE.md` for how the project is built and why it is the way it is, and `TODO.md` for what is

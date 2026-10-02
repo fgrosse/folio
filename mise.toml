@@ -7,6 +7,10 @@ go = "1.27.0"
 # Linters and formatters
 golangci-lint = "latest"
 
+[tasks.install]
+description = "Build folio and install it into Go's bin directory"
+run = "go install ./..."
+
 [tasks."git:hooks"]
 description = "Install git hooks"
 run = "cp scripts/pre-push.githook .git/hooks/pre-push"
