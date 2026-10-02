@@ -5,6 +5,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,4 +41,19 @@ func keyPressed(s string) tea.KeyPressMsg {
 		panic("expected a single key")
 	}
 	return tea.KeyPressMsg{Code: rune(s[0]), Text: s}
+}
+
+// day parses a calendar day written as YYYY-MM-DD.
+func day(s string) time.Time {
+	t, err := time.Parse(time.DateOnly, s)
+	if err != nil {
+		panic(err)
+	}
+
+	return t
+}
+
+// dec parses a decimal, such as a number of shares or a price, written the way it reads.
+func dec(s string) decimal.Decimal {
+	return decimal.RequireFromString(s)
 }
