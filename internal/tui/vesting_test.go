@@ -4,7 +4,43 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/fgrosse/folio/internal/portfolio"
 )
+
+// TestUnreleasedVests covers which vests the Vesting view lists: those of every grant that have not
+// been released, which are the ones the potential value counts, in the order of their days whatever
+// grant they belong to. Vests of the same day stay in the order of their grants.
+func TestUnreleasedVests(t *testing.T) {
+	grants := []portfolio.Grant{
+		{
+			Name:   "RSU 2025",
+			Symbol: "PANW",
+			Vests: []portfolio.Vest{
+				{ID: 1, Date: day("2026-08-20"), Shares: dec("10"), Released: true},
+				{ID: 2, Date: day("2026-11-20"), Shares: dec("10")},
+				{ID: 3, Date: day("2027-02-20"), Shares: dec("20")},
+			},
+		},
+		{
+			Name:   "Payout",
+			Symbol: "AAPL",
+			Vests: []portfolio.Vest{
+				{ID: 4, Date: day("2026-09-15"), Shares: dec("5"), Released: true},
+				{ID: 5, Date: day("2026-10-15"), Shares: dec("5")},
+				{ID: 6, Date: day("2026-11-20"), Shares: dec("5")},
+			},
+		},
+	}
+
+	expected := []grantVest{
+		{grant: "Payout", symbol: "AAPL", vest: grants[1].Vests[1]},
+		{grant: "RSU 2025", symbol: "PANW", vest: grants[0].Vests[1]},
+		{grant: "Payout", symbol: "AAPL", vest: grants[1].Vests[2]},
+		{grant: "RSU 2025", symbol: "PANW", vest: grants[0].Vests[2]},
+	}
+	assert.Equal(t, expected, unreleasedVests(grants))
+}
 
 // TestDueIn covers how far off a vest is, in the words of the last column of the Vesting table. The
 // nearer the day, the finer the unit: days up to two months out, then whole months, and whole years
