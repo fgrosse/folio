@@ -6,6 +6,7 @@ import (
 
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/exp/golden"
 	"github.com/stretchr/testify/assert"
@@ -131,6 +132,23 @@ func TestHoldingsModel_CancelAddLot(t *testing.T) {
 	assert.Nil(t, cmd)
 	assert.False(t, m.CapturesKeys(), "the dialog should be closed")
 	store.AssertNotCalled(t, "SaveLot", mock.Anything)
+}
+
+// TestHoldingsModel_RenderLotDialog is the frame while a lot is being typed: the dialog floats
+// centered in front of the table, and the help lines show the keys of the dialog, since none of the
+// others reach the view in that state. The frame is as tall as it is without the dialog.
+func TestHoldingsModel_RenderLotDialog(t *testing.T) {
+	m, _ := newTestingHoldings(t)
+	without := m.View().Content
+
+	m.Update(keyPressed("a"))
+	for _, key := range keysPressed("12 PANW") {
+		m.Update(key)
+	}
+
+	frame := ansi.Strip(m.View().Content)
+	assert.Equal(t, lipgloss.Height(without), lipgloss.Height(frame), "the dialog should not change the height of the frame")
+	golden.RequireEqual(t, frame)
 }
 
 // TestPositions covers the line the Holdings view puts above its table: how many shares of each

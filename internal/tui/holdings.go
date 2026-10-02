@@ -10,6 +10,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/shopspring/decimal"
 
 	"github.com/fgrosse/folio/internal/portfolio"
@@ -198,7 +199,17 @@ func (m *HoldingsModel) View() tea.View {
 		m.style.Table.Render(m.table.View()) + "\n" +
 		m.helpView()
 
-	return tea.NewView(trimTrailingSpace(frame) + "\n")
+	layers := []*lipgloss.Layer{lipgloss.NewLayer(frame)}
+	if m.input != nil {
+		// The dialog floats centered in front of everything else.
+		dialog := m.input.Layer()
+		dialog.X((lipgloss.Width(frame) - dialog.Width()) / 2)
+		dialog.Y((lipgloss.Height(frame) - dialog.Height()) / 2)
+		layers = append(layers, dialog)
+	}
+
+	c := lipgloss.NewCompositor(layers...)
+	return tea.NewView(trimTrailingSpace(c.Render()) + "\n")
 }
 
 // headerView renders the two lines above the table: the positions the lots add up to on the left,
@@ -212,12 +223,21 @@ func (m *HoldingsModel) headerView() string {
 }
 
 // helpView renders the keys worth knowing in two lines, as every view does: getting around on the
-// first, and what can be done to the table on the second, which is nothing yet and stays empty so
-// that the frame has the height it will have.
+// first, and what can be done to the table on the second. While the dialog is open it shows the
+// dialog's keys instead, since none of the others reach the view in that state anyway. Those take a
+// single line, and the second is left empty so that the frame keeps its height.
 func (m *HoldingsModel) helpView() string {
 	help, nav := m.table.Help, m.table.KeyMap
 
-	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n"
+	if m.input != nil {
+		return help.ShortHelpView([]key.Binding{
+			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "save")),
+			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
+		}) + "\n"
+	}
+
+	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n" +
+		help.ShortHelpView([]key.Binding{m.keys.Add})
 }
 
 // positions sums up lots as how many shares of each stock they hold, the stocks in alphabetical
