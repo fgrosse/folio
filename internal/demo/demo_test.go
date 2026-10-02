@@ -83,3 +83,40 @@ func TestFill(t *testing.T) {
 		assert.True(t, account.Potential.IsPositive(), "seed %d", seed)
 	}
 }
+
+// summary renders what an account holds as text, for two accounts to be compared by.
+func summary(t *testing.T, store *portfolio.SQLiteStore) string {
+	t.Helper()
+
+	grants, err := store.Grants()
+	require.NoError(t, err)
+	lots, err := store.Lots()
+	require.NoError(t, err)
+	sales, err := store.Sales()
+	require.NoError(t, err)
+
+	var s string
+	for _, grant := range grants {
+		s += grant.Name + " " + grant.Symbol + "\n"
+		for _, vest := range grant.Vests {
+			s += " " + vest.Date.Format(time.DateOnly) + " " + vest.Shares.String() + "\n"
+		}
+	}
+	for _, lot := range lots {
+		s += lot.String() + "\n"
+	}
+	for _, sale := range sales {
+		s += sale.Date.Format(time.DateOnly) + " " + sale.Shares.String() + " @" + sale.Price.String() + "\n"
+	}
+
+	return s
+}
+
+// TestFill_Seed covers what the random numbers are for: the same ones make the same account, so
+// that an account can be made again, and others make another, so that not every demo looks alike.
+func TestFill_Seed(t *testing.T) {
+	first := summary(t, newDemo(t, 7))
+
+	assert.Equal(t, first, summary(t, newDemo(t, 7)))
+	assert.NotEqual(t, first, summary(t, newDemo(t, 8)))
+}
