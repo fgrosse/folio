@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shopspring/decimal"
 	"github.com/spf13/cobra"
 
 	"github.com/fgrosse/folio/internal/portfolio"
@@ -30,24 +29,17 @@ If more than one grant vests on that day, --grant says which one is meant.
 		Example: `
   # Of the shares that vested on the 1st of August, 250 arrived, worth $162.50 each that day
   folio release 2025-08-01 250 @162.50`,
-		Args: cobra.RangeArgs(2, 3),
+		Args: cobra.MinimumNArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
 			date, err := portfolio.ParseDay(args[0])
 			if err != nil {
 				return err
 			}
 
-			shares, err := decimal.NewFromString(args[1])
+			// The shares and the cost are one spec, however the shell split them into arguments.
+			shares, cost, err := portfolio.ParseRelease(strings.Join(args[1:], " "))
 			if err != nil {
-				return fmt.Errorf("%q is not a number of shares", args[1])
-			}
-
-			cost := decimal.Zero
-			if len(args) == 3 {
-				cost, err = portfolio.ParseCost(args[2])
-				if err != nil {
-					return err
-				}
+				return err
 			}
 
 			grant, err := c.Flags().GetString("grant")

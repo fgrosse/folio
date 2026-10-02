@@ -31,6 +31,19 @@ func TestReleaseCmd(t *testing.T) {
 	assert.Equal(t, expected, all[2])
 }
 
+// TestReleaseCmd_WithoutSpace covers shares and cost given as one argument, with nothing between
+// the shares and the "@", which reads the same as two.
+func TestReleaseCmd_WithoutSpace(t *testing.T) {
+	cmd, dbPath := NewTestingCmd(t, "release", "2026-11-15", "6@380.12")
+	seed(t, dbPath)
+	require.NoError(t, cmd.Execute())
+
+	all := lots(t, dbPath)
+	require.Len(t, all, 3)
+	assert.Equal(t, "6", all[2].Shares.String())
+	assert.Equal(t, "380.12", all[2].Cost.String())
+}
+
 // TestReleaseCmd_WhichVest covers the days that do not name one vest: a day nothing vests on, or
 // whose vest is released already, and a day on which two grants vest, which --grant settles.
 func TestReleaseCmd_WhichVest(t *testing.T) {

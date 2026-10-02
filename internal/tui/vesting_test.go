@@ -207,6 +207,17 @@ func newTestingRelease(t *testing.T) *VestingModel {
 	return m
 }
 
+// TestVestingModel_ReleaseWithoutSpace covers shares and cost typed the way one writes them, with
+// nothing between the shares and the "@".
+func TestVestingModel_ReleaseWithoutSpace(t *testing.T) {
+	m := newTestingRelease(t)
+	m.input.SetValue("6@380.12")
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	assert.Equal(t, ReleaseVestMsg{id: 2, shares: dec("6"), cost: dec("380.12")}, runCmd(t, cmd))
+}
+
 // TestVestingModel_ReleaseDialogRefuses covers what the release dialog does not take for an answer:
 // something that is no number, no shares at all, and more shares than vested. It stays open and says
 // why under its field, rather than leaving it to the store to refuse once the dialog is gone.

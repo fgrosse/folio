@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -180,27 +179,12 @@ func (m *VestingModel) openRelease() (tea.Model, tea.Cmd) {
 // has none. The dialog refuses what the store would, so that it can say so while it is still open.
 func newRelease(vest portfolio.Vest) func(value string) (tea.Msg, error) {
 	return func(value string) (tea.Msg, error) {
-		fields := strings.Fields(value)
-		if len(fields) > 2 {
-			return nil, errors.New(`a release is written as "<shares> [@<cost>]"`)
-		}
-
-		shares, err := decimal.NewFromString(fields[0])
+		shares, cost, err := portfolio.ParseRelease(value)
 		switch {
 		case err != nil:
-			return nil, fmt.Errorf("%q is not a number of shares", fields[0])
-		case !shares.IsPositive():
-			return nil, errors.New("a vest must release more than 0 shares")
+			return nil, err
 		case shares.GreaterThan(vest.Shares):
 			return nil, fmt.Errorf("the vest has %s shares, not %s", vest.Shares, shares)
-		}
-
-		cost := decimal.Zero
-		if len(fields) == 2 {
-			cost, err = portfolio.ParseCost(fields[1])
-			if err != nil {
-				return nil, err
-			}
 		}
 
 		return ReleaseVestMsg{id: vest.ID, shares: shares, cost: cost}, nil
