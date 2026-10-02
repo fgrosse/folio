@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/exp/golden"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -147,7 +148,7 @@ func TestVestingModel_ReleaseVest(t *testing.T) {
 	msg := runCmd(t, cmd)
 	require.Equal(t, ReleaseVestMsg{id: 2, shares: dec("6")}, msg)
 
-	store.On("ReleaseVest", 2, dec("6")).Return(nil)
+	store.On("ReleaseVest", 2, dec("6"), decimal.Zero).Return(nil)
 	_, cmd = m.Update(msg)
 	assert.False(t, m.CapturesKeys(), "the dialog should be closed")
 	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))

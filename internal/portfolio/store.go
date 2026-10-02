@@ -238,9 +238,10 @@ func (s *SQLiteStore) DeleteGrant(id int) error {
 
 // ReleaseVest turns the vest with the given ID into a lot of its grant's stock, acquired on the day
 // of the vest and holding shares, the number that actually arrived: more than none, and no more than
-// vested. The vest counts as released from then on, for as long as that lot exists, and cannot be
+// vested. cost is what one share was worth that day, which is what the lot cost, or zero if that is
+// not known. The vest counts as released from then on, for as long as that lot exists, and cannot be
 // released a second time.
-func (s *SQLiteStore) ReleaseVest(id int, shares decimal.Decimal) error {
+func (s *SQLiteStore) ReleaseVest(id int, shares, cost decimal.Decimal) error {
 	if !shares.IsPositive() {
 		return errors.New("a vest must release more than 0 shares")
 	}
@@ -272,11 +273,11 @@ func (s *SQLiteStore) ReleaseVest(id int, shares decimal.Decimal) error {
 	}
 
 	_, err = tx.Exec(`
-		INSERT INTO lots (symbol, shares, acquired_on, vest_id)
-		SELECT grants.symbol, ?, vests.vests_on, vests.id
+		INSERT INTO lots (symbol, shares, acquired_on, cost, vest_id)
+		SELECT grants.symbol, ?, vests.vests_on, ?, vests.id
 		FROM vests JOIN grants ON grants.id = vests.grant_id
 		WHERE vests.id = ?`,
-		shares, id,
+		shares, nullable(cost), id,
 	)
 	if err != nil {
 		return err

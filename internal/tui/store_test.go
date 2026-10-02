@@ -48,8 +48,8 @@ func (m *MockStore) SaveQuote(quote portfolio.Quote) error {
 	return m.Called(quote).Error(0)
 }
 
-func (m *MockStore) ReleaseVest(id int, shares decimal.Decimal) error {
-	return m.Called(id, shares).Error(0)
+func (m *MockStore) ReleaseVest(id int, shares, cost decimal.Decimal) error {
+	return m.Called(id, shares, cost).Error(0)
 }
 
 func (m *MockStore) SaveGrant(grant portfolio.Grant) error {

@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/shopspring/decimal"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -199,7 +201,7 @@ func TestStore_SaveGrant(t *testing.T) {
 // TestStore_ReleaseVest covers the step that turns potential into current: releasing a vest makes a
 // lot of its grant's stock, acquired on the day of the vest, and marks the vest as released. The
 // lot holds the shares that actually arrived, which are fewer than vested whenever some were
-// withheld for tax.
+// withheld for tax, at the cost the release was given: what a share was worth that day.
 func TestStore_ReleaseVest(t *testing.T) {
 	s := NewTestingStore()
 	require.NoError(t, s.SaveGrant(Grant{
@@ -208,13 +210,14 @@ func TestStore_ReleaseVest(t *testing.T) {
 		Vests:  Repeating(day("2026-01-15"), 1, 2, shares("10")),
 	}))
 
-	require.NoError(t, s.ReleaseVest(1, shares("6")))
+	require.NoError(t, s.ReleaseVest(1, shares("6"), shares("380.12")))
 
 	lots, err := s.Lots()
 	require.NoError(t, err)
-	// The lot says which grant it came from, which a lot entered by hand has nothing to say about.
+	// The lot says which grant it came from, which a lot entered by hand has nothing to say about,
+	// and costs what a share was worth on the day of the vest.
 	expectedLots := []Lot{
-		{ID: 1, Symbol: "PANW", Shares: shares("6"), Acquired: day("2026-01-15"), Grant: "Payout"},
+		{ID: 1, Symbol: "PANW", Shares: shares("6"), Acquired: day("2026-01-15"), Cost: shares("380.12"), Grant: "Payout"},
 	}
 	assert.Equal(t, expectedLots, lots)
 
@@ -237,12 +240,12 @@ func TestStore_ReleaseVestRefusals(t *testing.T) {
 		Symbol: "PANW",
 		Vests:  Repeating(day("2026-01-15"), 1, 2, shares("10")),
 	}))
-	require.NoError(t, s.ReleaseVest(1, shares("6")))
+	require.NoError(t, s.ReleaseVest(1, shares("6"), decimal.Zero))
 
-	assert.EqualError(t, s.ReleaseVest(9, shares("6")), "no vest with ID 9")
-	assert.EqualError(t, s.ReleaseVest(1, shares("6")), "the vest of 2026-01-15 is released already")
-	assert.EqualError(t, s.ReleaseVest(2, shares("0")), "a vest must release more than 0 shares")
-	assert.EqualError(t, s.ReleaseVest(2, shares("10.5")), "the vest of 2026-02-15 has 10 shares, not 10.5")
+	assert.EqualError(t, s.ReleaseVest(9, shares("6"), decimal.Zero), "no vest with ID 9")
+	assert.EqualError(t, s.ReleaseVest(1, shares("6"), decimal.Zero), "the vest of 2026-01-15 is released already")
+	assert.EqualError(t, s.ReleaseVest(2, shares("0"), decimal.Zero), "a vest must release more than 0 shares")
+	assert.EqualError(t, s.ReleaseVest(2, shares("10.5"), decimal.Zero), "the vest of 2026-02-15 has 10 shares, not 10.5")
 
 	lots, err := s.Lots()
 	require.NoError(t, err)
@@ -264,7 +267,7 @@ func TestStore_DeleteGrant(t *testing.T) {
 		Symbol: "PANW",
 		Vests:  Repeating(day("2026-06-01"), 12, 1, shares("50")),
 	}))
-	require.NoError(t, s.ReleaseVest(1, shares("6")))
+	require.NoError(t, s.ReleaseVest(1, shares("6"), decimal.Zero))
 
 	require.NoError(t, s.DeleteGrant(1))
 

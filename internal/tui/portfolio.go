@@ -19,7 +19,7 @@ type Store interface {
 	SaveLot(lot portfolio.Lot) error
 	DeleteLot(id int) error
 	SaveQuote(quote portfolio.Quote) error
-	ReleaseVest(id int, shares decimal.Decimal) error
+	ReleaseVest(id int, shares, cost decimal.Decimal) error
 	SaveGrant(grant portfolio.Grant) error
 	DeleteGrant(id int) error
 }

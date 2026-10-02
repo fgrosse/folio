@@ -192,7 +192,7 @@ func (m *VestingModel) openRelease() (tea.Model, tea.Cmd) {
 func (m *VestingModel) releaseVestCmd(id int, shares decimal.Decimal) tea.Cmd {
 	store := m.store
 	return func() tea.Msg {
-		if err := store.ReleaseVest(id, shares); err != nil {
+		if err := store.ReleaseVest(id, shares, decimal.Zero); err != nil {
 			return PortfolioLoadedMsg{err: err}
 		}
 
