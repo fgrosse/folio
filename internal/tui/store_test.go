@@ -43,6 +43,10 @@ func (m *MockStore) DeleteLot(id int) error {
 	return m.Called(id).Error(0)
 }
 
+func (m *MockStore) SaveQuote(quote portfolio.Quote) error {
+	return m.Called(quote).Error(0)
+}
+
 // testPortfolio is the account most tests of the views look at: PANW stock in two lots of 8.5
 // shares in all, and a grant with one vest released into the first of them and two still to come.
 func testPortfolio() Portfolio {
