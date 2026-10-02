@@ -51,6 +51,39 @@ func TestStatusCmd_CachesQuotes(t *testing.T) {
 	assert.Equal(t, "396.25", cached["PANW"].Price.String())
 }
 
+// TestStatusCmd_FallsBackOnCachedQuotes covers status without a network, or with a source of prices
+// that is having a bad day: it values the account at the last quotes the database has, and says on
+// stderr what went wrong, where it does not get in the way of whoever reads the values.
+func TestStatusCmd_FallsBackOnCachedQuotes(t *testing.T) {
+	cmd, dbPath := NewTestingCmd(t, "status")
+	cmd.quoter = quotes{} // knows no symbol at all
+	seed(t, dbPath)
+	saveQuote(t, dbPath, portfolio.Quote{Symbol: "PANW", Price: decimal.RequireFromString("400"), Currency: "USD"})
+
+	var out, errOut strings.Builder
+	cmd.SetOut(&out)
+	cmd.SetErr(&errOut)
+	require.NoError(t, cmd.Execute())
+
+	expected := "" +
+		"Current     $3,400.00\n" +
+		"Potential   $8,000.00\n" +
+		"Total      $11,400.00\n"
+	assert.Equal(t, expected, out.String())
+	assert.Equal(t, "Warning: no quote of PANW\n", errOut.String())
+}
+
+// saveQuote saves quote to the database at dbPath, as a quote cached by an earlier run.
+func saveQuote(t *testing.T, dbPath string, quote portfolio.Quote) {
+	t.Helper()
+
+	store, err := portfolio.NewStore(dbPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = store.Close() })
+
+	require.NoError(t, store.SaveQuote(quote))
+}
+
 // seed fills the database at dbPath with an account of PANW stock: two lots of 8.5 shares in all,
 // and a grant with two vests of 10 shares each that have not been released.
 func seed(t *testing.T, dbPath string) {
