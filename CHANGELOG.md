@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+_Nothing yet_
+
+## [v1.0.0] - 2026-10-02
 - Initial release
 - Track the shares you hold as lots, with the day they were acquired and what they cost
 - Track grants of stock that vest over time, on a monthly, quarterly or yearly schedule or one listed vest by vest
@@ -16,4 +19,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `folio demo` to try folio with a made-up account
 - `folio version` to print the version of folio
 
-[Unreleased]: https://github.com/fgrosse/folio/commits/main
+[Unreleased]: https://github.com/fgrosse/folio/compare/v1.0.0...HEAD
+[v1.0.0]: https://github.com/fgrosse/folio/releases/tag/v1.0.0
