@@ -88,3 +88,20 @@ func TestNewAccount_Unpriced(t *testing.T) {
 	assert.Equal(t, "0", account.Potential.String())
 	assert.Equal(t, []string{"MSFT", "SAP.DE"}, account.Unpriced)
 }
+
+// TestSymbols covers which stock an account needs quotes of: that of every lot and every grant, each
+// symbol once and in alphabetical order, so that the same account always asks for the same list.
+func TestSymbols(t *testing.T) {
+	lots := []Lot{
+		{Symbol: "PANW", Shares: shares("2")},
+		{Symbol: "AAPL", Shares: shares("5")},
+		{Symbol: "PANW", Shares: shares("1")},
+	}
+	grants := []Grant{
+		{Name: "Plan", Symbol: "MSFT"},
+		{Name: "Payout", Symbol: "PANW"},
+	}
+
+	assert.Equal(t, []string{"AAPL", "MSFT", "PANW"}, Symbols(lots, grants))
+	assert.Empty(t, Symbols(nil, nil))
+}

@@ -59,3 +59,17 @@ func NewAccount(lots []Lot, grants []Grant, quotes map[string]Quote) Account {
 func (a Account) Total() decimal.Decimal {
 	return a.Current.Add(a.Potential)
 }
+
+// Symbols returns the symbols of the stock in lots and grants, each once and in alphabetical order.
+// They are what an account needs quotes of.
+func Symbols(lots []Lot, grants []Grant) []string {
+	symbols := make(map[string]bool)
+	for _, lot := range lots {
+		symbols[lot.Symbol] = true
+	}
+	for _, grant := range grants {
+		symbols[grant.Symbol] = true
+	}
+
+	return slices.Sorted(maps.Keys(symbols))
+}
