@@ -121,6 +121,20 @@ func TestNewLot_Cost(t *testing.T) {
 			spec:     "40 PANW @396",
 			expected: Lot{Symbol: "PANW", Shares: shares("40"), Cost: shares("396")},
 		},
+		// The "@" sets the cost apart by itself, so the space before it is optional, and one after
+		// it does no harm either.
+		"no space before the cost": {
+			spec:     "12.5 PANW 2026-03-15@380.12",
+			expected: Lot{Symbol: "PANW", Shares: shares("12.5"), Acquired: day("2026-03-15"), Cost: shares("380.12")},
+		},
+		"no space before the cost, without a day": {
+			spec:     "40 PANW@396",
+			expected: Lot{Symbol: "PANW", Shares: shares("40"), Cost: shares("396")},
+		},
+		"space after the @": {
+			spec:     "40 PANW @ 396",
+			expected: Lot{Symbol: "PANW", Shares: shares("40"), Cost: shares("396")},
+		},
 	}
 
 	for name, tt := range tests {

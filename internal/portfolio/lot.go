@@ -3,6 +3,7 @@ package portfolio
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -36,12 +37,13 @@ const lotSyntax = `a lot is written as "<shares> <symbol> [YYYY-MM-DD] [@<cost>]
 // NewLot parses a lot from its spec, "<shares> <symbol> [YYYY-MM-DD] [@<cost>]", such as
 // "12.5 PANW 2026-03-15 @380.12". The symbol is written in capitals however it was typed.
 //
-// The day and the cost are optional, and come in either order. A lot without a day comes back with
+// The day and the cost are optional, and come in either order. The cost needs no space before its
+// "@". A lot without a day comes back with
 // a zero Acquired for the caller to fill in, who knows what today is, and a lot without a cost with
 // a zero Cost, which says that it is not known. Apart from that day, the lot that comes back is
 // valid.
 func NewLot(spec string) (Lot, error) {
-	fields := strings.Fields(spec)
+	fields := specFields(spec)
 	if len(fields) < 2 || len(fields) > 4 {
 		return Lot{}, errors.New(lotSyntax)
 	}
@@ -71,6 +73,16 @@ func NewLot(spec string) (Lot, error) {
 	}
 
 	return lot, nil
+}
+
+// costSign finds the "@" that a cost is written after, with whatever space there is around it.
+var costSign = regexp.MustCompile(`\s*@\s*`)
+
+// specFields splits a spec into its fields, which are set apart by space. A cost is a field of its
+// own that starts with its "@", however the "@" was typed: right after the field before it, as in
+// "250@162.50", or with space after it.
+func specFields(spec string) []string {
+	return strings.Fields(costSign.ReplaceAllString(spec, " @"))
 }
 
 // ParseCost parses what a share cost, written after an "@" such as "@380.12", which has to be more
