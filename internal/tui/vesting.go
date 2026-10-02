@@ -140,8 +140,20 @@ func (m *VestingModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 // openRelease opens the dialog that releases the selected vest, which asks how many of its shares
 // arrived. All of them are in the field to begin with, since that is the usual answer, and fewer
 // when some were withheld for tax.
+//
+// Without a vest to select there is nothing to release, and neither is there on a vest whose day has
+// not come: its shares have not arrived, and the header says so instead.
 func (m *VestingModel) openRelease() (tea.Model, tea.Cmd) {
-	vest := m.vests[m.table.Cursor()].vest
+	i := m.table.Cursor()
+	if i < 0 || i >= len(m.vests) {
+		return m, nil
+	}
+
+	vest := m.vests[i].vest
+	if vest.Date.After(portfolio.DayOf(m.now())) {
+		m.err = fmt.Errorf("the vest of %s is not due yet", vest.Date.Format(time.DateOnly))
+		return m, nil
+	}
 
 	submit := func(value string) (tea.Msg, error) {
 		shares, err := decimal.NewFromString(value)

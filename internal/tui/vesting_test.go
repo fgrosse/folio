@@ -154,6 +154,29 @@ func TestVestingModel_ReleaseVest(t *testing.T) {
 	store.AssertExpectations(t)
 }
 
+// TestVestingModel_ReleaseRefused covers r where there is nothing to release: on a vest whose day
+// has not come, whose shares have not arrived whatever the user types, and in a view without vests.
+// No dialog opens, and for a vest that is not due the header says why.
+func TestVestingModel_ReleaseRefused(t *testing.T) {
+	m, _ := newTestingVesting(t) // on the 2nd of October, before either vest
+
+	_, cmd := m.Update(keyPressed("r"))
+
+	assert.Nil(t, cmd)
+	assert.False(t, m.CapturesKeys(), "there should be no dialog for a vest that is not due")
+	assert.Contains(t, ansi.Strip(m.View().Content), "the vest of 2026-11-15 is not due yet")
+
+	store := new(MockStore)
+	store.returns(Portfolio{})
+	empty := NewVestingModel(store, DefaultStyle())
+	empty.Update(runCmd(t, empty.Init()))
+
+	_, cmd = empty.Update(keyPressed("r"))
+
+	assert.Nil(t, cmd)
+	assert.False(t, empty.CapturesKeys(), "there should be no dialog without a vest")
+}
+
 // TestVestRow covers how one vest reads as a row of the Vesting table: its day and the grant it
 // belongs to, how many shares vest and what they are worth at the latest price, right-aligned like
 // the numbers of the Holdings table, and how far off the day is.
