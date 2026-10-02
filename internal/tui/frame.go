@@ -53,6 +53,16 @@ func newTable(style Style, cols []table.Column) table.Model {
 	return t
 }
 
+// setRows gives the table its rows and sees to it that one of them is selected. A table that is
+// given no rows moves its selection off the end of them, to before the first, and leaves it there
+// when rows arrive, where the keys that act on the selected row would find none.
+func setRows(t *table.Model, rows []table.Row) {
+	t.SetRows(rows)
+	if t.Cursor() < 0 && len(rows) > 0 {
+		t.SetCursor(0)
+	}
+}
+
 // tableWidth is how wide the table should be inside a terminal of the given width, clamped so it
 // neither overflows a small window nor stretches across a very large one.
 func tableWidth(terminalWidth int) int {

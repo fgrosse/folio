@@ -178,7 +178,7 @@ func (m *SalesModel) updateRows() {
 		rows[i] = saleRow(sale)
 	}
 
-	m.table.SetRows(rows)
+	setRows(&m.table, rows)
 }
 
 // View implements tea.Model by rendering the header above the table of sales, and the keys below it.

@@ -158,6 +158,37 @@ func TestSalesModel_ShowsTheNote(t *testing.T) {
 	assert.NotContains(t, frame, "PANW $396.25 ▼")
 }
 
+// TestViews_SelectTheFirstRow covers a view whose table was empty and is then given rows, which is
+// every view of an account that is just being set up, and the Sales view until the first sale: the
+// selection is on the first row then, rather than on none, which would leave the keys that act on
+// the selected row doing nothing until the selection was moved.
+func TestViews_SelectTheFirstRow(t *testing.T) {
+	store := new(MockStore)
+	store.returns(Portfolio{})
+	empty := PortfolioLoadedMsg{}
+	loaded := PortfolioLoadedMsg{portfolio: soldPortfolio()}
+
+	holdings := NewHoldingsModel(store, quotes{}, DefaultStyle())
+	holdings.Update(empty)
+	holdings.Update(loaded)
+	assert.Equal(t, 0, holdings.table.Cursor(), "Holdings")
+
+	vesting := NewVestingModel(store, DefaultStyle())
+	vesting.Update(empty)
+	vesting.Update(loaded)
+	assert.Equal(t, 0, vesting.table.Cursor(), "Vesting")
+
+	grants := NewGrantsModel(store, DefaultStyle())
+	grants.Update(empty)
+	grants.Update(loaded)
+	assert.Equal(t, 0, grants.table.Cursor(), "Grants")
+
+	sales := NewSalesModel(store, DefaultStyle())
+	sales.Update(empty)
+	sales.Update(loaded)
+	assert.Equal(t, 0, sales.table.Cursor(), "Sales")
+}
+
 // TestSaleRow covers how one sale reads as a row of the Sales table: its day, the stock and the
 // grant its lot was from, and the numbers right-aligned - how many shares, what one sold for, what
 // that brought in, and how much of it is gain over what the shares cost. A gain says which way it

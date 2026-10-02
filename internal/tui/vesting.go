@@ -214,7 +214,7 @@ func (m *VestingModel) updateRows() {
 		rows[i] = vestRow(vest, m.portfolio.Quotes[vest.symbol], today)
 	}
 
-	m.table.SetRows(rows)
+	setRows(&m.table, rows)
 }
 
 // View implements tea.Model by rendering the header above the table of vests, and the keys below it.

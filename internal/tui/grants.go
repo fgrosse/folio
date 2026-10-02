@@ -223,7 +223,7 @@ func (m *GrantsModel) updateRows() {
 		rows[i] = grantRow(grant, m.portfolio.Quotes[grant.Symbol])
 	}
 
-	m.table.SetRows(rows)
+	setRows(&m.table, rows)
 }
 
 // View implements tea.Model by rendering the header above the table of grants, and the keys below

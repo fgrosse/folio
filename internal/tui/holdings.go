@@ -438,7 +438,7 @@ func (m *HoldingsModel) updateRows() {
 		rows[i] = lotRow(lot, m.portfolio.Quotes[lot.Symbol])
 	}
 
-	m.table.SetRows(rows)
+	setRows(&m.table, rows)
 }
 
 // View implements tea.Model by rendering the header above the table of lots, and the keys below it.
