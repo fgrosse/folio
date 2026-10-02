@@ -267,6 +267,34 @@ func TestHoldingsModel_ShowsQuoteErrors(t *testing.T) {
 	assert.Len(t, m.table.Rows(), 1, "the portfolio that came with the error should be on display")
 }
 
+// TestHoldingsModel_KeepsQuotesFresh covers the prices of a TUI that is left open: every load of
+// the portfolio schedules a refresh of the quotes an interval later, unless one is on its way
+// already, since loads come from several places and each would start a timer of its own otherwise.
+// When the refresh is due the view fetches the quotes, and the load that follows schedules the next.
+func TestHoldingsModel_KeepsQuotesFresh(t *testing.T) {
+	p := testPortfolio()
+	store := new(MockStore)
+	store.returns(p)
+	store.On("SaveQuote", mock.Anything).Return(nil)
+
+	m := NewHoldingsModel(store, quotes{"PANW": "401.5"}, DefaultStyle())
+	m.refreshInterval = time.Millisecond // the real one would outlast the test
+
+	_, cmd := m.Update(PortfolioLoadedMsg{portfolio: p})
+	assert.Equal(t, RefreshQuotesMsg{}, runCmd(t, cmd))
+
+	_, again := m.Update(PortfolioLoadedMsg{portfolio: p})
+	assert.Nil(t, again, "a refresh is scheduled already")
+
+	_, cmd = m.Update(RefreshQuotesMsg{})
+	loaded := runCmd(t, cmd)
+	require.IsType(t, PortfolioLoadedMsg{}, loaded)
+	store.AssertNumberOfCalls(t, "SaveQuote", 1)
+
+	_, cmd = m.Update(loaded)
+	assert.Equal(t, RefreshQuotesMsg{}, runCmd(t, cmd), "the load after a refresh should schedule the next")
+}
+
 // TestPositions covers the line the Holdings view puts above its table: how many shares of each
 // stock the lots add up to, which no single row says. The stocks are in alphabetical order, and an
 // account without lots says so.

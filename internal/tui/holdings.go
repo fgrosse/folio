@@ -51,9 +51,15 @@ type HoldingsModel struct {
 	now       func() time.Time // the clock that says what today is
 	portfolio Portfolio        // the account as it was last loaded
 	err       error            // why the last load failed or had no fresh quotes, nil unless it did
-	input     *InputDialog     // the dialog that adds a lot, nil unless it is open
-	confirm   *ConfirmDialog   // the dialog asking whether to delete a lot, nil unless it is open
+
+	refreshInterval time.Duration  // how long the quotes are left alone before they are fetched again
+	refreshing      bool           // a RefreshQuotesMsg is on its way, so no load needs to schedule another
+	input           *InputDialog   // the dialog that adds a lot, nil unless it is open
+	confirm         *ConfirmDialog // the dialog asking whether to delete a lot, nil unless it is open
 }
+
+// RefreshQuotesMsg asks the view to fetch the quotes again, which it does every refreshInterval.
+type RefreshQuotesMsg struct{}
 
 // DeleteLotMsg reports that the user confirmed deleting the lot with the given ID.
 type DeleteLotMsg struct {
@@ -75,6 +81,9 @@ func NewHoldingsModel(store Store, quoter portfolio.Quoter, style Style) *Holdin
 		style:  style,
 		keys:   defaultKeyMap(),
 		now:    time.Now,
+		// Often enough to follow a trading day, and seldom enough for a source of quotes that is
+		// not an official API to put up with.
+		refreshInterval: 5 * time.Minute,
 		// A real width arrives with the first WindowSizeMsg, which Bubble Tea sends at startup.
 		// Until then the narrowest supported layout is the safest thing to hold.
 		width: minTableWidth,
@@ -132,6 +141,9 @@ func (m *HoldingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case PortfolioLoadedMsg:
 		return m.handlePortfolioLoaded(msg)
+	case RefreshQuotesMsg:
+		m.refreshing = false
+		return m, refreshQuotesCmd(m.store, m.quoter)
 	case SaveLotMsg:
 		m.input = nil
 		return m, m.saveLotCmd(msg.lot)
@@ -155,19 +167,30 @@ func (m *HoldingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // handlePortfolioLoaded takes over the portfolio that was loaded and fills the table with its lots.
-// A load that failed leaves the one on display where it is, and its error to the header.
+// A load that failed leaves the one on display where it is, and its error to the header. Either way
+// it sees to it that the quotes are fetched again in a while.
 func (m *HoldingsModel) handlePortfolioLoaded(msg PortfolioLoadedMsg) (tea.Model, tea.Cmd) {
 	m.err = msg.err
-	if msg.err != nil {
-		return m, nil
+	if msg.err == nil {
+		// Quotes that could not be refreshed do not make the portfolio any less the latest there is.
+		m.err = msg.quotesErr
+		m.portfolio = msg.portfolio
+		m.updateRows()
 	}
 
-	// Quotes that could not be refreshed do not make the portfolio any less the latest there is.
-	m.err = msg.quotesErr
-	m.portfolio = msg.portfolio
-	m.updateRows()
+	return m, m.scheduleRefreshCmd()
+}
 
-	return m, nil
+// scheduleRefreshCmd returns a command that sends a RefreshQuotesMsg once the refresh interval has
+// passed, or nil if one is on its way already: loads come from saving, deleting and refreshing
+// alike, and a timer for each would have the quotes fetched ever more often.
+func (m *HoldingsModel) scheduleRefreshCmd() tea.Cmd {
+	if m.refreshing {
+		return nil
+	}
+
+	m.refreshing = true
+	return tea.Tick(m.refreshInterval, func(time.Time) tea.Msg { return RefreshQuotesMsg{} })
 }
 
 // handleKeyPress quits on the quit keys, opens the dialog for a new lot on the add key, asks whether
