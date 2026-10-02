@@ -14,6 +14,11 @@ Roughly in the order worth doing.
 - **Catch up on vests that are pending.** A grant entered with a first vest in the past leaves a
   row to release for every vest since, one dialog each. Releasing all pending vests of a grant in
   one go, with the shares that arrived as a percentage, would make that a single step.
+- **Record the whole of a release.** A release confirmation states more than folio keeps: the
+  shares that were sold to cover tax, which folio can work out, and the price they sold at, which
+  it cannot. That sale is a taxable event of its own, with a gain or loss against the value of the
+  shares on the day of the vest. The confirmation itself, a PDF, could be attached to the release
+  and kept in the database, so that every number has its source next to it.
 - **Say how old the prices are.** The header shows the prices but not when they are from, which
   matters at a weekend and without a network. The time of the quote is stored already.
 - **A key that fetches the quotes now**, rather than waiting for the five minutes to pass.

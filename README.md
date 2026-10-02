@@ -83,6 +83,8 @@ prices it saw, so it works without a network too.
 ```bash
 folio lot 12.5 PANW 2026-03-15 @380.12
 folio grant "Payout: 10 PANW monthly x24 from 2026-01-15"
+folio grant --vests schedule.txt "Payout: PANW"    # the vests listed, "<YYYY-MM-DD> <shares>" a line
+folio release 2026-01-15 6 @380.12                 # 6 shares arrived, worth $380.12 each that day
 folio status
 folio status --json
 ```
