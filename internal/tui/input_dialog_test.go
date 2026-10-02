@@ -83,3 +83,18 @@ func TestInputDialog_Cancel(t *testing.T) {
 		})
 	}
 }
+
+// TestInputDialog_SetValue covers a dialog that opens with something in its field already, such as
+// the shares of a vest that most likely all arrived: the text is there to be confirmed as it is, and
+// the cursor is at its end, where a backspace corrects it.
+func TestInputDialog_SetValue(t *testing.T) {
+	d := newTestingDialog()
+
+	d.SetValue("10")
+	assert.Equal(t, "10", d.Value())
+
+	d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	typeInto(d, "2")
+	cmd := d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyEnter})
+	assert.Equal(t, submittedMsg{value: "12"}, runCmd(t, cmd))
+}

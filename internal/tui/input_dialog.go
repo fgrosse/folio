@@ -110,6 +110,13 @@ func (d *InputDialog) submitCmd() tea.Cmd {
 	return func() tea.Msg { return msg }
 }
 
+// SetValue puts value into the field, in place of what it holds, with the cursor at the end of it,
+// where a typo is a backspace away.
+func (d *InputDialog) SetValue(value string) {
+	d.input.SetValue(value)
+	d.input.CursorEnd()
+}
+
 // Value returns the text typed into the field so far.
 func (d *InputDialog) Value() string {
 	return d.input.Value()
