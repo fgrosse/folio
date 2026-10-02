@@ -26,10 +26,16 @@ type GrantsModel struct {
 	style     Style
 	keys      keyMap
 	table     table.Model
-	width     int          // width of the table, which the header line is spread across
-	portfolio Portfolio    // the account as it was last loaded
-	err       error        // why the last load failed or had no fresh quotes, nil unless it did
-	input     *InputDialog // the dialog that adds a grant, nil unless it is open
+	width     int            // width of the table, which the header line is spread across
+	portfolio Portfolio      // the account as it was last loaded
+	err       error          // why the last load failed or had no fresh quotes, nil unless it did
+	input     *InputDialog   // the dialog that adds a grant, nil unless it is open
+	confirm   *ConfirmDialog // the dialog asking whether to delete a grant, nil unless it is open
+}
+
+// DeleteGrantMsg reports that the user confirmed deleting the grant with the given ID.
+type DeleteGrantMsg struct {
+	id int
 }
 
 // SaveGrantMsg reports that the dialog was confirmed with the spec of a grant. The grant has not
@@ -70,10 +76,10 @@ func (m *GrantsModel) Title() string {
 	return "Grants"
 }
 
-// CapturesKeys implements KeyCapturer: while the dialog is open the keyboard belongs to it, down to
+// CapturesKeys implements KeyCapturer: while a dialog is open the keyboard belongs to it, down to
 // the keys that would otherwise switch views. The digits are part of the spec being typed.
 func (m *GrantsModel) CapturesKeys() bool {
-	return m.input != nil
+	return m.input != nil || m.confirm != nil
 }
 
 // Init implements tea.Model by loading the portfolio.
@@ -108,6 +114,12 @@ func (m *GrantsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case InputCanceledMsg:
 		m.input = nil
 		return m, nil
+	case DeleteGrantMsg:
+		m.confirm = nil
+		return m, m.deleteGrantCmd(msg.id)
+	case ConfirmCanceledMsg:
+		m.confirm = nil
+		return m, nil
 	}
 
 	if m.input != nil {
@@ -118,17 +130,22 @@ func (m *GrantsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleKeyPress quits on the quit keys, opens the dialog for a new grant on the add key, and hands
-// every other key to the table, which moves the selection. While the dialog is open, every key is
-// the dialog's.
+// handleKeyPress quits on the quit keys, opens the dialog for a new grant on the add key, asks
+// whether to delete the selected grant on the delete key, and hands every other key to the table,
+// which moves the selection. While a dialog is open, every key is the dialog's.
 func (m *GrantsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.input != nil {
 		return m, m.input.HandleKeyPress(msg)
+	}
+	if m.confirm != nil {
+		return m, m.confirm.HandleKeyPress(msg)
 	}
 
 	switch {
 	case key.Matches(msg, m.keys.Quit):
 		return m, tea.Quit
+	case key.Matches(msg, m.keys.Delete):
+		return m.askToDelete()
 	case key.Matches(msg, m.keys.Add):
 		m.input = NewInputDialog("New grant", "Name: 10 PANW monthly x24 from 2026-01-15", newGrant, dialogWidth, m.style)
 		return m, m.input.Init()
@@ -137,6 +154,43 @@ func (m *GrantsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.table, cmd = m.table.Update(msg)
 	return m, cmd
+}
+
+// askToDelete opens a dialog asking whether to delete the selected grant, which sends a
+// DeleteGrantMsg if the answer is yes. The question names what goes with the grant: its vests that
+// are still to come, which leave the potential value. The lots of the vests that were released stay.
+// Without a grant to select, there is nothing to ask.
+func (m *GrantsModel) askToDelete() (tea.Model, tea.Cmd) {
+	i := m.table.Cursor()
+	if i < 0 || i >= len(m.portfolio.Grants) {
+		return m, nil
+	}
+
+	grant := m.portfolio.Grants[i]
+	unreleased := 0
+	for _, vest := range grant.Vests {
+		if !vest.Released {
+			unreleased++
+		}
+	}
+
+	question := fmt.Sprintf("Delete %q and its %s still to come?", grant.Name, count(unreleased, "vest"))
+	m.confirm = NewConfirmDialog("Delete grant", question, DeleteGrantMsg{id: grant.ID}, m.style)
+
+	return m, nil
+}
+
+// deleteGrantCmd returns a command that deletes the grant with the given ID and loads the portfolio
+// again, which then no longer has it.
+func (m *GrantsModel) deleteGrantCmd(id int) tea.Cmd {
+	store := m.store
+	return func() tea.Msg {
+		if err := store.DeleteGrant(id); err != nil {
+			return PortfolioLoadedMsg{err: err}
+		}
+
+		return loadPortfolioCmd(store)()
+	}
 }
 
 // newGrant turns the spec typed into the dialog into the message that asks for the grant to be
@@ -180,9 +234,8 @@ func (m *GrantsModel) View() tea.View {
 		m.helpView()
 
 	layers := []*lipgloss.Layer{lipgloss.NewLayer(frame)}
-	if m.input != nil {
+	if dialog := m.dialogLayer(); dialog != nil {
 		// The dialog floats centered in front of the table, as those of the other views do.
-		dialog := m.input.Layer()
 		dialog.X((lipgloss.Width(frame) - dialog.Width()) / 2)
 		dialog.Y((lipgloss.Height(frame) - dialog.Height()) / 2)
 		layers = append(layers, dialog)
@@ -190,6 +243,18 @@ func (m *GrantsModel) View() tea.View {
 
 	c := lipgloss.NewCompositor(layers...)
 	return tea.NewView(trimTrailingSpace(c.Render()) + "\n")
+}
+
+// dialogLayer renders whichever dialog is open, or returns nil if none is.
+func (m *GrantsModel) dialogLayer() *lipgloss.Layer {
+	switch {
+	case m.input != nil:
+		return m.input.Layer()
+	case m.confirm != nil:
+		return m.confirm.Layer()
+	default:
+		return nil
+	}
 }
 
 // headerView renders the two lines above the table: how many grants there are on the left, with the
@@ -204,21 +269,27 @@ func (m *GrantsModel) headerView() string {
 }
 
 // helpView renders the keys worth knowing in two lines, as every view does: getting around on the
-// first, and what can be done to the table on the second. While the dialog is open it shows the
+// first, and what can be done to the table on the second. While a dialog is open it shows the
 // dialog's keys instead, on one line, and leaves the second empty so that the frame keeps its
 // height.
 func (m *GrantsModel) helpView() string {
 	help, nav := m.table.Help, m.table.KeyMap
 
-	if m.input != nil {
+	switch {
+	case m.input != nil:
 		return help.ShortHelpView([]key.Binding{
 			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "save")),
 			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
 		}) + "\n"
+	case m.confirm != nil:
+		return help.ShortHelpView([]key.Binding{
+			key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "delete")),
+			key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "cancel")),
+		}) + "\n"
 	}
 
 	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n" +
-		help.ShortHelpView([]key.Binding{m.keys.Add})
+		help.ShortHelpView([]key.Binding{m.keys.Add, m.keys.Delete})
 }
 
 // grantRow renders a grant as a row of the Grants table: how many of its shares are still to come,

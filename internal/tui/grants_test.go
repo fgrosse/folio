@@ -140,6 +140,56 @@ func TestGrantsModel_RenderGrantDialog(t *testing.T) {
 	golden.RequireEqual(t, ansi.Strip(m.View().Content))
 }
 
+// TestGrantsModel_DeleteGrant covers taking a grant back: d asks before it deletes the selected
+// grant, naming it and what goes with it, and only a y has the store delete it, after which the view
+// loads the portfolio again. A no closes the question and deletes nothing.
+func TestGrantsModel_DeleteGrant(t *testing.T) {
+	m, store := newTestingGrants(t)
+
+	m.Update(keyPressed("d"))
+	require.True(t, m.CapturesKeys(), "the question should take the keyboard")
+	assert.Contains(t, ansi.Strip(m.View().Content), `Delete "Payout" and its 2 vests still to come?`)
+
+	_, cmd := m.Update(keyPressed("n"))
+	_, cmd = m.Update(runCmd(t, cmd))
+	assert.Nil(t, cmd)
+	assert.False(t, m.CapturesKeys(), "a no should close the question")
+
+	m.Update(keyPressed("d"))
+	_, cmd = m.Update(keyPressed("y"))
+	msg := runCmd(t, cmd)
+	require.Equal(t, DeleteGrantMsg{id: 1}, msg)
+
+	store.On("DeleteGrant", 1).Return(nil)
+	_, cmd = m.Update(msg)
+	assert.False(t, m.CapturesKeys(), "the question should be closed")
+	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
+	store.AssertExpectations(t)
+}
+
+// TestGrantsModel_DeleteWithNothingSelected covers d in an account without grants, where there is
+// nothing to ask about.
+func TestGrantsModel_DeleteWithNothingSelected(t *testing.T) {
+	store := new(MockStore)
+	store.returns(Portfolio{})
+	m := NewGrantsModel(store, DefaultStyle())
+	m.Update(runCmd(t, m.Init()))
+
+	_, cmd := m.Update(keyPressed("d"))
+
+	assert.Nil(t, cmd)
+	assert.False(t, m.CapturesKeys(), "there should be no question to answer")
+}
+
+// TestGrantsModel_RenderDeleteDialog is the frame while the view asks whether to delete a grant: the
+// question in front of the table, and the keys that answer it in the help lines.
+func TestGrantsModel_RenderDeleteDialog(t *testing.T) {
+	m, _ := newTestingGrants(t)
+	m.Update(keyPressed("d"))
+
+	golden.RequireEqual(t, ansi.Strip(m.View().Content))
+}
+
 // TestGrantRow covers how one grant reads as a row of the Grants table: its name and stock, how many
 // of its shares are still to come and how many it had in all, and what the ones to come are worth,
 // which is the grant's part of the potential value. The numbers are right-aligned like those of the

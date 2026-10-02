@@ -21,6 +21,7 @@ type Store interface {
 	SaveQuote(quote portfolio.Quote) error
 	ReleaseVest(id int, shares decimal.Decimal) error
 	SaveGrant(grant portfolio.Grant) error
+	DeleteGrant(id int) error
 }
 
 // A Portfolio is everything the views show, as the store had it at one moment: the lots and grants
