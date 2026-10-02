@@ -30,6 +30,42 @@ func TestHoldingsModel_LoadsPortfolio(t *testing.T) {
 	store.AssertExpectations(t)
 }
 
+// TestPositions covers the line the Holdings view puts above its table: how many shares of each
+// stock the lots add up to, which no single row says. The stocks are in alphabetical order, and an
+// account without lots says so.
+func TestPositions(t *testing.T) {
+	tests := map[string]struct {
+		lots     []portfolio.Lot
+		expected string
+	}{
+		"no lots": {
+			lots:     nil,
+			expected: "No shares held",
+		},
+		"one stock in two lots": {
+			lots: []portfolio.Lot{
+				{Symbol: "PANW", Shares: dec("6")},
+				{Symbol: "PANW", Shares: dec("2.5")},
+			},
+			expected: "8.5 PANW",
+		},
+		"several stocks": {
+			lots: []portfolio.Lot{
+				{Symbol: "PANW", Shares: dec("6")},
+				{Symbol: "AAPL", Shares: dec("3")},
+				{Symbol: "PANW", Shares: dec("4")},
+			},
+			expected: "3 AAPL · 10 PANW",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, positions(tt.lots))
+		})
+	}
+}
+
 // TestLotRow covers how one lot reads as a row of the Holdings table: the day it was acquired, its
 // symbol, and then the numbers - how many shares, what one is worth and what all of them are -
 // right-aligned so that their digits line up down the column. The table has no alignment of its

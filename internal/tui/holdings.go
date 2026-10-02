@@ -2,10 +2,14 @@ package tui
 
 import (
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	"github.com/shopspring/decimal"
 
 	"github.com/fgrosse/folio/internal/portfolio"
 )
@@ -103,6 +107,27 @@ func (m *HoldingsModel) updateRows() {
 // View implements tea.Model by rendering the table of lots.
 func (m *HoldingsModel) View() tea.View {
 	return tea.NewView(m.style.Table.Render(m.table.View()))
+}
+
+// positions sums up lots as how many shares of each stock they hold, the stocks in alphabetical
+// order, such as "3 AAPL · 10 PANW". It is what the Holdings view says above its table, where the
+// rows only have the shares of one lot each.
+func positions(lots []portfolio.Lot) string {
+	if len(lots) == 0 {
+		return "No shares held"
+	}
+
+	shares := make(map[string]decimal.Decimal)
+	for _, lot := range lots {
+		shares[lot.Symbol] = shares[lot.Symbol].Add(lot.Shares)
+	}
+
+	var parts []string
+	for _, symbol := range slices.Sorted(maps.Keys(shares)) {
+		parts = append(parts, shares[symbol].String()+" "+symbol)
+	}
+
+	return strings.Join(parts, " · ")
 }
 
 // lotRow renders a lot as a row of the Holdings table, valued at quote, which is the zero Quote if
