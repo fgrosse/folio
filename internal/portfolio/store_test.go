@@ -430,3 +430,54 @@ func TestStore_LotsKnowWhatWasSold(t *testing.T) {
 	assert.True(t, lots[1].Sold.IsZero())
 	assert.Equal(t, "5", lots[1].Remaining().String())
 }
+
+// TestStore_SaveSaleRefusals covers the sales that cannot have happened: of a lot that does not
+// exist, of no shares or at no price, without a day or on one before the lot was acquired, and of
+// more shares than the lot has left once its earlier sales are taken off.
+func TestStore_SaveSaleRefusals(t *testing.T) {
+	s := newSalesStore(t)
+	require.NoError(t, s.SaveSale(Sale{LotID: 1, Date: day("2026-09-15"), Shares: shares("50"), Price: shares("410.2")}))
+
+	tests := map[string]struct {
+		sale  Sale
+		error string
+	}{
+		"a lot that does not exist": {
+			sale:  Sale{LotID: 9, Date: day("2026-09-20"), Shares: shares("10"), Price: shares("400")},
+			error: "no lot with ID 9",
+		},
+		"no shares": {
+			sale:  Sale{LotID: 1, Date: day("2026-09-20"), Price: shares("400")},
+			error: "a sale must have more than 0 shares",
+		},
+		"no price": {
+			sale:  Sale{LotID: 1, Date: day("2026-09-20"), Shares: shares("10")},
+			error: "a sale must have a price of more than 0",
+		},
+		"no day": {
+			sale:  Sale{LotID: 1, Shares: shares("10"), Price: shares("400")},
+			error: "sale has no day",
+		},
+		"before the lot was acquired": {
+			sale:  Sale{LotID: 1, Date: day("2025-07-31"), Shares: shares("10"), Price: shares("400")},
+			error: "the lot was only acquired on 2025-08-01",
+		},
+		"more shares than are left": {
+			sale:  Sale{LotID: 1, Date: day("2026-09-20"), Shares: shares("200.5"), Price: shares("400")},
+			error: "the lot has 200 shares left, not 200.5",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.EqualError(t, s.SaveSale(tt.sale), tt.error)
+
+			sales, err := s.Sales()
+			require.NoError(t, err)
+			assert.Len(t, sales, 1, "a refused sale must not be saved")
+		})
+	}
+
+	// What is left can be sold to the last share.
+	require.NoError(t, s.SaveSale(Sale{LotID: 1, Date: day("2026-09-20"), Shares: shares("200"), Price: shares("400")}))
+}

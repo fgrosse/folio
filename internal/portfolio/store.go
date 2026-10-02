@@ -234,14 +234,56 @@ func (s *SQLiteStore) Sales() ([]Sale, error) {
 	return sales, nil
 }
 
-// SaveSale records a new sale of shares of the lot it names.
+// SaveSale records a new sale of shares of the lot it names, which has to be valid. The lot has to
+// exist, to have been acquired by the day of the sale, and to have that many shares left once its
+// earlier sales are taken off.
 func (s *SQLiteStore) SaveSale(sale Sale) error {
-	_, err := s.db.Exec(
+	if err := sale.Validate(); err != nil {
+		return err
+	}
+
+	tx, err := s.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }() // does nothing once the transaction is committed
+
+	var lot struct {
+		Shares   decimal.Decimal `db:"shares"`
+		Acquired time.Time       `db:"acquired_on"`
+	}
+	err = tx.Get(&lot, `SELECT shares, acquired_on FROM lots WHERE id = ?`, sale.LotID)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return fmt.Errorf("no lot with ID %d", sale.LotID)
+	case err != nil:
+		return err
+	case sale.Date.Before(lot.Acquired):
+		return fmt.Errorf("the lot was only acquired on %s", lot.Acquired.Format(time.DateOnly))
+	}
+
+	var sold []decimal.Decimal
+	if err := tx.Select(&sold, `SELECT shares FROM sales WHERE lot_id = ?`, sale.LotID); err != nil {
+		return err
+	}
+
+	left := lot.Shares
+	for _, shares := range sold {
+		left = left.Sub(shares)
+	}
+	if sale.Shares.GreaterThan(left) {
+		return fmt.Errorf("the lot has %s shares left, not %s", left, sale.Shares)
+	}
+
+	_, err = tx.Exec(
 		`INSERT INTO sales (lot_id, sold_on, shares, price, note) VALUES (?, ?, ?, ?, ?)`,
 		sale.LotID, sale.Date.Format(time.DateOnly), sale.Shares, sale.Price, sale.Note,
 	)
+	if err != nil {
+		return err
+	}
 
-	return err
+	return tx.Commit()
 }
 
 // Grants lists every grant in the order they were saved, each with its vests in the order of

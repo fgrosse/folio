@@ -1,6 +1,7 @@
 package portfolio
 
 import (
+	"errors"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -32,4 +33,19 @@ type Sale struct {
 	Symbol string
 	Cost   decimal.Decimal
 	Grant  string
+}
+
+// Validate says what a sale is missing to have happened: shares that were sold, a price they sold
+// at, and the day of it.
+func (s Sale) Validate() error {
+	switch {
+	case !s.Shares.IsPositive():
+		return errors.New("a sale must have more than 0 shares")
+	case !s.Price.IsPositive():
+		return errors.New("a sale must have a price of more than 0")
+	case s.Date.IsZero():
+		return errors.New("sale has no day")
+	}
+
+	return nil
 }
