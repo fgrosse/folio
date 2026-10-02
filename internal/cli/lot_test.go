@@ -39,6 +39,22 @@ func TestLotCmd(t *testing.T) {
 	assert.Equal(t, expected, lots(t, dbPath))
 }
 
+// TestLotCmd_Today covers a lot without a day, which is the usual case of shares that arrived just
+// now: it is of today, the calendar day where the user is, whatever day it is in UTC by then.
+func TestLotCmd_Today(t *testing.T) {
+	cmd, dbPath := NewTestingCmd(t, "lot", "40 PANW")
+	// Late in the evening in New York, which is the next day already in UTC.
+	newYork := time.FixedZone("EDT", -4*60*60)
+	cmd.now = func() time.Time { return time.Date(2026, time.October, 2, 22, 30, 0, 0, newYork) }
+
+	require.NoError(t, cmd.Execute())
+
+	expected := []portfolio.Lot{
+		{ID: 1, Symbol: "PANW", Shares: decimal.RequireFromString("40"), Acquired: day("2026-10-02")},
+	}
+	assert.Equal(t, expected, lots(t, dbPath))
+}
+
 // lots returns the lots in the database at dbPath.
 func lots(t *testing.T, dbPath string) []portfolio.Lot {
 	t.Helper()

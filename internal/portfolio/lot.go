@@ -54,6 +54,14 @@ func NewLot(spec string) (Lot, error) {
 	return lot, nil
 }
 
+// DayOf returns the calendar day that t falls on where t is, at midnight UTC, which is how every
+// day in the portfolio is held. Late in the evening it is still today, even though it is tomorrow in
+// UTC by then.
+func DayOf(t time.Time) time.Time {
+	y, m, d := t.Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
 // ParseDay parses a calendar day written as YYYY-MM-DD.
 func ParseDay(s string) (time.Time, error) {
 	day, err := time.Parse(time.DateOnly, s)

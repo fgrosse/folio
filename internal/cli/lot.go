@@ -33,6 +33,10 @@ any positional arguments are joined with spaces.
 				return err
 			}
 
+			if lot.Acquired.IsZero() {
+				lot.Acquired = portfolio.DayOf(cmd.now())
+			}
+
 			return cmd.store.SaveLot(lot)
 		},
 	}
