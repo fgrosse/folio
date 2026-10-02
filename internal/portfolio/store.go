@@ -7,6 +7,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"time"
 
@@ -66,14 +67,25 @@ func NewStore(dsn string) (*SQLiteStore, error) {
 // createPrivate makes sure that there is a file at path which only its owner can read and write.
 // SQLite would create the database itself, readable by everyone the umask lets in, and an account
 // is nobody's business but its owner's. The files that SQLite keeps next to the database get the
-// permissions of the database, so they are covered by this as well.
+// permissions of the database when it creates them. A database that is there already may have been
+// made before folio did this, so it and the files next to it lose what others were allowed.
 func createPrivate(path string) error {
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // the path is the user's choice of a database
 	if err != nil {
 		return err
 	}
 
-	return file.Close()
+	if err := file.Close(); err != nil {
+		return err
+	}
+
+	for _, existing := range []string{path, path + "-wal", path + "-shm"} {
+		if err := os.Chmod(existing, 0o600); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Migrate applies every pending schema migration embedded in the binary; it is a no-op if the

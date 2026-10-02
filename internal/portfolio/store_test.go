@@ -343,6 +343,25 @@ func TestNewStore_KeepsTheDatabasePrivate(t *testing.T) {
 	}
 }
 
+// A database that an earlier folio made is readable by everyone, and opening it is what fixes that.
+func TestNewStore_MakesAnExistingDatabasePrivate(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "folio.db")
+	files := []string{path, path + "-wal", path + "-shm"}
+	for _, file := range files {
+		require.NoError(t, os.WriteFile(file, nil, 0o644)) //nolint:gosec // the permissions are what the test is about
+	}
+
+	s, err := NewStore(path)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = s.Close() })
+
+	for _, file := range files {
+		info, err := os.Stat(file)
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(), file)
+	}
+}
+
 // TestStore_SaveLotWithCost covers the cost of a lot in the database: a lot saved with one comes
 // back with it, and a lot saved without comes back without, rather than with a cost of nothing.
 func TestStore_SaveLotWithCost(t *testing.T) {
