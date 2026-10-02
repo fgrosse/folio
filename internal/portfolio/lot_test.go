@@ -177,3 +177,41 @@ func TestLot_String(t *testing.T) {
 		})
 	}
 }
+
+// TestParseRelease covers what is typed when a vest is released, "<shares> [@<cost>]": the shares
+// that arrived and what one was worth that day, with or without space around the "@". A release
+// without a cost has none.
+func TestParseRelease(t *testing.T) {
+	tests := map[string]struct {
+		spec   string
+		shares string
+		cost   string
+		error  string
+	}{
+		"shares and cost":        {spec: "250 @162.50", shares: "250", cost: "162.5"},
+		"no space before the @":  {spec: "250@162.50", shares: "250", cost: "162.5"},
+		"space around the @":     {spec: " 250 @ 162.50 ", shares: "250", cost: "162.5"},
+		"only shares":            {spec: "42", shares: "42", cost: "0"},
+		"nothing":                {spec: "", error: `a release is written as "<shares> [@<cost>]"`},
+		"too much":               {spec: "250 @162.50 net", error: `a release is written as "<shares> [@<cost>]"`},
+		"only a cost":            {spec: "@162.50", error: `"@162.50" is not a number of shares`},
+		"shares not a number":    {spec: "many @162.50", error: `"many" is not a number of shares`},
+		"no shares":              {spec: "0 @162.50", error: "a vest must release more than 0 shares"},
+		"a cost without its @":   {spec: "250 162.50", error: `"162.50" is not a cost such as @380.12`},
+		"a cost that is nothing": {spec: "250 @0", error: `"@0" is not a cost such as @380.12`},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			released, cost, err := ParseRelease(tt.spec)
+			if tt.error != "" {
+				assert.EqualError(t, err, tt.error)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.True(t, shares(tt.shares).Equal(released), "shares: %s", released)
+			assert.True(t, shares(tt.cost).Equal(cost), "cost: %s", cost)
+		})
+	}
+}

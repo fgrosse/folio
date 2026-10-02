@@ -75,6 +75,31 @@ func NewLot(spec string) (Lot, error) {
 	return lot, nil
 }
 
+// ParseRelease parses what is typed when a vest is released, "<shares> [@<cost>]", such as
+// "250 @162.50": the shares that arrived, which have to be more than none, and what one of them was
+// worth that day, which is zero if the spec does not say.
+func ParseRelease(spec string) (shares, cost decimal.Decimal, err error) {
+	fields := specFields(spec)
+	if len(fields) < 1 || len(fields) > 2 {
+		return shares, cost, errors.New(`a release is written as "<shares> [@<cost>]"`)
+	}
+
+	shares, err = decimal.NewFromString(fields[0])
+	switch {
+	case err != nil:
+		return shares, cost, fmt.Errorf("%q is not a number of shares", fields[0])
+	case !shares.IsPositive():
+		return shares, cost, errors.New("a vest must release more than 0 shares")
+	}
+
+	cost = decimal.Zero
+	if len(fields) == 2 {
+		cost, err = ParseCost(fields[1])
+	}
+
+	return shares, cost, err
+}
+
 // costSign finds the "@" that a cost is written after, with whatever space there is around it.
 var costSign = regexp.MustCompile(`\s*@\s*`)
 
