@@ -97,18 +97,40 @@ func (s *SQLiteStore) Lots() ([]Lot, error) {
 	return lots, nil
 }
 
-// SaveLot records a new lot, which has to be valid.
+// SaveLot records a lot, which has to be valid: a new one if its ID is zero, and otherwise it
+// replaces the lot with that ID, which has to exist. A lot that a vest was released into stays that
+// vest's whatever else about it is replaced, and with it the grant it is from.
 func (s *SQLiteStore) SaveLot(lot Lot) error {
 	if err := lot.Validate(); err != nil {
 		return err
 	}
 
-	_, err := s.db.Exec(
-		`INSERT INTO lots (symbol, shares, acquired_on, cost) VALUES (?, ?, ?, ?)`,
-		lot.Symbol, lot.Shares, lot.Acquired.Format(time.DateOnly), nullable(lot.Cost),
-	)
+	if lot.ID == 0 {
+		_, err := s.db.Exec(
+			`INSERT INTO lots (symbol, shares, acquired_on, cost) VALUES (?, ?, ?, ?)`,
+			lot.Symbol, lot.Shares, lot.Acquired.Format(time.DateOnly), nullable(lot.Cost),
+		)
 
-	return err
+		return err
+	}
+
+	result, err := s.db.Exec(
+		`UPDATE lots SET symbol = ?, shares = ?, acquired_on = ?, cost = ? WHERE id = ?`,
+		lot.Symbol, lot.Shares, lot.Acquired.Format(time.DateOnly), nullable(lot.Cost), lot.ID,
+	)
+	if err != nil {
+		return err
+	}
+
+	n, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("no lot with ID %d", lot.ID)
+	}
+
+	return nil
 }
 
 // nullable is cost the way the database holds it: NULL for a cost of zero, which stands for a cost

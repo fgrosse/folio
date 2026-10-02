@@ -322,3 +322,37 @@ func TestStore_SaveLotWithCost(t *testing.T) {
 	}
 	assert.Equal(t, expected, lots)
 }
+
+// TestStore_SaveLotReplaces covers correcting a lot: saved with the ID of one that exists, a lot
+// takes its place rather than being added, and a lot that a vest was released into stays that
+// vest's, so that a cost filled in later does not cut the lot loose from its grant. An ID no lot has
+// is refused.
+func TestStore_SaveLotReplaces(t *testing.T) {
+	s := NewTestingStore()
+	require.NoError(t, s.SaveGrant(Grant{
+		Name:   "Payout",
+		Symbol: "PANW",
+		Vests:  Repeating(day("2026-01-15"), 1, 2, shares("10")),
+	}))
+	require.NoError(t, s.ReleaseVest(1, shares("6"), decimal.Zero))
+	require.NoError(t, s.SaveLot(Lot{Symbol: "AAPL", Shares: shares("3"), Acquired: day("2026-02-01")}))
+
+	// The release was entered without what a share was worth that day, and a day late.
+	err := s.SaveLot(Lot{ID: 1, Symbol: "PANW", Shares: shares("6"), Acquired: day("2026-01-16"), Cost: shares("380.12")})
+	require.NoError(t, err)
+
+	lots, err := s.Lots()
+	require.NoError(t, err)
+	expected := []Lot{
+		{ID: 1, Symbol: "PANW", Shares: shares("6"), Acquired: day("2026-01-16"), Cost: shares("380.12"), Grant: "Payout"},
+		{ID: 2, Symbol: "AAPL", Shares: shares("3"), Acquired: day("2026-02-01")},
+	}
+	assert.Equal(t, expected, lots)
+
+	grants, err := s.Grants()
+	require.NoError(t, err)
+	assert.True(t, grants[0].Vests[0].Released, "the vest should still be released")
+
+	err = s.SaveLot(Lot{ID: 9, Symbol: "PANW", Shares: shares("1"), Acquired: day("2026-01-16")})
+	assert.EqualError(t, err, "no lot with ID 9")
+}
