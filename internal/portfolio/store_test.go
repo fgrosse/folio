@@ -101,3 +101,23 @@ func TestStore_SaveLotRefusesInvalidLots(t *testing.T) {
 		})
 	}
 }
+
+// TestStore_DeleteLot covers taking back a lot that was entered by mistake: it is gone from the
+// list and the others stay. A lot that does not exist cannot be deleted, which says so rather than
+// passing for done.
+func TestStore_DeleteLot(t *testing.T) {
+	s := NewTestingStore()
+	require.NoError(t, s.SaveLot(Lot{Symbol: "PANW", Shares: shares("3"), Acquired: day("2026-03-15")}))
+	require.NoError(t, s.SaveLot(Lot{Symbol: "AAPL", Shares: shares("1"), Acquired: day("2026-04-01")}))
+
+	require.NoError(t, s.DeleteLot(1))
+
+	lots, err := s.Lots()
+	require.NoError(t, err)
+	expected := []Lot{
+		{ID: 2, Symbol: "AAPL", Shares: shares("1"), Acquired: day("2026-04-01")},
+	}
+	assert.Equal(t, expected, lots)
+
+	assert.EqualError(t, s.DeleteLot(7), "no lot with ID 7")
+}

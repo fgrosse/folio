@@ -97,6 +97,24 @@ func (s *SQLiteStore) SaveLot(lot Lot) error {
 	return err
 }
 
+// DeleteLot deletes the lot with the given ID, which has to exist.
+func (s *SQLiteStore) DeleteLot(id int) error {
+	result, err := s.db.Exec(`DELETE FROM lots WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+
+	n, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("no lot with ID %d", id)
+	}
+
+	return nil
+}
+
 // Close closes the database.
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()
