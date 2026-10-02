@@ -79,6 +79,48 @@ func TestVestRow(t *testing.T) {
 	}
 }
 
+// TestVestingSummary covers the line the Vesting view puts above its table: how many vests are due
+// and waiting to be released, which is what there is to do in the view, and how many are still to
+// come and when the next of them is.
+func TestVestingSummary(t *testing.T) {
+	today := day("2026-10-02")
+	vest := func(date string) grantVest {
+		return grantVest{grant: "Payout", symbol: "PANW", vest: portfolio.Vest{Date: day(date), Shares: dec("10")}}
+	}
+
+	tests := map[string]struct {
+		vests    []grantVest
+		expected string
+	}{
+		"no vests": {
+			vests:    nil,
+			expected: "Nothing left to vest",
+		},
+		"vests to come": {
+			vests:    []grantVest{vest("2026-11-15"), vest("2026-12-15"), vest("2027-01-15")},
+			expected: "3 vests to come, the next on 2026-11-15",
+		},
+		"a single vest to come": {
+			vests:    []grantVest{vest("2026-11-15")},
+			expected: "1 vest to come, the next on 2026-11-15",
+		},
+		"vests pending release, today's among them": {
+			vests:    []grantVest{vest("2026-09-15"), vest("2026-10-02"), vest("2026-11-15")},
+			expected: "2 vests pending release · 1 vest to come, the next on 2026-11-15",
+		},
+		"only a vest pending release": {
+			vests:    []grantVest{vest("2026-09-15")},
+			expected: "1 vest pending release",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, vestingSummary(tt.vests, today))
+		})
+	}
+}
+
 // TestDueIn covers how far off a vest is, in the words of the last column of the Vesting table. The
 // nearer the day, the finer the unit: days up to two months out, then whole months, and whole years
 // from two years on, since nobody plans by the day for a vest that is years away. A vest whose day

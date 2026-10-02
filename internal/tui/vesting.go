@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/table"
@@ -36,6 +37,32 @@ func unreleasedVests(grants []portfolio.Grant) []grantVest {
 	})
 
 	return vests
+}
+
+// vestingSummary sums up vests, which are in the order of their days, as how many of them are due
+// and pending release and how many are still to come, with the day of the next. It is what the
+// Vesting view says above its table.
+func vestingSummary(vests []grantVest, today time.Time) string {
+	// The vests are sorted, so the pending ones come first.
+	pending := 0
+	for pending < len(vests) && !vests[pending].vest.Date.After(today) {
+		pending++
+	}
+
+	var parts []string
+	if pending > 0 {
+		parts = append(parts, count(pending, "vest")+" pending release")
+	}
+	if coming := vests[pending:]; len(coming) > 0 {
+		next := coming[0].vest.Date.Format(time.DateOnly)
+		parts = append(parts, count(len(coming), "vest")+" to come, the next on "+next)
+	}
+
+	if len(parts) == 0 {
+		return "Nothing left to vest"
+	}
+
+	return strings.Join(parts, " · ")
 }
 
 // vestRow renders a vest as a row of the Vesting table, valued at quote, which is the zero Quote if
@@ -83,9 +110,14 @@ func dueIn(date, today time.Time) string {
 
 // plural renders "in n units", with the unit in the singular for one of them.
 func plural(n int, unit string) string {
+	return "in " + count(n, unit)
+}
+
+// count renders "n units", with the unit in the singular for one of them.
+func count(n int, unit string) string {
 	if n == 1 {
-		return fmt.Sprintf("in 1 %s", unit)
+		return "1 " + unit
 	}
 
-	return fmt.Sprintf("in %d %ss", n, unit)
+	return fmt.Sprintf("%d %ss", n, unit)
 }
