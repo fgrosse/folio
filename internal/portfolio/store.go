@@ -115,6 +115,66 @@ func (s *SQLiteStore) DeleteLot(id int) error {
 	return nil
 }
 
+// Grants lists every grant in the order they were saved, each with its vests in the order of
+// their days.
+func (s *SQLiteStore) Grants() ([]Grant, error) {
+	var grants []Grant
+	if err := s.db.Select(&grants, `SELECT id, name, symbol FROM grants ORDER BY id`); err != nil {
+		return nil, err
+	}
+
+	var rows []struct {
+		ID      int             `db:"id"`
+		GrantID int             `db:"grant_id"`
+		Date    time.Time       `db:"vests_on"`
+		Shares  decimal.Decimal `db:"shares"`
+	}
+	if err := s.db.Select(&rows, `SELECT id, grant_id, vests_on, shares FROM vests ORDER BY vests_on, id`); err != nil {
+		return nil, err
+	}
+
+	for i := range grants {
+		for _, r := range rows {
+			if r.GrantID == grants[i].ID {
+				grants[i].Vests = append(grants[i].Vests, Vest{ID: r.ID, Date: r.Date, Shares: r.Shares})
+			}
+		}
+	}
+
+	return grants, nil
+}
+
+// SaveGrant records a new grant together with its vests, all of them or none.
+func (s *SQLiteStore) SaveGrant(grant Grant) error {
+	tx, err := s.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }() // does nothing once the transaction is committed
+
+	result, err := tx.Exec(`INSERT INTO grants (name, symbol) VALUES (?, ?)`, grant.Name, grant.Symbol)
+	if err != nil {
+		return err
+	}
+
+	grantID, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	for _, vest := range grant.Vests {
+		_, err := tx.Exec(
+			`INSERT INTO vests (grant_id, vests_on, shares) VALUES (?, ?, ?)`,
+			grantID, vest.Date.Format(time.DateOnly), vest.Shares,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 // Quotes returns the latest quote the database has of every symbol it has one of, by symbol. The
 // database is the cache of the prices: what comes back is as old as the last SaveQuote.
 func (s *SQLiteStore) Quotes() (map[string]Quote, error) {

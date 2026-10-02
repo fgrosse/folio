@@ -161,3 +161,36 @@ func TestStore_SaveQuote(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, map[string]Quote{"PANW": panw, "AAPL": aapl}, quotes)
 }
+
+// TestStore_SaveGrant covers recording a grant: it comes back with its vests, each with an ID of
+// its own, and a database that has none returns none.
+func TestStore_SaveGrant(t *testing.T) {
+	s := NewTestingStore()
+
+	grants, err := s.Grants()
+	require.NoError(t, err)
+	assert.Empty(t, grants)
+
+	err = s.SaveGrant(Grant{
+		Name:   "Payout",
+		Symbol: "PANW",
+		Vests:  Repeating(day("2026-01-15"), 1, 3, shares("10")),
+	})
+	require.NoError(t, err)
+
+	grants, err = s.Grants()
+	require.NoError(t, err)
+	expected := []Grant{
+		{
+			ID:     1,
+			Name:   "Payout",
+			Symbol: "PANW",
+			Vests: []Vest{
+				{ID: 1, Date: day("2026-01-15"), Shares: shares("10")},
+				{ID: 2, Date: day("2026-02-15"), Shares: shares("10")},
+				{ID: 3, Date: day("2026-03-15"), Shares: shares("10")},
+			},
+		},
+	}
+	assert.Equal(t, expected, grants)
+}
