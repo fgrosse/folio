@@ -1,4 +1,7 @@
-<h1 align="center">folio</h1>
+<h1 align="center">
+    <img src="logo.png" alt="The folio logo: an f next to a stack of coins" height="100"><br>
+    folio
+</h1>
 <p align="center">A terminal-first tracker for the stock you hold and the stock that is still to vest.</p>
 <p align="center">
     <a href="https://github.com/fgrosse/folio/releases"><img src="https://img.shields.io/github/tag/fgrosse/folio.svg?label=version&color=brightgreen"></a>
