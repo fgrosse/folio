@@ -84,6 +84,17 @@ func ParseCost(s string) (decimal.Decimal, error) {
 	return cost, nil
 }
 
+// String renders the lot as its spec, in the syntax NewLot reads: "<shares> <symbol> <YYYY-MM-DD>",
+// and "@<cost>" after it if the lot has a cost.
+func (l Lot) String() string {
+	spec := l.Shares.String() + " " + l.Symbol + " " + l.Acquired.Format(time.DateOnly)
+	if !l.Cost.IsZero() {
+		spec += " @" + l.Cost.String()
+	}
+
+	return spec
+}
+
 // DayOf returns the calendar day that t falls on where t is, at midnight UTC, which is how every
 // day in the portfolio is held. Late in the evening it is still today, even though it is tomorrow in
 // UTC by then.

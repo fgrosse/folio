@@ -131,3 +131,35 @@ func TestNewLot_Cost(t *testing.T) {
 		})
 	}
 }
+
+// TestLot_String covers a lot written back as its spec, which is what the dialog that edits a lot
+// starts out with: exactly the syntax NewLot reads, so that a lot survives the round trip, and
+// without a cost if the lot has none.
+func TestLot_String(t *testing.T) {
+	tests := map[string]struct {
+		lot      Lot
+		expected string
+	}{
+		"with a cost": {
+			lot:      Lot{ID: 3, Symbol: "PANW", Shares: shares("12.5"), Acquired: day("2026-03-15"), Cost: shares("380.12"), Grant: "Payout"},
+			expected: "12.5 PANW 2026-03-15 @380.12",
+		},
+		"without a cost": {
+			lot:      Lot{Symbol: "PANW", Shares: shares("40"), Acquired: day("2026-03-15")},
+			expected: "40 PANW 2026-03-15",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.lot.String())
+
+			parsed, err := NewLot(tt.lot.String())
+			require.NoError(t, err)
+			assert.Equal(t, tt.lot.Symbol, parsed.Symbol)
+			assert.Equal(t, tt.lot.Acquired, parsed.Acquired)
+			assert.True(t, tt.lot.Shares.Equal(parsed.Shares))
+			assert.True(t, tt.lot.Cost.Equal(parsed.Cost))
+		})
+	}
+}
