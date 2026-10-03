@@ -366,3 +366,32 @@ func TestAppModel_ConfigKeepsTheKeys(t *testing.T) {
 	m = driveApp(t, m, keyPressed("2"))
 	assert.Equal(t, 1, m.selected, "the keys switch views again")
 }
+
+// TestAppModel_SetsConfig covers what the app does with a value the dialog asks to be set: it is
+// stored, the dialog is given the configuration as the store has it then, and the portfolio is
+// loaded again for every view, since what they show depends on the configuration.
+func TestAppModel_SetsConfig(t *testing.T) {
+	store := new(MockStore)
+	store.returnsAccount(testPortfolio())
+	store.On("SetConfig", "potential", "net").Return(nil)
+	store.On("GetConfig", portfolio.PotentialBasisKey).Return("net", nil)
+	store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
+
+	holdings := &stubView{title: "Holdings", content: "the lots"}
+	m := openConfig(t, store, nil, holdings)
+
+	_, cmd := m.Update(SetConfigMsg{key: "potential", value: "net"})
+	saved := runCmd(t, cmd)
+	store.AssertCalled(t, "SetConfig", "potential", "net")
+	assert.Equal(t, ConfigSavedMsg{values: map[string]string{"potential": "net"}}, saved)
+
+	_, cmd = m.Update(saved)
+	assert.Contains(t, ansi.Strip(m.View().Content), "‹ net ›")
+
+	loaded, ok := runCmd(t, cmd).(PortfolioLoadedMsg)
+	require.True(t, ok, "the portfolio is loaded again")
+	assert.Equal(t, portfolio.Net, loaded.portfolio.PotentialBasis)
+
+	driveApp(t, m, loaded)
+	assert.Equal(t, []tea.Msg{loaded}, holdings.msgs, "and every view receives it")
+}

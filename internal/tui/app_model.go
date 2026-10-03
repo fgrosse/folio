@@ -96,9 +96,24 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ConfigClosedMsg:
 		m.config = nil
 		return m, nil
+	case SetConfigMsg:
+		return m, setConfigCmd(m.store, msg.key, msg.value)
+	case ConfigSavedMsg:
+		return m.handleConfigSaved(msg)
 	default:
 		return m.updateViews(msg)
 	}
+}
+
+// handleConfigSaved gives the dialog the configuration as it is since it was changed, if the dialog
+// is still open, and loads the portfolio again: what the views show depends on the configuration,
+// and they all receive what is loaded.
+func (m *AppModel) handleConfigSaved(msg ConfigSavedMsg) (tea.Model, tea.Cmd) {
+	if m.config != nil {
+		m.config.SetValues(msg.values)
+	}
+
+	return m, loadPortfolioCmd(m.store)
 }
 
 // handleKeyPress switches views if msg is one of the keys that do, loads the configuration for its

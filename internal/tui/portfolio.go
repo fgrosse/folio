@@ -18,6 +18,7 @@ type Store interface {
 	Grants() ([]portfolio.Grant, error)
 	Quotes() (map[string]portfolio.Quote, error)
 	GetConfig(key string) (string, error)
+	SetConfig(key, value string) error
 	SaveLot(lot portfolio.Lot) error
 	DeleteLot(id int) error
 	SaveQuote(quote portfolio.Quote) error

@@ -41,6 +41,10 @@ func (m *MockStore) GetConfig(key string) (string, error) {
 	return result.String(0), result.Error(1)
 }
 
+func (m *MockStore) SetConfig(key, value string) error {
+	return m.Called(key, value).Error(0)
+}
+
 func (m *MockStore) SaveLot(lot portfolio.Lot) error {
 	return m.Called(lot).Error(0)
 }

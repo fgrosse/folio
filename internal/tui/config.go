@@ -23,6 +23,23 @@ func loadConfigCmd(store Store) tea.Cmd {
 	}
 }
 
+// ConfigSavedMsg reports that the configuration was changed, with what its keys are set to since,
+// as ConfigLoadedMsg has them.
+type ConfigSavedMsg struct {
+	values map[string]string
+}
+
+// setConfigCmd returns a command that sets key of the configuration in store to value and then
+// loads the configuration, so that the dialog shows what the store has rather than what it asked
+// for.
+func setConfigCmd(store Store, key, value string) tea.Cmd {
+	return func() tea.Msg {
+		_ = store.SetConfig(key, value)
+		values, _ := loadConfig(store)
+		return ConfigSavedMsg{values: values}
+	}
+}
+
 // loadConfig returns what every key of the configuration is set to in store, by the name of the
 // key, as text the way the store keeps it. A key that is not set is not in it.
 func loadConfig(store Store) (map[string]string, error) {
