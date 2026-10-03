@@ -230,3 +230,19 @@ func TestConfigDialog_Close(t *testing.T) {
 
 	assert.Equal(t, ConfigClosedMsg{}, runCmd(t, d.HandleKeyPress(esc)))
 }
+
+// TestConfigDialog_Help covers the line of keys at the foot of the dialog, which says what the keys
+// do to the row that is selected: a value that is typed is edited, one that is picked is changed,
+// and while a value is being typed, enter and esc are about that value.
+func TestConfigDialog_Help(t *testing.T) {
+	d := NewConfigDialog(testConfigKeys(t), nil, dialogWidth, DefaultStyle())
+	assert.Contains(t, dialogText(d), "↑/k up • ↓/j down • enter edit • esc close")
+
+	d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyDown})
+	assert.Contains(t, dialogText(d), "↑/k up • ↓/j down • ←/→ change • esc close")
+
+	d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyUp})
+	d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyEnter})
+	assert.Contains(t, dialogText(d), "enter save • esc cancel")
+	assert.NotContains(t, dialogText(d), "esc close")
+}

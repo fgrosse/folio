@@ -4,6 +4,8 @@ import (
 	"slices"
 	"strings"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -30,6 +32,7 @@ type ConfigDialog struct {
 	editing  bool              // whether the value of the selected key is being typed into input
 	input    textinput.Model   // the field the value of the selected key is typed into
 	err      error             // why the last value was refused, nil unless it was
+	help     help.Model        // renders the keys at the foot of the dialog
 	width    int               // how many columns the dialog has inside its border
 	style    Style
 }
@@ -57,6 +60,7 @@ func NewConfigDialog(keys []portfolio.ConfigKey, values map[string]string, width
 		keys:   keys,
 		values: values,
 		width:  width,
+		help:   help.New(),
 		style:  style,
 	}
 }
@@ -205,7 +209,7 @@ func (d *ConfigDialog) selectKey(index int) {
 }
 
 // Layer renders the whole dialog - title, the rows of the keys, what the selected key is for, why
-// the last value was refused, and border - as a compositor layer, for the parent to position over its own view.
+// the last value was refused, the keys, and border - as a compositor layer, for the parent to position over its own view.
 func (d *ConfigDialog) Layer() *lipgloss.Layer {
 	lines := []string{d.style.DialogTitle.Render("Configuration")}
 	for i := range d.keys {
@@ -220,7 +224,33 @@ func (d *ConfigDialog) Layer() *lipgloss.Layer {
 		lines = append(lines, d.style.Error.Width(d.width).Render(d.err.Error()))
 	}
 
+	lines = append(lines, "", d.helpView())
+
 	return lipgloss.NewLayer(d.style.Dialog.Render(strings.Join(lines, "\n")))
+}
+
+// helpView renders the keys worth knowing for the row that is selected. A view shows the keys of
+// its dialog in its own help lines, under the table. This dialog is the app's and has no such
+// lines, so it carries its keys itself.
+func (d *ConfigDialog) helpView() string {
+	if d.editing {
+		return d.help.ShortHelpView([]key.Binding{
+			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "save")),
+			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
+		})
+	}
+
+	change := key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "edit"))
+	if len(d.keys[d.selected].Choices) > 0 {
+		change = key.NewBinding(key.WithKeys("left", "right"), key.WithHelp("←/→", "change"))
+	}
+
+	return d.help.ShortHelpView([]key.Binding{
+		key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up")),
+		key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
+		change,
+		key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
+	})
 }
 
 // rowView renders the row of the key at index: a mark if it is the selected one, its name, and its
