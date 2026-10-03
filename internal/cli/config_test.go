@@ -27,8 +27,8 @@ func TestConfigCmd_Set(t *testing.T) {
 }
 
 // TestConfigCmd_Get covers asking for a value: "folio config tax-rate" without one prints the rate
-// that is set. A key that is not set prints nothing and exits 1, as git config does, so that a
-// script can tell it apart from a value by the exit code alone.
+// that is set. A key that is not set is an error, which goes to stderr and exits 1, so that a
+// script that reads stdout never takes the message for the value.
 func TestConfigCmd_Get(t *testing.T) {
 	cmd, dbPath := NewTestingCmd(t, "config", "tax-rate")
 	var out, stderr bytes.Buffer
@@ -37,7 +37,7 @@ func TestConfigCmd_Get(t *testing.T) {
 
 	assert.Equal(t, 1, cmd.Main())
 	assert.Empty(t, out.String())
-	assert.Empty(t, stderr.String())
+	assert.Equal(t, "Error: tax-rate is not set\n", stderr.String())
 
 	set := New()
 	set.SetArgs([]string{"--db", dbPath, "config", "tax-rate", "44.3"})

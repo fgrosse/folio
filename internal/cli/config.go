@@ -27,11 +27,6 @@ var configKeys = []configKey{
 	},
 }
 
-// errUnset is what folio config fails with for a key that is not set. Main exits 1 with it and
-// prints nothing, as git config does, so that a script tells an unset key from a value by the exit
-// code alone and never reads a message as the value.
-var errUnset = errors.New("the key is not set")
-
 // A configKey is a value of the configuration of an account, by the name that folio config knows
 // it by and the store keeps it under. The store keeps any text it is given, so it is up to the key
 // to refuse a value that is not one, before it is stored and read by a part of folio that does not
@@ -127,13 +122,10 @@ func configKeyNamed(name string) (configKey, error) {
 	return configKey{}, fmt.Errorf("%q is no key of the configuration: use %s", name, strings.Join(names, ", "))
 }
 
-// printConfig prints the value of key, and fails with errUnset if it is not set.
+// printConfig prints the value of key, and fails with portfolio.ErrNotSet if it is not set.
 func (cmd *Folio) printConfig(key configKey) error {
 	value, err := cmd.store.GetConfig(key.name)
-	switch {
-	case errors.Is(err, portfolio.ErrNotSet):
-		return errUnset
-	case err != nil:
+	if err != nil {
 		return err
 	}
 
