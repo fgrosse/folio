@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,7 +17,7 @@ type Store interface {
 	Lots() ([]portfolio.Lot, error)
 	Grants() ([]portfolio.Grant, error)
 	Quotes() (map[string]portfolio.Quote, error)
-	TaxRate() (decimal.NullDecimal, error)
+	GetConfig(key string) (string, error)
 	SaveLot(lot portfolio.Lot) error
 	DeleteLot(id int) error
 	SaveQuote(quote portfolio.Quote) error
@@ -110,10 +111,29 @@ func loadPortfolio(store Store) (Portfolio, error) {
 		return Portfolio{}, err
 	}
 
-	taxRate, err := store.TaxRate()
+	taxRate, err := loadTaxRate(store)
 	if err != nil {
 		return Portfolio{}, err
 	}
 
 	return Portfolio{Lots: lots, Grants: grants, Quotes: quotes, Sales: sales, TaxRate: taxRate}, nil
+}
+
+// loadTaxRate returns the rate that vests are taxed at, which is not valid if the account has none.
+// The store keeps it as text among the configuration, as folio config set it.
+func loadTaxRate(store Store) (decimal.NullDecimal, error) {
+	value, err := store.GetConfig(portfolio.TaxRateKey)
+	switch {
+	case errors.Is(err, portfolio.ErrNotSet):
+		return decimal.NullDecimal{}, nil
+	case err != nil:
+		return decimal.NullDecimal{}, err
+	}
+
+	rate, err := portfolio.ParseTaxRate(value)
+	if err != nil {
+		return decimal.NullDecimal{}, fmt.Errorf("%s: %w", portfolio.TaxRateKey, err)
+	}
+
+	return decimal.NewNullDecimal(rate), nil
 }
