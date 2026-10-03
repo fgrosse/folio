@@ -42,9 +42,10 @@ Roughly in the order worth doing.
 
 - **Show values in another currency**, such as EUR, toggled with a key in the TUI and a flag on `folio status`. It needs an
   exchange rate, fetched and cached like a quote.
-- **Tax estimates**: the Vesting view shows each vest after tax at the rate of the account. Still
-  to come: the potential value after tax next to the one before, in the header and in
-  `folio status`, and a key in the TUI that sets the rate, which only the command line does now.
+- **Tax estimates**: the Vesting view shows each vest after tax at the rate of the account, and the
+  header shows the potential value after tax with `folio config potential net`. Still to come:
+  the potential value after tax in `folio status`, a key in the TUI that sets the rate, which only
+  the command line does now, and one that switches the header between gross and net.
   For what is held, the gain of a lot since its cost, which is recorded, and the tax on it if it
   was sold. Costs are in USD, and a tax return outside the US wants them in its own currency at
   the rate of the day, so this needs the exchange rate of a past day.
