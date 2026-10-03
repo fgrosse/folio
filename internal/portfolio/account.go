@@ -60,6 +60,16 @@ func (a Account) Total() decimal.Decimal {
 	return a.Current.Add(a.Potential)
 }
 
+// AfterTax returns the account with its potential value after tax at rate, in percent: what the
+// vests will bring once tax is withheld from them, rather than what the bank states for them. The
+// current value stays the same, since the shares that are held were taxed when they vested. The tax
+// is taken off the potential value as a whole, which is the same as off each vest, since every vest
+// is taxed at the one rate, but for the rounding of a cent.
+func (a Account) AfterTax(rate decimal.Decimal) Account {
+	a.Potential = AfterTax(a.Potential, rate)
+	return a
+}
+
 // Symbols returns the symbols of the stock in lots and grants, each once and in alphabetical order.
 // They are what an account needs quotes of.
 func Symbols(lots []Lot, grants []Grant) []string {
