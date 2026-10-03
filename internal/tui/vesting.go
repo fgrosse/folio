@@ -20,11 +20,11 @@ const dueColumnWidth = 12
 
 // vestingColumnsWidth is what every column of the Vesting table other than the grant occupies,
 // padding included.
-const vestingColumnsWidth = dayColumnWidth + sharesColumnWidth + valueColumnWidth + dueColumnWidth + 4*cellPadding
+const vestingColumnsWidth = dayColumnWidth + sharesColumnWidth + 2*valueColumnWidth + dueColumnWidth + 5*cellPadding
 
 // A VestingModel is the Vesting view: every vest that has not been released, across all grants and
-// in the order of their days, with what it is worth at the latest price. Those vests are what the
-// potential value counts.
+// in the order of their days, with what it is worth at the latest price, before tax and after it.
+// Those vests are what the potential value counts, before tax as the bank does.
 type VestingModel struct {
 	store     Store
 	style     Style
@@ -70,6 +70,7 @@ func (m *VestingModel) columns() []table.Column {
 		{Title: "Grant", Width: m.width - vestingColumnsWidth - cellPadding},
 		{Title: fmt.Sprintf("%*s", sharesColumnWidth, "Shares"), Width: sharesColumnWidth},
 		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Value"), Width: valueColumnWidth},
+		{Title: fmt.Sprintf("%*s", valueColumnWidth, "After tax"), Width: valueColumnWidth},
 		{Title: "Due", Width: dueColumnWidth},
 	}
 }
@@ -211,7 +212,7 @@ func (m *VestingModel) updateRows() {
 
 	rows := make([]table.Row, len(m.vests))
 	for i, vest := range m.vests {
-		rows[i] = vestRow(vest, m.portfolio.Quotes[vest.symbol], today)
+		rows[i] = vestRow(vest, m.portfolio.Quotes[vest.symbol], m.portfolio.TaxRate, today)
 	}
 
 	setRows(&m.table, rows)
@@ -317,12 +318,16 @@ func vestingSummary(vests []grantVest, today time.Time) string {
 }
 
 // vestRow renders a vest as a row of the Vesting table, valued at quote, which is the zero Quote if
-// there is none of the grant's stock. The numbers are right-aligned and padded out like those of
-// the Holdings table.
-func vestRow(v grantVest, quote portfolio.Quote, today time.Time) table.Row {
-	value := noValue
+// there is none of the grant's stock, and after tax at taxRate, which is not valid if the account
+// has none. The numbers are right-aligned and padded out like those of the Holdings table.
+func vestRow(v grantVest, quote portfolio.Quote, taxRate decimal.NullDecimal, today time.Time) table.Row {
+	value, afterTax := noValue, noValue
 	if quote.Symbol != "" {
-		value = portfolio.FormatUSD(v.vest.Shares.Mul(quote.Price))
+		worth := v.vest.Shares.Mul(quote.Price)
+		value = portfolio.FormatUSD(worth)
+		if taxRate.Valid {
+			afterTax = portfolio.FormatUSD(portfolio.AfterTax(worth, taxRate.Decimal))
+		}
 	}
 
 	return table.Row{
@@ -330,6 +335,7 @@ func vestRow(v grantVest, quote portfolio.Quote, today time.Time) table.Row {
 		v.grant,
 		fmt.Sprintf("%*s", sharesColumnWidth, v.vest.Shares),
 		fmt.Sprintf("%*s", valueColumnWidth, value),
+		fmt.Sprintf("%*s", valueColumnWidth, afterTax),
 		dueIn(v.vest.Date, today),
 	}
 }

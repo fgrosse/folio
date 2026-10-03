@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/exp/golden"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -79,8 +80,8 @@ func TestVestingModel_LoadsPortfolio(t *testing.T) {
 
 	rows := m.table.Rows()
 	require.Len(t, rows, 2)
-	assert.Equal(t, vestRow(vests[0], p.Quotes["PANW"], today), rows[0])
-	assert.Equal(t, vestRow(vests[1], p.Quotes["PANW"], today), rows[1])
+	assert.Equal(t, vestRow(vests[0], p.Quotes["PANW"], p.TaxRate, today), rows[0])
+	assert.Equal(t, vestRow(vests[1], p.Quotes["PANW"], p.TaxRate, today), rows[1])
 	store.AssertExpectations(t)
 }
 
@@ -269,37 +270,49 @@ func TestVestingModel_RenderReleaseDialog(t *testing.T) {
 }
 
 // TestVestRow covers how one vest reads as a row of the Vesting table: its day and the grant it
-// belongs to, how many shares vest and what they are worth at the latest price, right-aligned like
-// the numbers of the Holdings table, and how far off the day is.
+// belongs to, how many shares vest and what they are worth at the latest price, before tax and after
+// it at the rate of the account, right-aligned like the numbers of the Holdings table, and how far
+// off the day is. Without a price or a rate there is no value to take tax off.
 func TestVestRow(t *testing.T) {
 	today := day("2026-10-02")
 	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
+	rate := decimal.NewNullDecimal(dec("44.3"))
 
 	tests := map[string]struct {
 		vest     grantVest
 		quote    portfolio.Quote
+		rate     decimal.NullDecimal
 		expected table.Row
 	}{
 		"a vest to come": {
 			vest:     grantVest{grant: "Payout", symbol: "PANW", vest: portfolio.Vest{Date: day("2026-11-15"), Shares: dec("10")}},
 			quote:    panw,
-			expected: table.Row{"2026-11-15", "Payout", "        10", "     $3,962.50", "in 44 days"},
+			rate:     rate,
+			expected: table.Row{"2026-11-15", "Payout", "        10", "     $3,962.50", "     $2,207.11", "in 44 days"},
 		},
 		"a vest pending release": {
 			vest:     grantVest{grant: "RSU 2025", symbol: "PANW", vest: portfolio.Vest{Date: day("2026-08-20"), Shares: dec("2.5")}},
 			quote:    panw,
-			expected: table.Row{"2026-08-20", "RSU 2025", "       2.5", "       $990.63", "pending"},
+			rate:     rate,
+			expected: table.Row{"2026-08-20", "RSU 2025", "       2.5", "       $990.63", "       $551.78", "pending"},
 		},
 		"a vest without a quote": {
 			vest:     grantVest{grant: "Old plan", symbol: "SAP.DE", vest: portfolio.Vest{Date: day("2027-01-01"), Shares: dec("5")}},
 			quote:    portfolio.Quote{},
-			expected: table.Row{"2027-01-01", "Old plan", "         5", "             -", "in 2 months"},
+			rate:     rate,
+			expected: table.Row{"2027-01-01", "Old plan", "         5", "             -", "             -", "in 2 months"},
+		},
+		"an account without a tax rate": {
+			vest:     grantVest{grant: "Payout", symbol: "PANW", vest: portfolio.Vest{Date: day("2026-11-15"), Shares: dec("10")}},
+			quote:    panw,
+			rate:     decimal.NullDecimal{},
+			expected: table.Row{"2026-11-15", "Payout", "        10", "     $3,962.50", "             -", "in 44 days"},
 		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, vestRow(tt.vest, tt.quote, today))
+			assert.Equal(t, tt.expected, vestRow(tt.vest, tt.quote, tt.rate, today))
 		})
 	}
 }
