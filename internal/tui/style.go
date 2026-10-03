@@ -21,11 +21,11 @@ type Style struct {
 	// not read, so it stays dim.
 	Tab lipgloss.Style
 
-	// TabSelected is the view on display, which carries the same accent as the total.
+	// TabSelected is the view on display, in the accent of the table's selection.
 	TabSelected lipgloss.Style
 
-	// Total is the total account value, the one number worth glancing at, so it carries the only
-	// accent in the header.
+	// Total is the total account value, the one number worth glancing at, so it is the only thing
+	// in the header that stands out, in gold.
 	Total lipgloss.Style
 
 	// Hint is what the header says besides the total: the two values the total is made of, and how
@@ -49,6 +49,7 @@ func DefaultStyle() Style {
 	border := lipgloss.NormalBorder()
 	borderColor := lipgloss.Color("240")
 	accent := lipgloss.Color("99") // in the same purple family as the table's selection color
+	gold := lipgloss.Color("220")  // for what the eye should land on first
 	return Style{
 		Table: lipgloss.NewStyle().
 			BorderStyle(border).
@@ -66,7 +67,7 @@ func DefaultStyle() Style {
 			Foreground(accent),
 		Total: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(accent),
+			Foreground(gold),
 		Hint: lipgloss.NewStyle().
 			Foreground(borderColor),
 		Error: lipgloss.NewStyle().
@@ -77,6 +78,6 @@ func DefaultStyle() Style {
 			Padding(0, 1),
 		DialogTitle: lipgloss.NewStyle().
 			Bold(true).
-			Foreground(accent),
+			Foreground(gold),
 	}
 }
