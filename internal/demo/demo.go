@@ -82,9 +82,11 @@ func Fill(store Store, rng *rand.Rand, today time.Time) error {
 	return nil
 }
 
-// taxRate is the rate in percent that the vests of a demo account are taxed at, about what the top
-// of a salary that comes with stock is taxed at in much of Europe.
-var taxRate = decimal.NewFromInt(42)
+// taxRate is the rate in percent that the vests of a demo account are taxed at: the top rate of
+// income tax in Germany, 45%, with the solidarity surcharge of 5.5% and church tax of 9% on it. A
+// salary that comes with stock is often taxed at the top rate, and a rate any lower would make
+// what is left of a vest look better than it is.
+var taxRate = decimal.RequireFromString("51.525")
 
 // A generator makes up the parts of a demo account and writes them to its store.
 type generator struct {
