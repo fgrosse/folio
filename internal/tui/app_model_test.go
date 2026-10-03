@@ -480,3 +480,23 @@ func TestAppModel_ForwardsOtherMessagesToConfig(t *testing.T) {
 	assert.Contains(t, ansi.Strip(m.View().Content), "> tax-rate   44.3")
 	assert.Equal(t, []tea.Msg{tea.PasteMsg{Content: "44.3"}}, holdings.msgs, "the views still get them")
 }
+
+// TestNew_RenderConfigDialog is the golden of the app with the configuration open: the dialog
+// floats in the middle of the Holdings view, tab bar included, and the frame keeps the height of
+// the window.
+func TestNew_RenderConfigDialog(t *testing.T) {
+	store := new(MockStore)
+	store.returns(testPortfolio())
+	store.On("SaveQuote", mock.Anything).Return(nil)
+
+	m := New(store, quotes{"PANW": "396.25"}, DefaultStyle())
+	m = driveApp(t, m, tea.WindowSizeMsg{Width: 100, Height: 21})
+	m = driveApp(t, m, PortfolioLoadedMsg{portfolio: testPortfolio()})
+
+	_, cmd := m.Update(keyPressed("c"))
+	m = driveApp(t, m, runCmd(t, cmd))
+
+	frame := ansi.Strip(m.View().Content)
+	assert.Equal(t, 21, lipgloss.Height(frame), "the frame should fill the window, and no more")
+	golden.RequireEqual(t, frame)
+}
