@@ -29,6 +29,7 @@ type ConfigDialog struct {
 	selected int               // the index of the selected key
 	editing  bool              // whether the value of the selected key is being typed into input
 	input    textinput.Model   // the field the value of the selected key is typed into
+	err      error             // why the last value was refused, nil unless it was
 	width    int               // how many columns the dialog has inside its border
 	style    Style
 }
@@ -59,7 +60,8 @@ func NewConfigDialog(keys []portfolio.ConfigKey, values map[string]string, width
 //
 // On a key that takes any text, enter turns the value into a field to type it into. While that is
 // open, enter asks for what it holds to be set, and every other key goes to the field, so that
-// letters such as "j" type rather than move the selection.
+// letters such as "j" type rather than move the selection. A value that the key refuses keeps the
+// field open, and the dialog shows why under the description.
 func (d *ConfigDialog) HandleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 	if d.editing {
 		return d.handleEditKeyPress(msg)
@@ -117,9 +119,12 @@ func (d *ConfigDialog) submitCmd() tea.Cmd {
 
 	value, err := key.Parse(strings.TrimSpace(d.input.Value()))
 	if err != nil {
+		// Stay in the field with the text still in it, so the user can correct it.
+		d.err = err
 		return nil
 	}
 
+	d.err = nil
 	d.editing = false
 	set := SetConfigMsg{key: key.Name, value: value}
 
@@ -165,8 +170,8 @@ func (d *ConfigDialog) selectKey(index int) {
 	d.selected = (index + n) % n
 }
 
-// Layer renders the whole dialog - title, the rows of the keys, what the selected key is for, and
-// border - as a compositor layer, for the parent to position over its own view.
+// Layer renders the whole dialog - title, the rows of the keys, what the selected key is for, why
+// the last value was refused, and border - as a compositor layer, for the parent to position over its own view.
 func (d *ConfigDialog) Layer() *lipgloss.Layer {
 	lines := []string{d.style.DialogTitle.Render("Configuration")}
 	for i := range d.keys {
@@ -176,6 +181,10 @@ func (d *ConfigDialog) Layer() *lipgloss.Layer {
 	// The description takes the width of the dialog, on as many lines as that needs.
 	description := lipgloss.NewStyle().Width(d.width).Render(d.keys[d.selected].Description)
 	lines = append(lines, "", d.style.Hint.Render(description))
+
+	if d.err != nil {
+		lines = append(lines, d.style.Error.Width(d.width).Render(d.err.Error()))
+	}
 
 	return lipgloss.NewLayer(d.style.Dialog.Render(strings.Join(lines, "\n")))
 }

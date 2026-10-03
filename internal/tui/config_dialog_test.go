@@ -166,3 +166,24 @@ func TestConfigDialog_Edit(t *testing.T) {
 	assert.Equal(t, SetConfigMsg{key: "tax-rate", value: "42.5%"}, runCmd(t, cmd))
 	assert.False(t, d.Editing())
 }
+
+// TestConfigDialog_Refused covers a value the key refuses: the field stays open with the text
+// still in it, and the dialog says why, so that the text can be corrected. Once it is, the reason
+// is gone.
+func TestConfigDialog_Refused(t *testing.T) {
+	enter := tea.KeyPressMsg{Code: tea.KeyEnter}
+
+	d := NewConfigDialog(testConfigKeys(t), nil, dialogWidth, DefaultStyle())
+	d.HandleKeyPress(enter)
+	typeIntoConfig(d, "120")
+
+	assert.Nil(t, d.HandleKeyPress(enter), "a refused value should send nothing")
+	assert.True(t, d.Editing())
+	assert.Contains(t, dialogText(d), "> tax-rate   120")
+	assert.Contains(t, dialogText(d), "a tax rate is between 0% and 100%, not 120%")
+
+	d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	cmd := d.HandleKeyPress(enter)
+	assert.Equal(t, SetConfigMsg{key: "tax-rate", value: "12%"}, runCmd(t, cmd))
+	assert.NotContains(t, dialogText(d), "a tax rate is between")
+}
