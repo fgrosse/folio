@@ -97,20 +97,20 @@ func (d *ConfigDialog) HandleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 
 	choices := len(d.keys[d.selected].Choices) > 0
 
-	switch key := msg.String(); {
-	case key == "down", key == "j":
+	switch pressed := msg.String(); {
+	case pressed == "down", pressed == "j":
 		d.selectKey(d.selected + 1)
-	case key == "up", key == "k":
+	case pressed == "up", pressed == "k":
 		d.selectKey(d.selected - 1)
-	case key == "enter" && !choices:
+	case pressed == "enter" && !choices:
 		return d.editCmd()
-	case key == "right", key == "enter", key == "space":
+	case pressed == "right", pressed == "enter", pressed == "space":
 		return d.chooseCmd(1)
-	case key == "left":
+	case pressed == "left":
 		return d.chooseCmd(-1)
-	case key == "esc":
+	case pressed == "esc":
 		return func() tea.Msg { return ConfigClosedMsg{} }
-	case key == "ctrl+c":
+	case pressed == "ctrl+c":
 		return tea.Quit
 	}
 
@@ -160,19 +160,19 @@ func (d *ConfigDialog) editCmd() tea.Cmd {
 // was typed, written the way the key stores it, or to be unset if nothing was. The field is read right away rather than inside
 // the returned command, as in InputDialog.
 func (d *ConfigDialog) submitCmd() tea.Cmd {
-	key := d.keys[d.selected]
+	k := d.keys[d.selected]
 
 	typed := strings.TrimSpace(d.input.Value())
 	if typed == "" {
 		// Nothing is no value of any key, so it is how to say that the key should have none.
 		d.err = nil
 		d.editing = false
-		unset := UnsetConfigMsg{key: key.Name}
+		unset := UnsetConfigMsg{key: k.Name}
 
 		return func() tea.Msg { return unset }
 	}
 
-	value, err := key.Parse(typed)
+	value, err := k.Parse(typed)
 	if err != nil {
 		// Stay in the field with the text still in it, so the user can correct it.
 		d.err = err
@@ -181,7 +181,7 @@ func (d *ConfigDialog) submitCmd() tea.Cmd {
 
 	d.err = nil
 	d.editing = false
-	set := SetConfigMsg{key: key.Name, value: value}
+	set := SetConfigMsg{key: k.Name, value: value}
 
 	return func() tea.Msg { return set }
 }
@@ -203,17 +203,17 @@ func (d *ConfigDialog) Editing() bool {
 // does not have choices. The dialog goes on showing the value it has until SetValues gives it the
 // one that was stored, so that it never shows a value the store did not take.
 func (d *ConfigDialog) chooseCmd(step int) tea.Cmd {
-	key := d.keys[d.selected]
-	n := len(key.Choices)
+	k := d.keys[d.selected]
+	n := len(k.Choices)
 	if n == 0 {
 		return nil
 	}
 
 	// A value that is none of the choices counts as the one before the first, so that right picks
 	// the first of them.
-	current, _ := d.value(key)
-	next := (slices.Index(key.Choices, current) + step + n) % n
-	set := SetConfigMsg{key: key.Name, value: key.Choices[next]}
+	current, _ := d.value(k)
+	next := (slices.Index(k.Choices, current) + step + n) % n
+	set := SetConfigMsg{key: k.Name, value: k.Choices[next]}
 
 	return func() tea.Msg { return set }
 }
@@ -279,22 +279,22 @@ func (d *ConfigDialog) helpView() string {
 // rowView renders the row of the key at index: a mark if it is the selected one, its name, and its
 // value. The names are padded to the longest of them, so that the values line up in a column.
 func (d *ConfigDialog) rowView(index int) string {
-	key := d.keys[index]
+	k := d.keys[index]
 
 	mark, nameStyle := strings.Repeat(" ", len(rowMark)), d.style.Hint
 	if index == d.selected {
 		mark, nameStyle = rowMark, d.style.DialogTitle
 	}
 
-	padding := strings.Repeat(" ", d.nameWidth()-lipgloss.Width(key.Name)+labelGap)
+	padding := strings.Repeat(" ", d.nameWidth()-lipgloss.Width(k.Name)+labelGap)
 
-	value := d.valueView(key)
+	value := d.valueView(k)
 	if d.editing && index == d.selected {
 		// The field pads its view to its width, which truncating keeps it to.
 		value = ansi.Truncate(d.input.View(), d.valueWidth(), "")
 	}
 
-	return mark + nameStyle.Render(key.Name) + padding + value
+	return mark + nameStyle.Render(k.Name) + padding + value
 }
 
 // valueWidth is how many columns of a row are left for the value, after the mark and the names.
@@ -305,8 +305,8 @@ func (d *ConfigDialog) valueWidth() int {
 // nameWidth is how many columns the longest name of a key takes.
 func (d *ConfigDialog) nameWidth() int {
 	width := 0
-	for _, key := range d.keys {
-		width = max(width, lipgloss.Width(key.Name))
+	for _, k := range d.keys {
+		width = max(width, lipgloss.Width(k.Name))
 	}
 
 	return width
@@ -314,12 +314,12 @@ func (d *ConfigDialog) nameWidth() int {
 
 // valueView renders what key is set to. A key that takes one of a few values has it between the
 // arrows that change it, and a key without a value says so, dimmed, since that is not a value.
-func (d *ConfigDialog) valueView(key portfolio.ConfigKey) string {
-	value, ok := d.value(key)
+func (d *ConfigDialog) valueView(k portfolio.ConfigKey) string {
+	value, ok := d.value(k)
 	switch {
 	case !ok:
 		return d.style.Hint.Render(notSet)
-	case len(key.Choices) > 0:
+	case len(k.Choices) > 0:
 		return "‹ " + value + " ›"
 	default:
 		return value
@@ -328,10 +328,10 @@ func (d *ConfigDialog) valueView(key portfolio.ConfigKey) string {
 
 // value returns what applies for key: the value it is set to, or else its default. It reports
 // false for a key that has neither.
-func (d *ConfigDialog) value(key portfolio.ConfigKey) (string, bool) {
-	if value, ok := d.values[key.Name]; ok {
+func (d *ConfigDialog) value(k portfolio.ConfigKey) (string, bool) {
+	if value, ok := d.values[k.Name]; ok {
 		return value, true
 	}
 
-	return key.Default, key.Default != ""
+	return k.Default, k.Default != ""
 }
