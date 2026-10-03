@@ -464,3 +464,16 @@ func TestAppModel_ConfigErrors(t *testing.T) {
 	m = driveApp(t, m, runCmd(t, cmd))
 	assert.Contains(t, ansi.Strip(m.View().Content), "get tax-rate: disk on fire")
 }
+
+// TestAppModel_ForwardsOtherMessagesToConfig covers messages that are not keys while the
+// configuration is open: the dialog gets them as well as the views, or the cursor of the field a
+// value is typed into would not blink and text that is pasted would not arrive.
+func TestAppModel_ForwardsOtherMessagesToConfig(t *testing.T) {
+	holdings := &stubView{title: "Holdings"}
+	m := openConfig(t, nil, nil, holdings)
+
+	m = driveApp(t, m, tea.KeyPressMsg{Code: tea.KeyEnter}, tea.PasteMsg{Content: "44.3"})
+
+	assert.Contains(t, ansi.Strip(m.View().Content), "> tax-rate   44.3")
+	assert.Equal(t, []tea.Msg{tea.PasteMsg{Content: "44.3"}}, holdings.msgs, "the views still get them")
+}

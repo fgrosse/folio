@@ -214,6 +214,12 @@ func (m *AppModel) updateViews(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd) // tea.Batch ignores nil commands
 	}
 
+	// The open dialog is one more recipient: the ticks that blink the cursor of its field are
+	// messages like these.
+	if m.config != nil {
+		cmds = append(cmds, m.config.Update(msg))
+	}
+
 	return m, tea.Batch(cmds...)
 }
 
