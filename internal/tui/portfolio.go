@@ -16,6 +16,7 @@ type Store interface {
 	Lots() ([]portfolio.Lot, error)
 	Grants() ([]portfolio.Grant, error)
 	Quotes() (map[string]portfolio.Quote, error)
+	TaxRate() (decimal.NullDecimal, error)
 	SaveLot(lot portfolio.Lot) error
 	DeleteLot(id int) error
 	SaveQuote(quote portfolio.Quote) error
@@ -28,12 +29,16 @@ type Store interface {
 }
 
 // A Portfolio is everything the views show, as the store had it at one moment: the lots and grants
-// of the account, the quotes they are valued at, and the sales that took shares out of the lots. Every view holds the latest one it was sent.
+// of the account, the quotes they are valued at, the sales that took shares out of the lots, and
+// the rate that vests are taxed at. Every view holds the latest one it was sent.
 type Portfolio struct {
 	Lots   []portfolio.Lot
 	Grants []portfolio.Grant
 	Quotes map[string]portfolio.Quote
 	Sales  []portfolio.Sale
+
+	// TaxRate is the rate in percent that vests are taxed at, not valid if none was set.
+	TaxRate decimal.NullDecimal
 }
 
 // PortfolioLoadedMsg reports the result of loading the portfolio from the Store. Every view
@@ -105,5 +110,10 @@ func loadPortfolio(store Store) (Portfolio, error) {
 		return Portfolio{}, err
 	}
 
-	return Portfolio{Lots: lots, Grants: grants, Quotes: quotes, Sales: sales}, nil
+	taxRate, err := store.TaxRate()
+	if err != nil {
+		return Portfolio{}, err
+	}
+
+	return Portfolio{Lots: lots, Grants: grants, Quotes: quotes, Sales: sales, TaxRate: taxRate}, nil
 }

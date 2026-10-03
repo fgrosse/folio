@@ -43,3 +43,20 @@ func TestRefreshQuotesCmd(t *testing.T) {
 	assert.Equal(t, p, loaded.portfolio)
 	store.AssertExpectations(t)
 }
+
+// TestLoadPortfolioCmd covers what the views are sent when they ask for the account: everything the
+// store has of it, down to the rate that vests are taxed at.
+func TestLoadPortfolioCmd(t *testing.T) {
+	p := testPortfolio()
+	store := new(MockStore)
+	store.returns(p)
+
+	msg := runCmd(t, loadPortfolioCmd(store))
+
+	loaded, ok := msg.(PortfolioLoadedMsg)
+	require.True(t, ok, "the command should report a loaded portfolio, not %T", msg)
+	require.NoError(t, loaded.err)
+	assert.Equal(t, p, loaded.portfolio)
+	assert.Equal(t, "44.3", loaded.portfolio.TaxRate.Decimal.String())
+	store.AssertExpectations(t)
+}

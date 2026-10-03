@@ -36,6 +36,11 @@ func (m *MockStore) Quotes() (map[string]portfolio.Quote, error) {
 	return nil, result.Error(1)
 }
 
+func (m *MockStore) TaxRate() (decimal.NullDecimal, error) {
+	result := m.Called()
+	return result.Get(0).(decimal.NullDecimal), result.Error(1)
+}
+
 func (m *MockStore) SaveLot(lot portfolio.Lot) error {
 	return m.Called(lot).Error(0)
 }
@@ -77,7 +82,8 @@ func (m *MockStore) DeleteSale(id int) error {
 }
 
 // testPortfolio is the account most tests of the views look at: PANW stock in two lots of 8.5
-// shares in all, and a grant with one vest released into the first of them and two still to come.
+// shares in all, and a grant with one vest released into the first of them and two still to come,
+// which are taxed at 44.3%.
 func testPortfolio() Portfolio {
 	return Portfolio{
 		Lots: []portfolio.Lot{
@@ -99,6 +105,7 @@ func testPortfolio() Portfolio {
 		Quotes: map[string]portfolio.Quote{
 			"PANW": {Symbol: "PANW", Price: dec("396.25"), PreviousClose: dec("397.31"), Currency: "USD"},
 		},
+		TaxRate: decimal.NewNullDecimal(dec("44.3")),
 	}
 }
 
@@ -108,4 +115,5 @@ func (m *MockStore) returns(p Portfolio) {
 	m.On("Grants").Return(p.Grants, nil)
 	m.On("Quotes").Return(p.Quotes, nil)
 	m.On("Sales").Return(p.Sales, nil)
+	m.On("TaxRate").Return(p.TaxRate, nil)
 }
