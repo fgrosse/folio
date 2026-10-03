@@ -557,6 +557,33 @@ func (s *SQLiteStore) SaveQuote(quote Quote) error {
 	return err
 }
 
+// taxRateSetting is the name the tax rate is stored under in the settings, which hold what applies
+// to the whole account rather than to a lot or a grant, one value by name.
+const taxRateSetting = "tax_rate"
+
+// TaxRate returns the rate in percent that vests are taxed at, which is not valid if none was set.
+func (s *SQLiteStore) TaxRate() (decimal.NullDecimal, error) {
+	var rate decimal.NullDecimal
+	err := s.db.Get(&rate, `SELECT value FROM settings WHERE name = ?`, taxRateSetting)
+	if errors.Is(err, sql.ErrNoRows) {
+		return decimal.NullDecimal{}, nil
+	}
+
+	return rate, err
+}
+
+// SetTaxRate records rate, in percent, as the one that vests are taxed at, in place of the one
+// before. See ParseTaxRate for what it is.
+func (s *SQLiteStore) SetTaxRate(rate decimal.Decimal) error {
+	_, err := s.db.Exec(`
+		INSERT INTO settings (name, value) VALUES (?, ?)
+		ON CONFLICT (name) DO UPDATE SET value = excluded.value`,
+		taxRateSetting, rate,
+	)
+
+	return err
+}
+
 // Close closes the database.
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()

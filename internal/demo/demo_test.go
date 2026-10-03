@@ -30,8 +30,8 @@ func newDemo(t *testing.T, seed uint64) *portfolio.SQLiteStore {
 
 // TestFill covers what a demo account has to have for every view of folio to show something: grants
 // with vests still to come and at least one that is due and pending release, lots that were released
-// from them at a cost, a lot that was bought, a sale, and a quote of every stock in it, so that the
-// account has all of its values without a network.
+// from them at a cost, a lot that was bought, a sale, a quote of every stock in it, so that the
+// account has all of its values without a network, and a rate that the vests are taxed at.
 func TestFill(t *testing.T) {
 	for seed := range uint64(20) {
 		store := newDemo(t, seed)
@@ -43,6 +43,8 @@ func TestFill(t *testing.T) {
 		sales, err := store.Sales()
 		require.NoError(t, err)
 		quotes, err := store.Quotes()
+		require.NoError(t, err)
+		taxRate, err := store.TaxRate()
 		require.NoError(t, err)
 
 		require.GreaterOrEqual(t, len(grants), 2, "seed %d", seed)
@@ -81,6 +83,8 @@ func TestFill(t *testing.T) {
 		assert.Empty(t, account.Unpriced, "seed %d: every stock should have a quote", seed)
 		assert.True(t, account.Current.IsPositive(), "seed %d", seed)
 		assert.True(t, account.Potential.IsPositive(), "seed %d", seed)
+
+		assert.True(t, taxRate.Valid, "seed %d: the account should have a tax rate", seed)
 	}
 }
 
