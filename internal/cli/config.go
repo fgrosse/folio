@@ -55,7 +55,8 @@ func (cmd *Folio) ConfigCmd() *cobra.Command {
 Get and set the configuration of your account: with a key and a value it sets the
 key to that value, and with a key alone it prints the value the key is set to.
 Without a key it prints every key that is set, as YAML, or as JSON with
---output=json. The configuration is kept in the database of the account.
+--output=json. With --unset and a key it takes the value of the key back. The
+configuration is kept in the database of the account.
 
 The keys are:
 
@@ -82,6 +83,9 @@ The keys are:
   # Show the potential value after tax in the TUI
   folio config potential net
 
+  # Have vests taxed at no rate again
+  folio config --unset tax-rate
+
   # Print the whole configuration
   folio config
 
@@ -90,9 +94,16 @@ The keys are:
 		Args: cobra.MaximumNArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
 			output, err := c.Flags().GetString("output")
+			if err != nil {
+				return err
+			}
+
+			unset, err := c.Flags().GetBool("unset")
 			switch {
 			case err != nil:
 				return err
+			case unset:
+				return cmd.unsetConfig(args)
 			case len(args) == 0:
 				return cmd.printAllConfig(output)
 			case c.Flags().Changed("output"):
@@ -120,6 +131,7 @@ The keys are:
 	// One flag that names the format, rather than a flag for each, has room for formats other than
 	// these two.
 	c.Flags().StringP("output", "o", "yaml", "print the whole configuration as yaml or json")
+	c.Flags().Bool("unset", false, "take the value of the key back, which leaves it not set")
 
 	return c
 }
@@ -135,6 +147,20 @@ func configKeyNamed(name string) (configKey, error) {
 	}
 
 	return configKey{}, fmt.Errorf("%q is no key of the configuration: use %s", name, strings.Join(names, ", "))
+}
+
+// unsetConfig takes back the value of the key that args names, which have to be that key alone.
+func (cmd *Folio) unsetConfig(args []string) error {
+	if len(args) != 1 {
+		return errors.New("--unset takes the key to unset and nothing else")
+	}
+
+	key, err := configKeyNamed(args[0])
+	if err != nil {
+		return err
+	}
+
+	return cmd.store.UnsetConfig(key.name)
 }
 
 // printConfig prints the value of key, and fails with portfolio.ErrNotSet if it is not set.
