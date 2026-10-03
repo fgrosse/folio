@@ -285,9 +285,9 @@ func tabBar(titles []string, selected int, style Style) string {
 		tabs[i] = tabStyle.Render(strconv.Itoa(i+1) + " " + title)
 	}
 
-	// The configuration is no view, and its key stays dim like the help it is: what it opens
-	// floats in front of whichever view is selected.
-	tabs = append(tabs, style.Tab.Render(configKey+" configuration"))
+	// The configuration is no view, so it is never the selected tab: what its key opens floats in
+	// front of whichever view is. It is named as the tabs are and as its dialog is titled.
+	tabs = append(tabs, style.Tab.Render(configKey+" Configuration"))
 
 	return strings.Join(tabs, tabGap)
 }

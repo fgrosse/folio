@@ -232,7 +232,8 @@ func (d *ConfigDialog) selectKey(index int) {
 }
 
 // Layer renders the whole dialog - title, the rows of the keys, what the selected key is for, why
-// the last value was refused, the keys, and border - as a compositor layer, for the parent to position over its own view.
+// the last value was refused, the keys, and border - as a compositor layer, for the parent to
+// position over its own view.
 func (d *ConfigDialog) Layer() *lipgloss.Layer {
 	lines := []string{d.style.DialogTitle.Render("Configuration")}
 	for i := range d.keys {

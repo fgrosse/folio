@@ -72,10 +72,10 @@ func TestAppModel_RendersTabBarBelowActiveView(t *testing.T) {
 	vesting := &stubView{title: "Vesting", content: "the vests"}
 	m := NewAppModel(nil, DefaultStyle(), holdings, vesting)
 
-	assert.Equal(t, "the lots\n1 Holdings • 2 Vesting • c configuration", ansi.Strip(m.View().Content))
+	assert.Equal(t, "the lots\n1 Holdings • 2 Vesting • c Configuration", ansi.Strip(m.View().Content))
 
 	m = driveApp(t, m, keyPressed("2"))
-	assert.Equal(t, "the vests\n1 Holdings • 2 Vesting • c configuration", ansi.Strip(m.View().Content))
+	assert.Equal(t, "the vests\n1 Holdings • 2 Vesting • c Configuration", ansi.Strip(m.View().Content))
 }
 
 // TestAppModel_SwitchView covers the keys that move between views: a digit selects the view with
@@ -199,11 +199,11 @@ func TestTabBar(t *testing.T) {
 	}{
 		"first tab selected": {
 			selected: 0,
-			expected: "1 Holdings • 2 Vesting • c configuration",
+			expected: "1 Holdings • 2 Vesting • c Configuration",
 		},
 		"second tab selected": {
 			selected: 1,
-			expected: "1 Holdings • 2 Vesting • c configuration",
+			expected: "1 Holdings • 2 Vesting • c Configuration",
 		},
 	}
 
@@ -231,12 +231,12 @@ func TestTabBar_Styled(t *testing.T) {
 		"first tab selected": {
 			selected: 0,
 			expected: style.TabSelected.Render("1 Holdings") + " • " + style.Tab.Render("2 Vesting") +
-				" • " + style.Tab.Render("c configuration"),
+				" • " + style.Tab.Render("c Configuration"),
 		},
 		"second tab selected": {
 			selected: 1,
 			expected: style.Tab.Render("1 Holdings") + " • " + style.TabSelected.Render("2 Vesting") +
-				" • " + style.Tab.Render("c configuration"),
+				" • " + style.Tab.Render("c Configuration"),
 		},
 	}
 
