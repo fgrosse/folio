@@ -62,7 +62,7 @@ func (cmd *Folio) ConfigCmd() *cobra.Command {
 Get and set the configuration of your account, the way git config does: with a key
 and a value it sets the key to that value, and with a key alone it prints the value
 the key is set to, or nothing and exits 1 if it is not set. Without a key it prints
-every key that is set, as YAML, or with --json as a JSON object. The configuration
+every key that is set, as YAML, or as JSON with --output=json. The configuration
 is kept in the database of the account.
 
 The keys are:
@@ -85,17 +85,17 @@ The keys are:
   folio config
 
   # Print the whole configuration for a script
-  folio config --json`,
+  folio config --output=json`,
 		Args: cobra.MaximumNArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
-			asJSON, err := c.Flags().GetBool("json")
+			output, err := c.Flags().GetString("output")
 			switch {
 			case err != nil:
 				return err
 			case len(args) == 0:
-				return cmd.printAllConfig(asJSON)
-			case asJSON:
-				return errors.New("--json prints the whole configuration: leave out the key")
+				return cmd.printAllConfig(output)
+			case c.Flags().Changed("output"):
+				return errors.New("--output is for the whole configuration: leave out the key")
 			}
 
 			key, err := configKeyNamed(args[0])
@@ -111,7 +111,9 @@ The keys are:
 		},
 	}
 
-	c.Flags().Bool("json", false, "print the whole configuration as a JSON object")
+	// --output and -o are what kubectl names the flag that picks the format of what it prints, and
+	// there is room in them for formats other than these two.
+	c.Flags().StringP("output", "o", "yaml", "print the whole configuration as yaml or json")
 
 	return c
 }
@@ -144,8 +146,8 @@ func (cmd *Folio) printConfig(key configKey) error {
 }
 
 // printAllConfig prints every key of the configuration that is set, with its value as printConfig
-// prints it, as YAML, or as a JSON object if asJSON is set.
-func (cmd *Folio) printAllConfig(asJSON bool) error {
+// prints it, in the format output: as YAML, or as a JSON object if output is json.
+func (cmd *Folio) printAllConfig(output string) error {
 	config := make(map[string]any)
 	for _, key := range configKeys {
 		value, ok, err := key.get(cmd.store)
@@ -157,7 +159,7 @@ func (cmd *Folio) printAllConfig(asJSON bool) error {
 		}
 	}
 
-	if asJSON {
+	if output == "json" {
 		return json.NewEncoder(cmd.OutOrStdout()).Encode(config)
 	}
 

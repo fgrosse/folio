@@ -86,10 +86,11 @@ func TestConfigCmd_List(t *testing.T) {
 	assert.Equal(t, "tax-rate: 44.3%\n", out.String())
 }
 
-// TestConfigCmd_ListJSON covers "folio config --json", which prints the whole configuration as a
-// JSON object for a script to read, with the same keys and values as the YAML.
+// TestConfigCmd_ListJSON covers "folio config --output=json", which prints the whole configuration
+// as a JSON object for a script to read, with the same keys and values as the YAML. As in kubectl,
+// -o is short for --output.
 func TestConfigCmd_ListJSON(t *testing.T) {
-	cmd, dbPath := NewTestingCmd(t, "config", "--json")
+	cmd, dbPath := NewTestingCmd(t, "config", "--output=json")
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 
@@ -102,16 +103,16 @@ func TestConfigCmd_ListJSON(t *testing.T) {
 
 	out.Reset()
 	cmd = New()
-	cmd.SetArgs([]string{"--db", dbPath, "config", "--json"})
+	cmd.SetArgs([]string{"--db", dbPath, "config", "-o", "json"})
 	cmd.SetOut(&out)
 
 	require.NoError(t, cmd.Execute())
 	assert.Equal(t, `{"tax-rate":"44.3%"}`+"\n", out.String())
 }
 
-// TestConfigCmd_JSONWithKey covers --json with a key, which is refused rather than ignored: it is
-// the whole configuration that is printed as JSON, and a single value prints as itself.
-func TestConfigCmd_JSONWithKey(t *testing.T) {
-	cmd, _ := NewTestingCmd(t, "config", "--json", "tax-rate")
-	assert.EqualError(t, cmd.Execute(), "--json prints the whole configuration: leave out the key")
+// TestConfigCmd_OutputWithKey covers --output with a key, which is refused rather than ignored: it
+// is the whole configuration that is printed in a format, and a single value prints as itself.
+func TestConfigCmd_OutputWithKey(t *testing.T) {
+	cmd, _ := NewTestingCmd(t, "config", "--output=json", "tax-rate")
+	assert.EqualError(t, cmd.Execute(), "--output is for the whole configuration: leave out the key")
 }
