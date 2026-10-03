@@ -69,6 +69,7 @@ func New() *Folio {
 	cmd.AddCommand(cmd.LotCmd())
 	cmd.AddCommand(cmd.GrantCmd())
 	cmd.AddCommand(cmd.ReleaseCmd())
+	cmd.AddCommand(cmd.TaxRateCmd())
 	cmd.AddCommand(cmd.StatusCmd())
 	cmd.AddCommand(cmd.DemoCmd())
 	cmd.AddCommand(cmd.VersionCmd())
