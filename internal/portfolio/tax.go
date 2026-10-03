@@ -37,3 +37,31 @@ func ParseTaxRate(spec string) (decimal.Decimal, error) {
 func AfterTax(value, rate decimal.Decimal) decimal.Decimal {
 	return value.Mul(hundred.Sub(rate)).Div(hundred).Round(2)
 }
+
+// PotentialBasisKey is the key of the configuration that says which potential value the TUI shows
+// in its header, as ParsePotentialBasis reads it. It is gross when it is not set.
+const PotentialBasisKey = "potential"
+
+// A PotentialBasis is whether the potential value of an account is shown as the bank states it,
+// before tax, or as what is left of it once the tax on the vests is taken off. The bank's number
+// is the one to compare with its web site, and the one after tax is closer to what the vests will
+// bring.
+type PotentialBasis string
+
+const (
+	// Gross is the potential value before tax, as the bank states it.
+	Gross PotentialBasis = "gross"
+
+	// Net is the potential value after tax, at the rate of the account.
+	Net PotentialBasis = "net"
+)
+
+// ParsePotentialBasis parses which potential value to show, written as "gross" or "net".
+func ParsePotentialBasis(value string) (PotentialBasis, error) {
+	switch basis := PotentialBasis(strings.ToLower(strings.TrimSpace(value))); basis {
+	case Gross, Net:
+		return basis, nil
+	default:
+		return "", fmt.Errorf("%q is neither gross nor net", value)
+	}
+}
