@@ -41,6 +41,11 @@ Roughly in the order worth doing.
 - **The help of a view while the configuration is open** still lists the keys of the view, which
   the dialog has taken. The lines could go empty, as they do under a dialog of the view's own.
 
+- **Slim the architecture decisions in `CLAUDE.md`.** The list gains an entry with nearly every
+  feature and is read in full at the start of every session. Most entries describe one feature and
+  say what the doc comment of its type says already. Decide what qualifies, such as a rule that
+  holds across packages and cannot be read off the code, and move the rest to the code it is about.
+
 ## Later
 
 - **Show values in another currency**, such as EUR, toggled with a key in the TUI and a flag on `folio status`. It needs an
