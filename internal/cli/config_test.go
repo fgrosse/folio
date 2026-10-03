@@ -10,20 +10,20 @@ import (
 	"github.com/fgrosse/folio/internal/portfolio"
 )
 
-// TestConfigCmd_Set covers setting a value of the configuration, as git config does: "folio config
-// tax-rate" with a percentage stores the rate that vests are taxed at for the whole account.
+// TestConfigCmd_Set covers setting a value of the configuration: "folio config tax-rate" with a
+// percentage stores the rate that vests are taxed at for the whole account, under the name of the
+// key and written the one way that folio prints it, however it was typed.
 func TestConfigCmd_Set(t *testing.T) {
-	cmd, dbPath := NewTestingCmd(t, "config", "tax-rate", "44.3%")
+	cmd, dbPath := NewTestingCmd(t, "config", "tax-rate", "44.30")
 	require.NoError(t, cmd.Execute())
 
 	store, err := portfolio.NewStore(dbPath)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = store.Close() })
 
-	rate, err := store.TaxRate()
+	value, err := store.GetConfig("tax-rate")
 	require.NoError(t, err)
-	require.True(t, rate.Valid)
-	assert.Equal(t, "44.3", rate.Decimal.String())
+	assert.Equal(t, "44.3%", value)
 }
 
 // TestConfigCmd_Get covers asking for a value: "folio config tax-rate" without one prints the rate

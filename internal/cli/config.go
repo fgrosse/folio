@@ -15,22 +15,14 @@ import (
 // configKeys are the keys of the configuration, in the order they are listed in.
 var configKeys = []configKey{
 	{
-		name: "tax-rate",
-		get: func(store *portfolio.SQLiteStore) (string, bool, error) {
-			rate, err := store.TaxRate()
-			if err != nil || !rate.Valid {
-				return "", false, err
-			}
-
-			return rate.Decimal.String() + "%", true, nil
-		},
-		set: func(store *portfolio.SQLiteStore, value string) error {
+		name: portfolio.TaxRateKey,
+		parse: func(value string) (string, error) {
 			rate, err := portfolio.ParseTaxRate(value)
 			if err != nil {
-				return err
+				return "", err
 			}
 
-			return store.SetTaxRate(rate)
+			return rate.String() + "%", nil
 		},
 	},
 }
@@ -41,16 +33,15 @@ var configKeys = []configKey{
 var errUnset = errors.New("the key is not set")
 
 // A configKey is a value of the configuration of an account, by the name that folio config knows
-// it by. The values are kept in the store, each in a form of its own, so every key says how to read
-// its value from there as text and how to store it from text.
+// it by and the store keeps it under. The store keeps any text it is given, so it is up to the key
+// to refuse a value that is not one, before it is stored and read by a part of folio that does not
+// expect it.
 type configKey struct {
 	name string
 
-	// get returns the value of the key as it is printed, and false if it is not set.
-	get func(store *portfolio.SQLiteStore) (string, bool, error)
-
-	// set parses value and stores it as the value of the key.
-	set func(store *portfolio.SQLiteStore, value string) error
+	// parse checks value and returns it written the one way the store keeps it and folio config
+	// prints it, or an error that says what is wrong with it.
+	parse func(value string) (string, error)
 }
 
 // ConfigCmd returns the "folio config" command.
@@ -107,7 +98,12 @@ The keys are:
 				return cmd.printConfig(key)
 			}
 
-			return key.set(cmd.store, args[1])
+			value, err := key.parse(args[1])
+			if err != nil {
+				return err
+			}
+
+			return cmd.store.SetConfig(key.name, value)
 		},
 	}
 
@@ -133,12 +129,12 @@ func configKeyNamed(name string) (configKey, error) {
 
 // printConfig prints the value of key, and fails with errUnset if it is not set.
 func (cmd *Folio) printConfig(key configKey) error {
-	value, ok, err := key.get(cmd.store)
+	value, err := cmd.store.GetConfig(key.name)
 	switch {
+	case errors.Is(err, portfolio.ErrNotSet):
+		return errUnset
 	case err != nil:
 		return err
-	case !ok:
-		return errUnset
 	}
 
 	cmd.Println(value)
@@ -150,13 +146,15 @@ func (cmd *Folio) printConfig(key configKey) error {
 func (cmd *Folio) printAllConfig(output string) error {
 	config := make(map[string]any)
 	for _, key := range configKeys {
-		value, ok, err := key.get(cmd.store)
-		if err != nil {
+		value, err := cmd.store.GetConfig(key.name)
+		switch {
+		case errors.Is(err, portfolio.ErrNotSet):
+			continue
+		case err != nil:
 			return fmt.Errorf("get %s: %w", key.name, err)
 		}
-		if ok {
-			config[key.name] = value
-		}
+
+		config[key.name] = value
 	}
 
 	switch output {

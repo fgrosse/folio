@@ -7,6 +7,10 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// TaxRateKey is the key of the configuration that the rate vests are taxed at is set under, in
+// percent and as ParseTaxRate reads it.
+const TaxRateKey = "tax-rate"
+
 // hundred is all of something, in percent.
 var hundred = decimal.NewFromInt(100)
 
