@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -25,6 +26,13 @@ type ConfigDialog struct {
 	style    Style
 }
 
+// SetConfigMsg asks for the key of the configuration to be set to value, which the key has checked
+// and written the way it is stored.
+type SetConfigMsg struct {
+	key   string
+	value string
+}
+
 // NewConfigDialog returns a dialog over keys, the first of which is selected. values is what the
 // keys are set to, by name, without the ones that are not set. width is how many columns the
 // dialog occupies inside its border, and style is what Layer draws it with.
@@ -39,16 +47,47 @@ func NewConfigDialog(keys []portfolio.ConfigKey, values map[string]string, width
 
 // HandleKeyPress reacts to a key pressed while the dialog is open and returns the command, if any,
 // that the parent should run. Down and up select the next key and the one before, around the ends,
-// and so do j and k, as in the tables.
+// and so do j and k, as in the tables. On a key that takes one of a few values, right and left ask
+// for the next of them and the one before to be set, and so do enter and space for the next.
 func (d *ConfigDialog) HandleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 	switch msg.String() {
 	case "down", "j":
 		d.selectKey(d.selected + 1)
 	case "up", "k":
 		d.selectKey(d.selected - 1)
+	case "right", "enter", "space":
+		return d.chooseCmd(1)
+	case "left":
+		return d.chooseCmd(-1)
 	}
 
 	return nil
+}
+
+// chooseCmd returns the command that asks for the selected key to be set to the choice that is
+// step choices on from the one that applies now, counted around the ends. It is nil for a key that
+// does not have choices. The dialog goes on showing the value it has until SetValues gives it the
+// one that was stored, so that it never shows a value the store did not take.
+func (d *ConfigDialog) chooseCmd(step int) tea.Cmd {
+	key := d.keys[d.selected]
+	n := len(key.Choices)
+	if n == 0 {
+		return nil
+	}
+
+	// A value that is none of the choices counts as the one before the first, so that right picks
+	// the first of them.
+	current, _ := d.value(key)
+	next := (slices.Index(key.Choices, current) + step + n) % n
+	set := SetConfigMsg{key: key.Name, value: key.Choices[next]}
+
+	return func() tea.Msg { return set }
+}
+
+// SetValues gives the dialog what the keys are set to now, in place of what it had, by name and
+// without the keys that are not set.
+func (d *ConfigDialog) SetValues(values map[string]string) {
+	d.values = values
 }
 
 // selectKey selects the key at index, counted around the ends.

@@ -86,3 +86,48 @@ func TestConfigDialog_Select(t *testing.T) {
 	d.HandleKeyPress(down)
 	assert.Contains(t, dialogText(d), "Which potential value the header shows")
 }
+
+// TestConfigDialog_Choose covers changing a key that takes one of a few values: right and left
+// pick the next value and the one before, around the ends, and enter and space pick the next, so
+// that there is nothing to type. The dialog asks for the value to be set with a SetConfigMsg and
+// goes on showing the value it was given until it is given the one that was stored. A key that
+// takes any text has no next value, so the arrows do nothing on it.
+func TestConfigDialog_Choose(t *testing.T) {
+	left, right := tea.KeyPressMsg{Code: tea.KeyLeft}, tea.KeyPressMsg{Code: tea.KeyRight}
+	enter, space := tea.KeyPressMsg{Code: tea.KeyEnter}, tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
+
+	tests := map[string]struct {
+		values   map[string]string
+		key      tea.KeyPressMsg
+		expected string
+	}{
+		"right picks the next":      {values: map[string]string{"potential": "gross"}, key: right, expected: "net"},
+		"right wraps around":        {values: map[string]string{"potential": "net"}, key: right, expected: "gross"},
+		"left picks the one before": {values: map[string]string{"potential": "net"}, key: left, expected: "gross"},
+		"left wraps around":         {values: map[string]string{"potential": "gross"}, key: left, expected: "net"},
+		"from the default":          {key: right, expected: "net"},
+		"enter picks the next":      {key: enter, expected: "net"},
+		"space picks the next":      {key: space, expected: "net"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			d := NewConfigDialog(testConfigKeys(t), tt.values, dialogWidth, DefaultStyle())
+			d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyDown})
+
+			cmd := d.HandleKeyPress(tt.key)
+			assert.Equal(t, SetConfigMsg{key: "potential", value: tt.expected}, runCmd(t, cmd))
+		})
+	}
+
+	d := NewConfigDialog(testConfigKeys(t), nil, dialogWidth, DefaultStyle())
+	assert.Nil(t, d.HandleKeyPress(right), "the tax rate has no next value")
+	assert.Nil(t, d.HandleKeyPress(left), "nor one before")
+
+	d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyDown})
+	d.HandleKeyPress(right)
+	assert.Contains(t, dialogText(d), "‹ gross ›", "the value changes once it is stored")
+
+	d.SetValues(map[string]string{"potential": "net"})
+	assert.Contains(t, dialogText(d), "‹ net ›")
+}
