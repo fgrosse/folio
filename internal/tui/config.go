@@ -13,13 +13,14 @@ import (
 // keys that are not set, for the configuration dialog to open on.
 type ConfigLoadedMsg struct {
 	values map[string]string
+	err    error // why the configuration could not be loaded, in which case there are no values
 }
 
 // loadConfigCmd returns a command that loads the configuration from store.
 func loadConfigCmd(store Store) tea.Cmd {
 	return func() tea.Msg {
-		values, _ := loadConfig(store)
-		return ConfigLoadedMsg{values: values}
+		values, err := loadConfig(store)
+		return ConfigLoadedMsg{values: values, err: err}
 	}
 }
 
@@ -27,6 +28,10 @@ func loadConfigCmd(store Store) tea.Cmd {
 // as ConfigLoadedMsg has them.
 type ConfigSavedMsg struct {
 	values map[string]string
+
+	// err is why the configuration could not be changed, or not be loaded afterwards. If it is
+	// the latter, there are no values.
+	err error
 }
 
 // setConfigCmd returns a command that sets key of the configuration in store to value and then
@@ -34,9 +39,11 @@ type ConfigSavedMsg struct {
 // for.
 func setConfigCmd(store Store, key, value string) tea.Cmd {
 	return func() tea.Msg {
-		_ = store.SetConfig(key, value)
-		values, _ := loadConfig(store)
-		return ConfigSavedMsg{values: values}
+		if err := store.SetConfig(key, value); err != nil {
+			return configSaved(store, fmt.Errorf("set %s: %w", key, err))
+		}
+
+		return configSaved(store, nil)
 	}
 }
 
@@ -44,10 +51,24 @@ func setConfigCmd(store Store, key, value string) tea.Cmd {
 // and then loads the configuration, as setConfigCmd does.
 func unsetConfigCmd(store Store, key string) tea.Cmd {
 	return func() tea.Msg {
-		_ = store.UnsetConfig(key)
-		values, _ := loadConfig(store)
-		return ConfigSavedMsg{values: values}
+		if err := store.UnsetConfig(key); err != nil {
+			return configSaved(store, fmt.Errorf("unset %s: %w", key, err))
+		}
+
+		return configSaved(store, nil)
 	}
+}
+
+// configSaved loads the configuration from store and reports it together with err, which is why
+// it could not be changed, if it could not. The configuration is loaded even then: the dialog keeps
+// showing what the store has, which is what it had before.
+func configSaved(store Store, err error) ConfigSavedMsg {
+	values, loadErr := loadConfig(store)
+	if err == nil {
+		err = loadErr
+	}
+
+	return ConfigSavedMsg{values: values, err: err}
 }
 
 // loadConfig returns what every key of the configuration is set to in store, by the name of the

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -419,4 +420,47 @@ func TestAppModel_UnsetsConfig(t *testing.T) {
 	loaded, ok := runCmd(t, cmd).(PortfolioLoadedMsg)
 	require.True(t, ok, "the portfolio is loaded again")
 	assert.False(t, loaded.portfolio.TaxRate.Valid)
+}
+
+// TestAppModel_ConfigErrors covers a store that fails while the configuration is edited. The dialog
+// says why, where the change was asked for, and keeps the values it has: one that could not be
+// stored is not shown as if it had been. The views are left alone, since nothing changed for them.
+// A configuration that cannot be loaded opens the dialog all the same, to say so.
+func TestAppModel_ConfigErrors(t *testing.T) {
+	store := new(MockStore)
+	store.On("SetConfig", "potential", "net").Return(errors.New("disk full"))
+	store.On("UnsetConfig", "tax-rate").Return(errors.New("disk full"))
+	store.On("GetConfig", portfolio.TaxRateKey).Return("44.3%", nil)
+	store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
+
+	tests := map[string]struct {
+		msg      tea.Msg
+		expected string
+	}{
+		"set":   {msg: SetConfigMsg{key: "potential", value: "net"}, expected: "set potential: disk full"},
+		"unset": {msg: UnsetConfigMsg{key: "tax-rate"}, expected: "unset tax-rate: disk full"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			m := openConfig(t, store, map[string]string{"tax-rate": "44.3%"}, &stubView{title: "Holdings"})
+
+			_, cmd := m.Update(tt.msg)
+			_, cmd = m.Update(runCmd(t, cmd))
+			assert.Nil(t, cmd, "nothing changed that the views would have to load")
+
+			frame := ansi.Strip(m.View().Content)
+			assert.Contains(t, frame, tt.expected)
+			assert.Contains(t, frame, "> tax-rate   44.3%")
+			assert.Contains(t, frame, "‹ gross ›")
+		})
+	}
+
+	broken := new(MockStore)
+	broken.On("GetConfig", mock.Anything).Return("", errors.New("disk on fire"))
+	m := NewAppModel(broken, DefaultStyle(), &stubView{title: "Holdings"})
+
+	_, cmd := m.Update(keyPressed("c"))
+	m = driveApp(t, m, runCmd(t, cmd))
+	assert.Contains(t, ansi.Strip(m.View().Content), "get tax-rate: disk on fire")
 }

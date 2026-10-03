@@ -91,7 +91,9 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
 	case ConfigLoadedMsg:
+		// A configuration that could not be loaded opens the dialog too, which is where to say so.
 		m.config = NewConfigDialog(portfolio.ConfigKeys, msg.values, dialogWidth, m.style)
+		m.config.SetError(msg.err)
 		return m, nil
 	case ConfigClosedMsg:
 		m.config = nil
@@ -109,10 +111,18 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // handleConfigSaved gives the dialog the configuration as it is since it was changed, if the dialog
 // is still open, and loads the portfolio again: what the views show depends on the configuration,
-// and they all receive what is loaded.
+// and they all receive what is loaded. A change that failed is the dialog's to report, and leaves
+// the views with what they have.
 func (m *AppModel) handleConfigSaved(msg ConfigSavedMsg) (tea.Model, tea.Cmd) {
 	if m.config != nil {
-		m.config.SetValues(msg.values)
+		m.config.SetError(msg.err)
+		if msg.values != nil {
+			m.config.SetValues(msg.values)
+		}
+	}
+
+	if msg.err != nil {
+		return m, nil
 	}
 
 	return m, loadPortfolioCmd(m.store)

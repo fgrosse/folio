@@ -31,7 +31,7 @@ type ConfigDialog struct {
 	selected int               // the index of the selected key
 	editing  bool              // whether the value of the selected key is being typed into input
 	input    textinput.Model   // the field the value of the selected key is typed into
-	err      error             // why the last value was refused, nil unless it was
+	err      error             // why the last value was refused or not stored, nil unless it was
 	help     help.Model        // renders the keys at the foot of the dialog
 	width    int               // how many columns the dialog has inside its border
 	style    Style
@@ -184,6 +184,12 @@ func (d *ConfigDialog) submitCmd() tea.Cmd {
 	set := SetConfigMsg{key: key.Name, value: value}
 
 	return func() tea.Msg { return set }
+}
+
+// SetError has the dialog say that err went wrong, such as storing a value, where it otherwise says
+// why a value was refused. A nil err takes back what it said.
+func (d *ConfigDialog) SetError(err error) {
+	d.err = err
 }
 
 // Editing reports whether the value of the selected key is being typed, which is when esc and enter
