@@ -11,8 +11,26 @@ import (
 // percent and as ParseTaxRate reads it.
 const TaxRateKey = "tax-rate"
 
+// PotentialBasisKey is the key of the configuration that says which potential value the TUI shows
+// in its header, as ParsePotentialBasis reads it. It is gross when it is not set.
+const PotentialBasisKey = "potential"
+
+const (
+	// Gross is the potential value before tax, as the bank states it.
+	Gross PotentialBasis = "gross"
+
+	// Net is the potential value after tax, at the rate of the account.
+	Net PotentialBasis = "net"
+)
+
 // hundred is all of something, in percent.
 var hundred = decimal.NewFromInt(100)
+
+// A PotentialBasis is whether the potential value of an account is shown as the bank states it,
+// before tax, or as what is left of it once the tax on the vests is taken off. The bank's number
+// is the one to compare with its web site, and the one after tax is closer to what the vests will
+// bring.
+type PotentialBasis string
 
 // ParseTaxRate parses the rate that a vest is taxed at, written as a percentage such as "44.3%" or
 // "44.3", and returns it in percent. A vest is taxed as income, at a rate that depends on the rest
@@ -37,24 +55,6 @@ func ParseTaxRate(spec string) (decimal.Decimal, error) {
 func AfterTax(value, rate decimal.Decimal) decimal.Decimal {
 	return value.Mul(hundred.Sub(rate)).Div(hundred).Round(2)
 }
-
-// PotentialBasisKey is the key of the configuration that says which potential value the TUI shows
-// in its header, as ParsePotentialBasis reads it. It is gross when it is not set.
-const PotentialBasisKey = "potential"
-
-// A PotentialBasis is whether the potential value of an account is shown as the bank states it,
-// before tax, or as what is left of it once the tax on the vests is taken off. The bank's number
-// is the one to compare with its web site, and the one after tax is closer to what the vests will
-// bring.
-type PotentialBasis string
-
-const (
-	// Gross is the potential value before tax, as the bank states it.
-	Gross PotentialBasis = "gross"
-
-	// Net is the potential value after tax, at the rate of the account.
-	Net PotentialBasis = "net"
-)
 
 // ParsePotentialBasis parses which potential value to show, written as "gross" or "net".
 func ParsePotentialBasis(value string) (PotentialBasis, error) {
