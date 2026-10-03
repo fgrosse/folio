@@ -35,9 +35,6 @@ jobs:
       - name: Test
         run: mise run test
         env:
-          # "mise run" installs every missing tool in mise.toml before it runs a task,
-          # including gopls, vhs and goreleaser, which no job here needs. Each job
-          # installs what it uses through mise-action's install_args instead.
           MISE_TASK_RUN_AUTO_INSTALL: "false"
 
   lint:
@@ -68,3 +65,5 @@ jobs:
 
       - name: golangci-lint
         run: mise run lint
+        env:
+          MISE_TASK_RUN_AUTO_INSTALL: "false"
