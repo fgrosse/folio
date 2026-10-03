@@ -41,8 +41,7 @@ and runs the build:
 ```bash
 git clone https://github.com/fgrosse/folio
 cd folio
-mise install        # Go, and the tools used to develop folio
-mise run install    # build folio and install it
+mise run install    # fetch Go and the tools used to develop folio, build folio and install it
 ```
 
 mise may ask you to trust the `mise.toml` of the checkout first (`mise trust`).
@@ -198,8 +197,7 @@ ask for their prices.
 ## Development
 
 ```bash
-mise install          # Go, gopls, golangci-lint, vhs and goreleaser
-mise run install      # build and install folio
+mise run install      # build and install folio, fetching Go, gopls, golangci-lint, vhs and goreleaser
 mise run test
 mise run lint
 mise run git:hooks    # run the tests and the linter before every push
