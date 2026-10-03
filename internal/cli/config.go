@@ -4,47 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v3"
 
 	"github.com/fgrosse/folio/internal/portfolio"
 )
-
-// configKeys are the keys of the configuration, in the order they are listed in.
-var configKeys = []configKey{
-	{
-		name: portfolio.TaxRateKey,
-		parse: func(value string) (string, error) {
-			rate, err := portfolio.ParseTaxRate(value)
-			if err != nil {
-				return "", err
-			}
-
-			return rate.String() + "%", nil
-		},
-	},
-	{
-		name: portfolio.PotentialBasisKey,
-		parse: func(value string) (string, error) {
-			basis, err := portfolio.ParsePotentialBasis(value)
-			return string(basis), err
-		},
-	},
-}
-
-// A configKey is a value of the configuration of an account, by the name that folio config knows
-// it by and the store keeps it under. The store keeps any text it is given, so it is up to the key
-// to refuse a value that is not one, before it is stored and read by a part of folio that does not
-// expect it.
-type configKey struct {
-	name string
-
-	// parse checks value and returns it written the one way the store keeps it and folio config
-	// prints it, or an error that says what is wrong with it.
-	parse func(value string) (string, error)
-}
 
 // ConfigCmd returns the "folio config" command.
 func (cmd *Folio) ConfigCmd() *cobra.Command {
@@ -110,7 +75,7 @@ The keys are:
 				return errors.New("--output is for the whole configuration: leave out the key")
 			}
 
-			key, err := configKeyNamed(args[0])
+			key, err := portfolio.ConfigKeyNamed(args[0])
 			if err != nil {
 				return err
 			}
@@ -119,12 +84,12 @@ The keys are:
 				return cmd.printConfig(key)
 			}
 
-			value, err := key.parse(args[1])
+			value, err := key.Parse(args[1])
 			if err != nil {
 				return err
 			}
 
-			return cmd.store.SetConfig(key.name, value)
+			return cmd.store.SetConfig(key.Name, value)
 		},
 	}
 
@@ -136,36 +101,23 @@ The keys are:
 	return c
 }
 
-// configKeyNamed returns the key of the configuration with the given name.
-func configKeyNamed(name string) (configKey, error) {
-	names := make([]string, len(configKeys))
-	for i, key := range configKeys {
-		if key.name == name {
-			return key, nil
-		}
-		names[i] = key.name
-	}
-
-	return configKey{}, fmt.Errorf("%q is no key of the configuration: use %s", name, strings.Join(names, ", "))
-}
-
 // unsetConfig takes back the value of the key that args names, which have to be that key alone.
 func (cmd *Folio) unsetConfig(args []string) error {
 	if len(args) != 1 {
 		return errors.New("--unset takes the key to unset and nothing else")
 	}
 
-	key, err := configKeyNamed(args[0])
+	key, err := portfolio.ConfigKeyNamed(args[0])
 	if err != nil {
 		return err
 	}
 
-	return cmd.store.UnsetConfig(key.name)
+	return cmd.store.UnsetConfig(key.Name)
 }
 
 // printConfig prints the value of key, and fails with portfolio.ErrNotSet if it is not set.
-func (cmd *Folio) printConfig(key configKey) error {
-	value, err := cmd.store.GetConfig(key.name)
+func (cmd *Folio) printConfig(key portfolio.ConfigKey) error {
+	value, err := cmd.store.GetConfig(key.Name)
 	if err != nil {
 		return err
 	}
@@ -178,16 +130,16 @@ func (cmd *Folio) printConfig(key configKey) error {
 // prints it, in the format output, which is yaml or json.
 func (cmd *Folio) printAllConfig(output string) error {
 	config := make(map[string]any)
-	for _, key := range configKeys {
-		value, err := cmd.store.GetConfig(key.name)
+	for _, key := range portfolio.ConfigKeys {
+		value, err := cmd.store.GetConfig(key.Name)
 		switch {
 		case errors.Is(err, portfolio.ErrNotSet):
 			continue
 		case err != nil:
-			return fmt.Errorf("get %s: %w", key.name, err)
+			return fmt.Errorf("get %s: %w", key.Name, err)
 		}
 
-		config[key.name] = value
+		config[key.Name] = value
 	}
 
 	switch output {
