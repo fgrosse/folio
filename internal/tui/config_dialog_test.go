@@ -204,3 +204,29 @@ func TestConfigDialog_Unset(t *testing.T) {
 	assert.Equal(t, UnsetConfigMsg{key: "tax-rate"}, runCmd(t, cmd))
 	assert.False(t, d.Editing())
 }
+
+// TestConfigDialog_Close covers the ways out. Esc closes the dialog with a ConfigClosedMsg. While
+// a value is being typed, esc is about that value instead: it drops what was typed, and why it was
+// refused, and leaves the dialog open on the value the key had. Ctrl+c quits the program from
+// either.
+func TestConfigDialog_Close(t *testing.T) {
+	enter, esc := tea.KeyPressMsg{Code: tea.KeyEnter}, tea.KeyPressMsg{Code: tea.KeyEscape}
+	ctrlC := tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
+
+	d := NewConfigDialog(testConfigKeys(t), map[string]string{"tax-rate": "44.3%"}, dialogWidth, DefaultStyle())
+	assert.Equal(t, tea.QuitMsg{}, runCmd(t, d.HandleKeyPress(ctrlC)))
+
+	d.HandleKeyPress(enter)
+	typeIntoConfig(d, "000")
+	d.HandleKeyPress(enter)
+	require.Contains(t, dialogText(d), "is not a tax rate")
+	assert.Equal(t, tea.QuitMsg{}, runCmd(t, d.HandleKeyPress(ctrlC)))
+
+	assert.Nil(t, d.HandleKeyPress(esc), "esc in the field should not close the dialog")
+	assert.False(t, d.Editing())
+	assert.Contains(t, dialogText(d), "> tax-rate   44.3%")
+	assert.NotContains(t, dialogText(d), "44.3%000")
+	assert.NotContains(t, dialogText(d), "is not a tax rate")
+
+	assert.Equal(t, ConfigClosedMsg{}, runCmd(t, d.HandleKeyPress(esc)))
+}

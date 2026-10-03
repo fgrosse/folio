@@ -46,6 +46,9 @@ type UnsetConfigMsg struct {
 	key string
 }
 
+// ConfigClosedMsg reports that a ConfigDialog was closed.
+type ConfigClosedMsg struct{}
+
 // NewConfigDialog returns a dialog over keys, the first of which is selected. values is what the
 // keys are set to, by name, without the ones that are not set. width is how many columns the
 // dialog occupies inside its border, and style is what Layer draws it with.
@@ -61,12 +64,11 @@ func NewConfigDialog(keys []portfolio.ConfigKey, values map[string]string, width
 // HandleKeyPress reacts to a key pressed while the dialog is open and returns the command, if any,
 // that the parent should run. Down and up select the next key and the one before, around the ends,
 // and so do j and k, as in the tables. On a key that takes one of a few values, right and left ask
-// for the next of them and the one before to be set, and so do enter and space for the next.
+// for the next of them and the one before to be set, and so do enter and space for the next. Esc
+// closes the dialog with a ConfigClosedMsg, and ctrl+c quits the program.
 //
-// On a key that takes any text, enter turns the value into a field to type it into. While that is
-// open, enter asks for what it holds to be set, and every other key goes to the field, so that
-// letters such as "j" type rather than move the selection. An empty field asks for the
-// key to be unset. A value that the key refuses keeps the field open, and the dialog shows why under the description.
+// On a key that takes any text, enter turns the value into a field to type it into, and
+// handleEditKeyPress has the keys while that is open.
 func (d *ConfigDialog) HandleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 	if d.editing {
 		return d.handleEditKeyPress(msg)
@@ -85,15 +87,30 @@ func (d *ConfigDialog) HandleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 		return d.chooseCmd(1)
 	case key == "left":
 		return d.chooseCmd(-1)
+	case key == "esc":
+		return func() tea.Msg { return ConfigClosedMsg{} }
+	case key == "ctrl+c":
+		return tea.Quit
 	}
 
 	return nil
 }
 
 // handleEditKeyPress reacts to a key pressed while the value of the selected key is being typed.
+// Enter asks for what the field holds to be set, or for the key to be unset if it holds nothing. A
+// value that the key refuses keeps the field open, and the dialog shows why under the description.
+// Esc drops what was typed and leaves the key as it was, and ctrl+c quits the program. Every other
+// key goes to the field, so that letters such as "j" type rather than move the selection.
 func (d *ConfigDialog) handleEditKeyPress(msg tea.KeyPressMsg) tea.Cmd {
-	if msg.String() == "enter" {
+	switch msg.String() {
+	case "enter":
 		return d.submitCmd()
+	case "esc":
+		d.err = nil
+		d.editing = false
+		return nil
+	case "ctrl+c":
+		return tea.Quit
 	}
 
 	var cmd tea.Cmd
