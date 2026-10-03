@@ -93,16 +93,23 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ConfigLoadedMsg:
 		m.config = NewConfigDialog(portfolio.ConfigKeys, msg.values, dialogWidth, m.style)
 		return m, nil
+	case ConfigClosedMsg:
+		m.config = nil
+		return m, nil
 	default:
 		return m.updateViews(msg)
 	}
 }
 
 // handleKeyPress switches views if msg is one of the keys that do, loads the configuration for its
-// dialog if it is the key for that, and otherwise leaves the key to the view on display. The
-// AppModel stays the model that comes out either way: a view returned here would replace the whole
+// dialog if it is the key for that, and otherwise leaves the key to the view on display. While the
+// configuration is open, every key is its dialog's. The AppModel stays the model that comes out either way: a view returned here would replace the whole
 // app, tab bar and all.
 func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.config != nil {
+		return m, m.config.HandleKeyPress(msg)
+	}
+
 	if !m.activeViewCapturesKeys() {
 		if m.handleViewSwitch(msg) {
 			return m, nil

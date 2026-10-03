@@ -334,3 +334,35 @@ func TestAppModel_OpensConfig(t *testing.T) {
 	assert.Nil(t, cmd)
 	assert.Equal(t, []tea.Msg{keyPressed("c")}, typing.msgs, "a capturing view gets the key itself")
 }
+
+// openConfig returns an app over views whose configuration dialog is open on values.
+func openConfig(t *testing.T, store Store, values map[string]string, views ...ViewModel) *AppModel {
+	t.Helper()
+
+	m := NewAppModel(store, DefaultStyle(), views...)
+	return driveApp(t, m, ConfigLoadedMsg{values: values})
+}
+
+// TestAppModel_ConfigKeepsTheKeys covers the keyboard while the configuration is open: every key is
+// the dialog's, the ones that switch views and the ones of the view behind it included. Esc closes
+// the dialog, and the keys are back where they were.
+func TestAppModel_ConfigKeepsTheKeys(t *testing.T) {
+	holdings := &stubView{title: "Holdings", content: "the lots"}
+	vesting := &stubView{title: "Vesting", content: "the vests"}
+	m := openConfig(t, nil, nil, holdings, vesting)
+
+	m = driveApp(t, m, keyPressed("2"), tea.KeyPressMsg{Code: tea.KeyTab}, keyPressed("a"))
+	assert.Equal(t, 0, m.selected, "the view behind the dialog stays on display")
+	assert.Empty(t, holdings.msgs, "and gets none of the keys")
+
+	m = driveApp(t, m, tea.KeyPressMsg{Code: tea.KeyDown})
+	assert.Contains(t, ansi.Strip(m.View().Content), "> potential", "the dialog gets them")
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m = driveApp(t, m, runCmd(t, cmd))
+	assert.NotContains(t, ansi.Strip(m.View().Content), "potential", "esc closes the dialog")
+	assert.Empty(t, holdings.msgs, "which is nothing a view has to know of")
+
+	m = driveApp(t, m, keyPressed("2"))
+	assert.Equal(t, 1, m.selected, "the keys switch views again")
+}
