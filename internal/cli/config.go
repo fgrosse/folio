@@ -45,11 +45,10 @@ func (cmd *Folio) ConfigCmd() *cobra.Command {
 		Use:   "config [key] [value]",
 		Short: "Get and set the configuration of your account",
 		Long: `
-Get and set the configuration of your account, the way git config does: with a key
-and a value it sets the key to that value, and with a key alone it prints the value
-the key is set to, or nothing and exits 1 if it is not set. Without a key it prints
-every key that is set, as YAML, or as JSON with --output=json. The configuration
-is kept in the database of the account.
+Get and set the configuration of your account: with a key and a value it sets the
+key to that value, and with a key alone it prints the value the key is set to.
+Without a key it prints every key that is set, as YAML, or as JSON with
+--output=json. The configuration is kept in the database of the account.
 
 The keys are:
 
@@ -102,8 +101,8 @@ The keys are:
 		},
 	}
 
-	// --output and -o are what kubectl names the flag that picks the format of what it prints, and
-	// there is room in them for formats other than these two.
+	// One flag that names the format, rather than a flag for each, has room for formats other than
+	// these two.
 	c.Flags().StringP("output", "o", "yaml", "print the whole configuration as yaml or json")
 
 	return c

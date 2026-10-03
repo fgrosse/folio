@@ -5,10 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- `folio config` to get and set the configuration of the account, the way `git config` does,
-  and to print all of it as YAML or JSON, picked with `--output` (`-o`) as in kubectl
-- The `tax-rate` key of the configuration: the rate that vests are taxed at
-- The Vesting view shows what each vest is worth after tax at that rate
+- `folio config` to get and set the configuration of the account, such as the tax rate
+- The Vesting view shows what each vest is worth after tax
 
 ## [v1.0.0] - 2026-10-02
 - Initial release

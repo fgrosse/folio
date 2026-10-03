@@ -99,13 +99,9 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
   view is the one that keeps the quotes fresh: it fetches them on start and every five minutes.
 - **Tax is an estimate at one rate.** A vest is taxed as income at a rate that depends on the rest
   of the year's income, which folio does not know, so the user sets one rate in percent for the
-  whole account (`folio config tax-rate`) and folio takes it off each vest. The three values stay the
-  bank's, before tax. The rate is kept in the `settings` table, which holds what applies to the
+  whole account (`folio config tax-rate`) and folio takes it off each vest. The three values stay
+  the bank's, before tax. The rate is kept in the `settings` table, which holds what applies to the
   whole account, one value by name, so that it is in the database like everything else.
-- **`folio config` is the one verb for settings**, and works like git config: a key and a value
-  set it, a key alone prints it, and no key prints every key that is set as YAML. The format is
-  picked with `--output`/`-o` as in kubectl, not a flag per format, so that another format is a
-  value of it. A new setting is a `configKey` in `internal/cli/config.go`, not a verb of its own.
 - **Everything is in USD for now**, the currency the stock trades in. Showing another currency is
   in `TODO.md`.
 - **The demo is the one verb with a database of its own.** Every other verb shares the database of

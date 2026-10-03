@@ -87,8 +87,8 @@ func TestConfigCmd_List(t *testing.T) {
 }
 
 // TestConfigCmd_ListJSON covers "folio config --output=json", which prints the whole configuration
-// as a JSON object for a script to read, with the same keys and values as the YAML. As in kubectl,
-// -o is short for --output.
+// as a JSON object for a script to read, with the same keys and values as the YAML. -o is short for
+// --output.
 func TestConfigCmd_ListJSON(t *testing.T) {
 	cmd, dbPath := NewTestingCmd(t, "config", "--output=json")
 	var out bytes.Buffer
