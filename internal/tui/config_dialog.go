@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
 	"github.com/fgrosse/folio/internal/portfolio"
@@ -34,6 +35,27 @@ func NewConfigDialog(keys []portfolio.ConfigKey, values map[string]string, width
 		width:  width,
 		style:  style,
 	}
+}
+
+// HandleKeyPress reacts to a key pressed while the dialog is open and returns the command, if any,
+// that the parent should run. Down and up select the next key and the one before, around the ends,
+// and so do j and k, as in the tables.
+func (d *ConfigDialog) HandleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
+	switch msg.String() {
+	case "down", "j":
+		d.selectKey(d.selected + 1)
+	case "up", "k":
+		d.selectKey(d.selected - 1)
+	}
+
+	return nil
+}
+
+// selectKey selects the key at index, counted around the ends.
+func (d *ConfigDialog) selectKey(index int) {
+	n := len(d.keys)
+	// Adding n first keeps the left side of the % positive, as in AppModel.cycleView.
+	d.selected = (index + n) % n
 }
 
 // Layer renders the whole dialog - title, the rows of the keys, what the selected key is for, and

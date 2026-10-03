@@ -3,6 +3,7 @@ package tui
 import (
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,4 +50,39 @@ func TestConfigDialog_Rows(t *testing.T) {
 	text = dialogText(d)
 	assert.Contains(t, text, "> tax-rate   not set")
 	assert.Contains(t, text, "  potential  ‹ gross ›")
+}
+
+// TestConfigDialog_Select covers moving through the keys: down and up select the next key and the
+// one before, as do j and k, which move through every table of folio, and both wrap around the
+// ends. What is described under the rows is the key that is selected.
+func TestConfigDialog_Select(t *testing.T) {
+	up, down := tea.KeyPressMsg{Code: tea.KeyUp}, tea.KeyPressMsg{Code: tea.KeyDown}
+
+	tests := map[string]struct {
+		keys     []tea.KeyPressMsg
+		expected string
+	}{
+		"nothing pressed yet":       {expected: "> tax-rate"},
+		"down selects the next":     {keys: []tea.KeyPressMsg{down}, expected: "> potential"},
+		"down wraps around":         {keys: []tea.KeyPressMsg{down, down}, expected: "> tax-rate"},
+		"up selects the one before": {keys: []tea.KeyPressMsg{down, up}, expected: "> tax-rate"},
+		"up wraps around":           {keys: []tea.KeyPressMsg{up}, expected: "> potential"},
+		"j is down":                 {keys: []tea.KeyPressMsg{keyPressed("j")}, expected: "> potential"},
+		"k is up":                   {keys: []tea.KeyPressMsg{keyPressed("k")}, expected: "> potential"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			d := NewConfigDialog(testConfigKeys(t), nil, dialogWidth, DefaultStyle())
+			for _, key := range tt.keys {
+				assert.Nil(t, d.HandleKeyPress(key), "moving the selection sends nothing")
+			}
+
+			assert.Contains(t, dialogText(d), tt.expected)
+		})
+	}
+
+	d := NewConfigDialog(testConfigKeys(t), nil, dialogWidth, DefaultStyle())
+	d.HandleKeyPress(down)
+	assert.Contains(t, dialogText(d), "Which potential value the header shows")
 }
