@@ -1,0 +1,119 @@
+package cli
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/spf13/cobra"
+
+	"github.com/fgrosse/folio/internal/portfolio"
+)
+
+// ConfigCmd returns the "folio config" command.
+func (cmd *Folio) ConfigCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "config <key> [value]",
+		Short: "Get and set the configuration of your account",
+		Long: `
+Get and set the configuration of your account, the way git config does: with a key
+and a value it sets the key to that value, and with a key alone it prints the value
+the key is set to. The configuration is kept in the database of the account.
+
+The keys are:
+
+  tax-rate   The rate that the shares still to vest are taxed at, as a percentage.
+             A vest is taxed as income when it vests, at a rate that depends on the
+             rest of the year's income and on where you live, so folio does not work
+             it out. It takes one rate for every vest instead: your estimate of the
+             rate at the top of your income. The Vesting view shows what each vest
+             is worth after tax at this rate.
+`,
+		Example: `
+  # Have vests taxed at 44.3%
+  folio config tax-rate 44.3%
+
+  # Print the rate that is set
+  folio config tax-rate`,
+		Args: cobra.RangeArgs(1, 2),
+		RunE: func(_ *cobra.Command, args []string) error {
+			key, err := configKeyNamed(args[0])
+			if err != nil {
+				return err
+			}
+
+			if len(args) == 1 {
+				return cmd.printConfig(key)
+			}
+
+			return key.set(cmd.store, args[1])
+		},
+	}
+}
+
+// A configKey is a value of the configuration of an account, by the name that folio config knows
+// it by. The values are kept in the store, each in a form of its own, so every key says how to read
+// its value from there as text and how to store it from text.
+type configKey struct {
+	name string
+
+	// get returns the value of the key as it is printed, and false if it is not set.
+	get func(store *portfolio.SQLiteStore) (string, bool, error)
+
+	// set parses value and stores it as the value of the key.
+	set func(store *portfolio.SQLiteStore, value string) error
+
+	// unset is what folio config prints for a key that is not set.
+	unset string
+}
+
+// configKeys are the keys of the configuration, in the order they are listed in.
+var configKeys = []configKey{
+	{
+		name: "tax-rate",
+		get: func(store *portfolio.SQLiteStore) (string, bool, error) {
+			rate, err := store.TaxRate()
+			if err != nil || !rate.Valid {
+				return "", false, err
+			}
+
+			return rate.Decimal.String() + "%", true, nil
+		},
+		set: func(store *portfolio.SQLiteStore, value string) error {
+			rate, err := portfolio.ParseTaxRate(value)
+			if err != nil {
+				return err
+			}
+
+			return store.SetTaxRate(rate)
+		},
+		unset: "No tax rate is set.",
+	},
+}
+
+// configKeyNamed returns the key of the configuration with the given name.
+func configKeyNamed(name string) (configKey, error) {
+	names := make([]string, len(configKeys))
+	for i, key := range configKeys {
+		if key.name == name {
+			return key, nil
+		}
+		names[i] = key.name
+	}
+
+	return configKey{}, fmt.Errorf("%q is no key of the configuration: use %s", name, strings.Join(names, ", "))
+}
+
+// printConfig prints the value of key, or that it is not set.
+func (cmd *Folio) printConfig(key configKey) error {
+	value, ok, err := key.get(cmd.store)
+	switch {
+	case err != nil:
+		return err
+	case !ok:
+		cmd.Println(key.unset)
+	default:
+		cmd.Println(value)
+	}
+
+	return nil
+}
