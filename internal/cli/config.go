@@ -12,6 +12,47 @@ import (
 	"github.com/fgrosse/folio/internal/portfolio"
 )
 
+// configKeys are the keys of the configuration, in the order they are listed in.
+var configKeys = []configKey{
+	{
+		name: "tax-rate",
+		get: func(store *portfolio.SQLiteStore) (string, bool, error) {
+			rate, err := store.TaxRate()
+			if err != nil || !rate.Valid {
+				return "", false, err
+			}
+
+			return rate.Decimal.String() + "%", true, nil
+		},
+		set: func(store *portfolio.SQLiteStore, value string) error {
+			rate, err := portfolio.ParseTaxRate(value)
+			if err != nil {
+				return err
+			}
+
+			return store.SetTaxRate(rate)
+		},
+	},
+}
+
+// errUnset is what folio config fails with for a key that is not set. Main exits 1 with it and
+// prints nothing, as git config does, so that a script tells an unset key from a value by the exit
+// code alone and never reads a message as the value.
+var errUnset = errors.New("the key is not set")
+
+// A configKey is a value of the configuration of an account, by the name that folio config knows
+// it by. The values are kept in the store, each in a form of its own, so every key says how to read
+// its value from there as text and how to store it from text.
+type configKey struct {
+	name string
+
+	// get returns the value of the key as it is printed, and false if it is not set.
+	get func(store *portfolio.SQLiteStore) (string, bool, error)
+
+	// set parses value and stores it as the value of the key.
+	set func(store *portfolio.SQLiteStore, value string) error
+}
+
 // ConfigCmd returns the "folio config" command.
 func (cmd *Folio) ConfigCmd() *cobra.Command {
 	c := &cobra.Command{
@@ -75,42 +116,6 @@ The keys are:
 	return c
 }
 
-// A configKey is a value of the configuration of an account, by the name that folio config knows
-// it by. The values are kept in the store, each in a form of its own, so every key says how to read
-// its value from there as text and how to store it from text.
-type configKey struct {
-	name string
-
-	// get returns the value of the key as it is printed, and false if it is not set.
-	get func(store *portfolio.SQLiteStore) (string, bool, error)
-
-	// set parses value and stores it as the value of the key.
-	set func(store *portfolio.SQLiteStore, value string) error
-}
-
-// configKeys are the keys of the configuration, in the order they are listed in.
-var configKeys = []configKey{
-	{
-		name: "tax-rate",
-		get: func(store *portfolio.SQLiteStore) (string, bool, error) {
-			rate, err := store.TaxRate()
-			if err != nil || !rate.Valid {
-				return "", false, err
-			}
-
-			return rate.Decimal.String() + "%", true, nil
-		},
-		set: func(store *portfolio.SQLiteStore, value string) error {
-			rate, err := portfolio.ParseTaxRate(value)
-			if err != nil {
-				return err
-			}
-
-			return store.SetTaxRate(rate)
-		},
-	},
-}
-
 // configKeyNamed returns the key of the configuration with the given name.
 func configKeyNamed(name string) (configKey, error) {
 	names := make([]string, len(configKeys))
@@ -123,11 +128,6 @@ func configKeyNamed(name string) (configKey, error) {
 
 	return configKey{}, fmt.Errorf("%q is no key of the configuration: use %s", name, strings.Join(names, ", "))
 }
-
-// errUnset is what folio config fails with for a key that is not set. Main exits 1 with it and
-// prints nothing, as git config does, so that a script tells an unset key from a value by the exit
-// code alone and never reads a message as the value.
-var errUnset = errors.New("the key is not set")
 
 // printConfig prints the value of key, and fails with errUnset if it is not set.
 func (cmd *Folio) printConfig(key configKey) error {
@@ -146,7 +146,7 @@ func (cmd *Folio) printConfig(key configKey) error {
 // printAllConfig prints every key of the configuration that is set, with its value as printConfig
 // prints it, as YAML, or as a JSON object if asJSON is set.
 func (cmd *Folio) printAllConfig(asJSON bool) error {
-	config := make(map[string]string)
+	config := make(map[string]any)
 	for _, key := range configKeys {
 		value, ok, err := key.get(cmd.store)
 		if err != nil {
