@@ -165,7 +165,7 @@ folio release 2026-01-15 6 @380.12                 # 6 shares arrived, worth $38
 folio config tax-rate 44.3%                        # the rate vests are taxed at
 folio config tax-rate                              # print it, or exit 1 if it is not set
 folio config                                       # the whole configuration, as YAML
-folio config --json                                # the whole configuration, as JSON
+folio config -o json                               # the whole configuration, as JSON
 folio status
 folio status --json
 folio version                                      # which release this is
