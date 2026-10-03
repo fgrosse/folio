@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/fgrosse/folio/internal/portfolio"
 )
 
 // loadedMsg and tickMsg stand in for the messages of real views, which the AppModel passes on
@@ -42,7 +44,7 @@ func TestAppModel_InitStartsEveryView(t *testing.T) {
 	holdings := &stubView{title: "Holdings", initCmd: func() tea.Msg { return tickMsg{} }}
 	vesting := &stubView{title: "Vesting", initCmd: func() tea.Msg { return loadedMsg{} }}
 	quiet := &stubView{title: "Quiet"} // a view with nothing to do on startup holds up nothing
-	m := NewAppModel(DefaultStyle(), holdings, vesting, quiet)
+	m := NewAppModel(nil, DefaultStyle(), holdings, vesting, quiet)
 
 	cmd := m.Init()
 	require.NotNil(t, cmd, "the commands of the views are passed on")
@@ -67,7 +69,7 @@ func (v *stubView) View() tea.View { return tea.NewView(v.content) }
 func TestAppModel_RendersTabBarBelowActiveView(t *testing.T) {
 	holdings := &stubView{title: "Holdings", content: "the lots"}
 	vesting := &stubView{title: "Vesting", content: "the vests"}
-	m := NewAppModel(DefaultStyle(), holdings, vesting)
+	m := NewAppModel(nil, DefaultStyle(), holdings, vesting)
 
 	assert.Equal(t, "the lots\n1 Holdings • 2 Vesting", ansi.Strip(m.View().Content))
 
@@ -99,7 +101,7 @@ func TestAppModel_SwitchView(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			m := NewAppModel(DefaultStyle(), &stubView{title: "Holdings"}, &stubView{title: "Vesting"})
+			m := NewAppModel(nil, DefaultStyle(), &stubView{title: "Holdings"}, &stubView{title: "Vesting"})
 			for _, key := range c.keys {
 				updated, _ := m.Update(key)
 				next, ok := updated.(*AppModel)
@@ -118,7 +120,7 @@ func TestAppModel_SwitchView(t *testing.T) {
 func TestAppModel_ForwardsKeysToActiveView(t *testing.T) {
 	holdings := &stubView{title: "Holdings"}
 	vesting := &stubView{title: "Vesting"}
-	m := NewAppModel(DefaultStyle(), holdings, vesting)
+	m := NewAppModel(nil, DefaultStyle(), holdings, vesting)
 
 	m = driveApp(t, m, keyPressed("a"))
 	assert.Equal(t, []tea.Msg{keyPressed("a")}, holdings.msgs, "the view on display gets the key")
@@ -135,7 +137,7 @@ func TestAppModel_ForwardsKeysToActiveView(t *testing.T) {
 func TestAppModel_ForwardsOtherMessagesToEveryView(t *testing.T) {
 	holdings := &stubView{title: "Holdings"}
 	vesting := &stubView{title: "Vesting"}
-	m := NewAppModel(DefaultStyle(), holdings, vesting)
+	m := NewAppModel(nil, DefaultStyle(), holdings, vesting)
 
 	driveApp(t, m, tickMsg{})
 
@@ -149,7 +151,7 @@ func TestAppModel_ForwardsOtherMessagesToEveryView(t *testing.T) {
 func TestAppModel_ShrinksTheWindowForTheTabBar(t *testing.T) {
 	holdings := &stubView{title: "Holdings"}
 	vesting := &stubView{title: "Vesting"}
-	m := NewAppModel(DefaultStyle(), holdings, vesting)
+	m := NewAppModel(nil, DefaultStyle(), holdings, vesting)
 
 	driveApp(t, m, tea.WindowSizeMsg{Width: 100, Height: 40})
 
@@ -163,7 +165,7 @@ func TestAppModel_ShrinksTheWindowForTheTabBar(t *testing.T) {
 func TestAppModel_PassesOnCommands(t *testing.T) {
 	refresh := func() tea.Msg { return tickMsg{} }
 	holdings := &stubView{title: "Holdings", cmd: refresh}
-	m := NewAppModel(DefaultStyle(), holdings, &stubView{title: "Vesting"})
+	m := NewAppModel(nil, DefaultStyle(), holdings, &stubView{title: "Vesting"})
 
 	_, cmd := m.Update(keyPressed("a"))
 	require.NotNil(t, cmd, "the command of the view on display is passed on")
@@ -252,7 +254,7 @@ func TestAppModel_CapturingViewKeepsTheKeys(t *testing.T) {
 
 	holdings := &stubView{title: "Holdings", captures: true}
 	vesting := &stubView{title: "Vesting"}
-	m := NewAppModel(DefaultStyle(), holdings, vesting)
+	m := NewAppModel(nil, DefaultStyle(), holdings, vesting)
 
 	m = driveApp(t, m, tab, shiftTab, two)
 	assert.Equal(t, 0, m.selected, "a capturing view is not switched away from")
@@ -300,4 +302,35 @@ func TestNew_TabsAreTheSameHeight(t *testing.T) {
 		m = driveApp(t, m, keyPressed(key))
 		assert.Equal(t, height, lipgloss.Height(m.View().Content), "tab %s should be as tall as the first", key)
 	}
+}
+
+// TestAppModel_OpensConfig covers the key that opens the configuration: c loads what the keys of
+// the configuration are set to from the store, and the dialog opens on those values, in front of
+// whichever view is on display. The key is the app's, so no view sees it. A view that is capturing
+// the keys keeps this one too: it is a letter like any other in the text being typed there.
+func TestAppModel_OpensConfig(t *testing.T) {
+	store := new(MockStore)
+	store.On("GetConfig", portfolio.TaxRateKey).Return("44.3%", nil)
+	store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
+
+	holdings := &stubView{title: "Holdings", content: "the lots"}
+	m := NewAppModel(store, DefaultStyle(), holdings)
+
+	_, cmd := m.Update(keyPressed("c"))
+	loaded := runCmd(t, cmd)
+	assert.Equal(t, ConfigLoadedMsg{values: map[string]string{"tax-rate": "44.3%"}}, loaded)
+	assert.NotContains(t, ansi.Strip(m.View().Content), "tax-rate", "the dialog waits for its values")
+
+	m = driveApp(t, m, loaded)
+	frame := ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "> tax-rate   44.3%")
+	assert.Contains(t, frame, "  potential  ‹ gross ›")
+	assert.Empty(t, holdings.msgs, "the view sees neither the key nor what was loaded")
+
+	typing := &stubView{title: "Holdings", captures: true}
+	m = NewAppModel(store, DefaultStyle(), typing)
+
+	_, cmd = m.Update(keyPressed("c"))
+	assert.Nil(t, cmd)
+	assert.Equal(t, []tea.Msg{keyPressed("c")}, typing.msgs, "a capturing view gets the key itself")
 }
