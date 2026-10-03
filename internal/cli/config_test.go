@@ -116,3 +116,40 @@ func TestConfigCmd_OutputWithKey(t *testing.T) {
 	cmd, _ := NewTestingCmd(t, "config", "--output=json", "tax-rate")
 	assert.EqualError(t, cmd.Execute(), "--output is for the whole configuration: leave out the key")
 }
+
+// TestConfigCmd_Outputs covers the formats --output takes: yaml, which is what folio config prints
+// without the flag, and json. Any other is refused with the ones there are, rather than printed as
+// one of them.
+func TestConfigCmd_Outputs(t *testing.T) {
+	tests := map[string]struct {
+		output   string
+		expected string
+		error    string
+	}{
+		"yaml":    {output: "yaml", expected: "tax-rate: 44.3%\n"},
+		"json":    {output: "json", expected: `{"tax-rate":"44.3%"}` + "\n"},
+		"unknown": {output: "xml", error: `"xml" is no output format: use yaml or json`},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			set, dbPath := NewTestingCmd(t, "config", "tax-rate", "44.3%")
+			require.NoError(t, set.Execute())
+
+			cmd := New()
+			cmd.SetArgs([]string{"--db", dbPath, "config", "--output", tt.output})
+			var out bytes.Buffer
+			cmd.SetOut(&out)
+
+			err := cmd.Execute()
+			if tt.error != "" {
+				assert.EqualError(t, err, tt.error)
+				assert.Empty(t, out.String())
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, out.String())
+		})
+	}
+}

@@ -146,7 +146,7 @@ func (cmd *Folio) printConfig(key configKey) error {
 }
 
 // printAllConfig prints every key of the configuration that is set, with its value as printConfig
-// prints it, in the format output: as YAML, or as a JSON object if output is json.
+// prints it, in the format output, which is yaml or json.
 func (cmd *Folio) printAllConfig(output string) error {
 	config := make(map[string]any)
 	for _, key := range configKeys {
@@ -159,15 +159,18 @@ func (cmd *Folio) printAllConfig(output string) error {
 		}
 	}
 
-	if output == "json" {
-		return json.NewEncoder(cmd.OutOrStdout()).Encode(config)
-	}
+	switch output {
+	case "yaml":
+		out, err := yaml.Marshal(config)
+		if err != nil {
+			return err
+		}
 
-	out, err := yaml.Marshal(config)
-	if err != nil {
+		_, err = cmd.OutOrStdout().Write(out)
 		return err
+	case "json":
+		return json.NewEncoder(cmd.OutOrStdout()).Encode(config)
+	default:
+		return fmt.Errorf("%q is no output format: use yaml or json", output)
 	}
-
-	_, err = cmd.OutOrStdout().Write(out)
-	return err
 }
