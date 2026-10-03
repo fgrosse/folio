@@ -39,3 +39,10 @@ func TestParseTaxRate(t *testing.T) {
 		})
 	}
 }
+
+// TestAfterTax covers what is left of a value once a rate in percent is taken off, to the cent.
+func TestAfterTax(t *testing.T) {
+	assert.Equal(t, "2207.11", AfterTax(shares("3962.50"), shares("44.3")).String())
+	assert.Equal(t, "3962.5", AfterTax(shares("3962.50"), shares("0")).String())
+	assert.Equal(t, "0", AfterTax(shares("3962.50"), shares("100")).String())
+}

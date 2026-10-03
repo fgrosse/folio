@@ -27,3 +27,9 @@ func ParseTaxRate(spec string) (decimal.Decimal, error) {
 
 	return rate, nil
 }
+
+// AfterTax returns what is left of value once tax at rate, in percent, is taken off, to the cent.
+// It is what a vest is worth to whoever receives it, which is less than the bank states for it.
+func AfterTax(value, rate decimal.Decimal) decimal.Decimal {
+	return value.Mul(hundred.Sub(rate)).Div(hundred).Round(2)
+}
