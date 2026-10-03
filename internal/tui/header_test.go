@@ -6,7 +6,9 @@ import (
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/fgrosse/folio/internal/portfolio"
 )
@@ -18,16 +20,63 @@ import (
 func TestAccountHeader(t *testing.T) {
 	account := portfolio.Account{Current: dec("3368.13"), Potential: dec("7925")}
 
-	header := accountHeader("8.5 PANW", "PANW $396.25", account, 58, DefaultStyle())
+	header := accountHeader("8.5 PANW", "PANW $396.25", account, portfolio.Gross, 66, DefaultStyle())
 
 	expected := "" +
-		"  8.5 PANW                                 Total: $11,293.13\n" +
-		"  PANW $396.25       Current $3,368.13 · Potential $7,925.00"
+		"  8.5 PANW                                         Total: $11,293.13\n" +
+		"  PANW $396.25       Current $3,368.13 · Potential (gross) $7,925.00"
 	assert.Equal(t, expected, ansi.Strip(header))
 
 	// Both lines end in the column the table's last cell does: the indent and the width given.
 	for line := range strings.SplitSeq(expected, "\n") {
-		assert.Equal(t, 60, lipgloss.Width(line))
+		assert.Equal(t, 68, lipgloss.Width(line))
+	}
+}
+
+// TestPortfolioHeader_PotentialBasis covers the potential value the header shows, which is the
+// bank's unless the account asks for it after tax, and the word next to it that says which one it
+// is. After tax, the total is the current value and the potential one after tax, so that the
+// values on screen add up. Without a tax rate there is nothing to take off, and the header says it
+// shows the bank's number.
+func TestPortfolioHeader_PotentialBasis(t *testing.T) {
+	tests := map[string]struct {
+		basis     portfolio.PotentialBasis
+		noTaxRate bool
+		total     string
+		parts     string
+	}{
+		"gross": {
+			basis: portfolio.Gross,
+			total: "Total: $11,293.13",
+			parts: "Current $3,368.13 · Potential (gross) $7,925.00",
+		},
+		"net": {
+			basis: portfolio.Net,
+			total: "Total: $7,782.36",
+			parts: "Current $3,368.13 · Potential (net) $4,414.23",
+		},
+		"net without a tax rate": {
+			basis:     portfolio.Net,
+			noTaxRate: true,
+			total:     "Total: $11,293.13",
+			parts:     "Current $3,368.13 · Potential (gross) $7,925.00",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := testPortfolio()
+			p.PotentialBasis = tt.basis
+			if tt.noTaxRate {
+				p.TaxRate = decimal.NullDecimal{}
+			}
+
+			lines := strings.Split(ansi.Strip(portfolioHeader("8.5 PANW", p, nil, 80, DefaultStyle())), "\n")
+
+			require.Len(t, lines, 2)
+			assert.True(t, strings.HasSuffix(lines[0], tt.total), "%q should end in %q", lines[0], tt.total)
+			assert.True(t, strings.HasSuffix(lines[1], tt.parts), "%q should end in %q", lines[1], tt.parts)
+		})
 	}
 }
 
