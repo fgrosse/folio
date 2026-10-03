@@ -246,3 +246,18 @@ func TestConfigDialog_Help(t *testing.T) {
 	assert.Contains(t, dialogText(d), "enter save • esc cancel")
 	assert.NotContains(t, dialogText(d), "esc close")
 }
+
+// TestConfigDialog_Update covers the messages the app passes on to the dialog: a key press is
+// handled as HandleKeyPress does, and anything else goes to the field while a value is being
+// typed, which is how text that is pasted and the ticks that blink its cursor reach it.
+func TestConfigDialog_Update(t *testing.T) {
+	d := NewConfigDialog(testConfigKeys(t), nil, dialogWidth, DefaultStyle())
+
+	assert.Nil(t, d.Update(tea.PasteMsg{Content: "44.3"}), "nothing is being typed yet")
+
+	d.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	require.True(t, d.Editing())
+
+	d.Update(tea.PasteMsg{Content: "44.3"})
+	assert.Contains(t, dialogText(d), "> tax-rate   44.3")
+}

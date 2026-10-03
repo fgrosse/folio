@@ -65,6 +65,23 @@ func NewConfigDialog(keys []portfolio.ConfigKey, values map[string]string, width
 	}
 }
 
+// Update passes a message on to the dialog, key presses by way of HandleKeyPress. Anything else goes
+// to the field while a value is being typed, which is how the ticks that make its cursor blink
+// reach it.
+func (d *ConfigDialog) Update(msg tea.Msg) tea.Cmd {
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
+		return d.HandleKeyPress(msg)
+	}
+
+	if !d.editing {
+		return nil
+	}
+
+	var cmd tea.Cmd
+	d.input, cmd = d.input.Update(msg)
+	return cmd
+}
+
 // HandleKeyPress reacts to a key pressed while the dialog is open and returns the command, if any,
 // that the parent should run. Down and up select the next key and the one before, around the ends,
 // and so do j and k, as in the tables. On a key that takes one of a few values, right and left ask
