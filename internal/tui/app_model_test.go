@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -10,6 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/fgrosse/folio/internal/portfolio"
 )
 
 // loadedMsg and tickMsg stand in for the messages of real views, which the AppModel passes on
@@ -42,7 +45,7 @@ func TestAppModel_InitStartsEveryView(t *testing.T) {
 	holdings := &stubView{title: "Holdings", initCmd: func() tea.Msg { return tickMsg{} }}
 	vesting := &stubView{title: "Vesting", initCmd: func() tea.Msg { return loadedMsg{} }}
 	quiet := &stubView{title: "Quiet"} // a view with nothing to do on startup holds up nothing
-	m := NewAppModel(DefaultStyle(), holdings, vesting, quiet)
+	m := NewAppModel(nil, DefaultStyle(), holdings, vesting, quiet)
 
 	cmd := m.Init()
 	require.NotNil(t, cmd, "the commands of the views are passed on")
@@ -67,12 +70,12 @@ func (v *stubView) View() tea.View { return tea.NewView(v.content) }
 func TestAppModel_RendersTabBarBelowActiveView(t *testing.T) {
 	holdings := &stubView{title: "Holdings", content: "the lots"}
 	vesting := &stubView{title: "Vesting", content: "the vests"}
-	m := NewAppModel(DefaultStyle(), holdings, vesting)
+	m := NewAppModel(nil, DefaultStyle(), holdings, vesting)
 
-	assert.Equal(t, "the lots\n1 Holdings • 2 Vesting", ansi.Strip(m.View().Content))
+	assert.Equal(t, "the lots\n1 Holdings • 2 Vesting • c Configuration", ansi.Strip(m.View().Content))
 
 	m = driveApp(t, m, keyPressed("2"))
-	assert.Equal(t, "the vests\n1 Holdings • 2 Vesting", ansi.Strip(m.View().Content))
+	assert.Equal(t, "the vests\n1 Holdings • 2 Vesting • c Configuration", ansi.Strip(m.View().Content))
 }
 
 // TestAppModel_SwitchView covers the keys that move between views: a digit selects the view with
@@ -99,7 +102,7 @@ func TestAppModel_SwitchView(t *testing.T) {
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			m := NewAppModel(DefaultStyle(), &stubView{title: "Holdings"}, &stubView{title: "Vesting"})
+			m := NewAppModel(nil, DefaultStyle(), &stubView{title: "Holdings"}, &stubView{title: "Vesting"})
 			for _, key := range c.keys {
 				updated, _ := m.Update(key)
 				next, ok := updated.(*AppModel)
@@ -118,7 +121,7 @@ func TestAppModel_SwitchView(t *testing.T) {
 func TestAppModel_ForwardsKeysToActiveView(t *testing.T) {
 	holdings := &stubView{title: "Holdings"}
 	vesting := &stubView{title: "Vesting"}
-	m := NewAppModel(DefaultStyle(), holdings, vesting)
+	m := NewAppModel(nil, DefaultStyle(), holdings, vesting)
 
 	m = driveApp(t, m, keyPressed("a"))
 	assert.Equal(t, []tea.Msg{keyPressed("a")}, holdings.msgs, "the view on display gets the key")
@@ -135,7 +138,7 @@ func TestAppModel_ForwardsKeysToActiveView(t *testing.T) {
 func TestAppModel_ForwardsOtherMessagesToEveryView(t *testing.T) {
 	holdings := &stubView{title: "Holdings"}
 	vesting := &stubView{title: "Vesting"}
-	m := NewAppModel(DefaultStyle(), holdings, vesting)
+	m := NewAppModel(nil, DefaultStyle(), holdings, vesting)
 
 	driveApp(t, m, tickMsg{})
 
@@ -149,7 +152,7 @@ func TestAppModel_ForwardsOtherMessagesToEveryView(t *testing.T) {
 func TestAppModel_ShrinksTheWindowForTheTabBar(t *testing.T) {
 	holdings := &stubView{title: "Holdings"}
 	vesting := &stubView{title: "Vesting"}
-	m := NewAppModel(DefaultStyle(), holdings, vesting)
+	m := NewAppModel(nil, DefaultStyle(), holdings, vesting)
 
 	driveApp(t, m, tea.WindowSizeMsg{Width: 100, Height: 40})
 
@@ -163,7 +166,7 @@ func TestAppModel_ShrinksTheWindowForTheTabBar(t *testing.T) {
 func TestAppModel_PassesOnCommands(t *testing.T) {
 	refresh := func() tea.Msg { return tickMsg{} }
 	holdings := &stubView{title: "Holdings", cmd: refresh}
-	m := NewAppModel(DefaultStyle(), holdings, &stubView{title: "Vesting"})
+	m := NewAppModel(nil, DefaultStyle(), holdings, &stubView{title: "Vesting"})
 
 	_, cmd := m.Update(keyPressed("a"))
 	require.NotNil(t, cmd, "the command of the view on display is passed on")
@@ -186,7 +189,8 @@ func driveApp(t *testing.T, m *AppModel, msgs ...tea.Msg) *AppModel {
 }
 
 // TestTabBar covers the text of the tab bar: every view's title after the number that selects it,
-// bulleted like the help lines above it. Which tab is selected only shows in the styling, so the
+// bulleted like the help lines above it, and after the views the key that opens the configuration,
+// which is there from every one of them. Which tab is selected only shows in the styling, so the
 // text is the same whichever one it is.
 func TestTabBar(t *testing.T) {
 	cases := map[string]struct {
@@ -195,11 +199,11 @@ func TestTabBar(t *testing.T) {
 	}{
 		"first tab selected": {
 			selected: 0,
-			expected: "1 Holdings • 2 Vesting",
+			expected: "1 Holdings • 2 Vesting • c Configuration",
 		},
 		"second tab selected": {
 			selected: 1,
-			expected: "1 Holdings • 2 Vesting",
+			expected: "1 Holdings • 2 Vesting • c Configuration",
 		},
 	}
 
@@ -226,11 +230,13 @@ func TestTabBar_Styled(t *testing.T) {
 	}{
 		"first tab selected": {
 			selected: 0,
-			expected: style.TabSelected.Render("1 Holdings") + " • " + style.Tab.Render("2 Vesting"),
+			expected: style.TabSelected.Render("1 Holdings") + " • " + style.Tab.Render("2 Vesting") +
+				" • " + style.Tab.Render("c Configuration"),
 		},
 		"second tab selected": {
 			selected: 1,
-			expected: style.Tab.Render("1 Holdings") + " • " + style.TabSelected.Render("2 Vesting"),
+			expected: style.Tab.Render("1 Holdings") + " • " + style.TabSelected.Render("2 Vesting") +
+				" • " + style.Tab.Render("c Configuration"),
 		},
 	}
 
@@ -252,7 +258,7 @@ func TestAppModel_CapturingViewKeepsTheKeys(t *testing.T) {
 
 	holdings := &stubView{title: "Holdings", captures: true}
 	vesting := &stubView{title: "Vesting"}
-	m := NewAppModel(DefaultStyle(), holdings, vesting)
+	m := NewAppModel(nil, DefaultStyle(), holdings, vesting)
 
 	m = driveApp(t, m, tab, shiftTab, two)
 	assert.Equal(t, 0, m.selected, "a capturing view is not switched away from")
@@ -300,4 +306,197 @@ func TestNew_TabsAreTheSameHeight(t *testing.T) {
 		m = driveApp(t, m, keyPressed(key))
 		assert.Equal(t, height, lipgloss.Height(m.View().Content), "tab %s should be as tall as the first", key)
 	}
+}
+
+// TestAppModel_OpensConfig covers the key that opens the configuration: c loads what the keys of
+// the configuration are set to from the store, and the dialog opens on those values, in front of
+// whichever view is on display. The key is the app's, so no view sees it. A view that is capturing
+// the keys keeps this one too: it is a letter like any other in the text being typed there.
+func TestAppModel_OpensConfig(t *testing.T) {
+	store := new(MockStore)
+	store.On("GetConfig", portfolio.TaxRateKey).Return("44.3%", nil)
+	store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
+
+	holdings := &stubView{title: "Holdings", content: "the lots"}
+	m := NewAppModel(store, DefaultStyle(), holdings)
+
+	_, cmd := m.Update(keyPressed("c"))
+	loaded := runCmd(t, cmd)
+	assert.Equal(t, ConfigLoadedMsg{values: map[string]string{"tax-rate": "44.3%"}}, loaded)
+	assert.NotContains(t, ansi.Strip(m.View().Content), "tax-rate", "the dialog waits for its values")
+
+	m = driveApp(t, m, loaded)
+	frame := ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "> tax-rate   44.3%")
+	assert.Contains(t, frame, "  potential  ‹ gross ›")
+	assert.Empty(t, holdings.msgs, "the view sees neither the key nor what was loaded")
+
+	typing := &stubView{title: "Holdings", captures: true}
+	m = NewAppModel(store, DefaultStyle(), typing)
+
+	_, cmd = m.Update(keyPressed("c"))
+	assert.Nil(t, cmd)
+	assert.Equal(t, []tea.Msg{keyPressed("c")}, typing.msgs, "a capturing view gets the key itself")
+}
+
+// openConfig returns an app over views whose configuration dialog is open on values.
+func openConfig(t *testing.T, store Store, values map[string]string, views ...ViewModel) *AppModel {
+	t.Helper()
+
+	m := NewAppModel(store, DefaultStyle(), views...)
+	return driveApp(t, m, ConfigLoadedMsg{values: values})
+}
+
+// TestAppModel_ConfigKeepsTheKeys covers the keyboard while the configuration is open: every key is
+// the dialog's, the ones that switch views and the ones of the view behind it included. Esc closes
+// the dialog, and the keys are back where they were.
+func TestAppModel_ConfigKeepsTheKeys(t *testing.T) {
+	holdings := &stubView{title: "Holdings", content: "the lots"}
+	vesting := &stubView{title: "Vesting", content: "the vests"}
+	m := openConfig(t, nil, nil, holdings, vesting)
+
+	m = driveApp(t, m, keyPressed("2"), tea.KeyPressMsg{Code: tea.KeyTab}, keyPressed("a"))
+	assert.Equal(t, 0, m.selected, "the view behind the dialog stays on display")
+	assert.Empty(t, holdings.msgs, "and gets none of the keys")
+
+	m = driveApp(t, m, tea.KeyPressMsg{Code: tea.KeyDown})
+	assert.Contains(t, ansi.Strip(m.View().Content), "> potential", "the dialog gets them")
+
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	m = driveApp(t, m, runCmd(t, cmd))
+	assert.NotContains(t, ansi.Strip(m.View().Content), "potential", "esc closes the dialog")
+	assert.Empty(t, holdings.msgs, "which is nothing a view has to know of")
+
+	m = driveApp(t, m, keyPressed("2"))
+	assert.Equal(t, 1, m.selected, "the keys switch views again")
+}
+
+// TestAppModel_SetsConfig covers what the app does with a value the dialog asks to be set: it is
+// stored, the dialog is given the configuration as the store has it then, and the portfolio is
+// loaded again for every view, since what they show depends on the configuration.
+func TestAppModel_SetsConfig(t *testing.T) {
+	store := new(MockStore)
+	store.returnsAccount(testPortfolio())
+	store.On("SetConfig", "potential", "net").Return(nil)
+	store.On("GetConfig", portfolio.PotentialBasisKey).Return("net", nil)
+	store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
+
+	holdings := &stubView{title: "Holdings", content: "the lots"}
+	m := openConfig(t, store, nil, holdings)
+
+	_, cmd := m.Update(SetConfigMsg{key: "potential", value: "net"})
+	saved := runCmd(t, cmd)
+	store.AssertCalled(t, "SetConfig", "potential", "net")
+	assert.Equal(t, ConfigSavedMsg{values: map[string]string{"potential": "net"}}, saved)
+
+	_, cmd = m.Update(saved)
+	assert.Contains(t, ansi.Strip(m.View().Content), "‹ net ›")
+
+	loaded, ok := runCmd(t, cmd).(PortfolioLoadedMsg)
+	require.True(t, ok, "the portfolio is loaded again")
+	assert.Equal(t, portfolio.Net, loaded.portfolio.PotentialBasis)
+
+	driveApp(t, m, loaded)
+	assert.Equal(t, []tea.Msg{loaded}, holdings.msgs, "and every view receives it")
+}
+
+// TestAppModel_UnsetsConfig covers what the app does when the dialog asks for a value to be taken
+// back: the key is unset in the store, and the dialog and the views are brought up to date as they
+// are after a value was set.
+func TestAppModel_UnsetsConfig(t *testing.T) {
+	store := new(MockStore)
+	store.returnsAccount(testPortfolio())
+	store.On("UnsetConfig", "tax-rate").Return(nil)
+	store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
+
+	holdings := &stubView{title: "Holdings", content: "the lots"}
+	m := openConfig(t, store, map[string]string{"tax-rate": "44.3%"}, holdings)
+
+	_, cmd := m.Update(UnsetConfigMsg{key: "tax-rate"})
+	saved := runCmd(t, cmd)
+	store.AssertCalled(t, "UnsetConfig", "tax-rate")
+	assert.Equal(t, ConfigSavedMsg{values: map[string]string{}}, saved)
+
+	_, cmd = m.Update(saved)
+	assert.Contains(t, ansi.Strip(m.View().Content), "> tax-rate   not set")
+
+	loaded, ok := runCmd(t, cmd).(PortfolioLoadedMsg)
+	require.True(t, ok, "the portfolio is loaded again")
+	assert.False(t, loaded.portfolio.TaxRate.Valid)
+}
+
+// TestAppModel_ConfigErrors covers a store that fails while the configuration is edited. The dialog
+// says why, where the change was asked for, and keeps the values it has: one that could not be
+// stored is not shown as if it had been. The views are left alone, since nothing changed for them.
+// A configuration that cannot be loaded opens the dialog all the same, to say so.
+func TestAppModel_ConfigErrors(t *testing.T) {
+	store := new(MockStore)
+	store.On("SetConfig", "potential", "net").Return(errors.New("disk full"))
+	store.On("UnsetConfig", "tax-rate").Return(errors.New("disk full"))
+	store.On("GetConfig", portfolio.TaxRateKey).Return("44.3%", nil)
+	store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
+
+	tests := map[string]struct {
+		msg      tea.Msg
+		expected string
+	}{
+		"set":   {msg: SetConfigMsg{key: "potential", value: "net"}, expected: "set potential: disk full"},
+		"unset": {msg: UnsetConfigMsg{key: "tax-rate"}, expected: "unset tax-rate: disk full"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			m := openConfig(t, store, map[string]string{"tax-rate": "44.3%"}, &stubView{title: "Holdings"})
+
+			_, cmd := m.Update(tt.msg)
+			_, cmd = m.Update(runCmd(t, cmd))
+			assert.Nil(t, cmd, "nothing changed that the views would have to load")
+
+			frame := ansi.Strip(m.View().Content)
+			assert.Contains(t, frame, tt.expected)
+			assert.Contains(t, frame, "> tax-rate   44.3%")
+			assert.Contains(t, frame, "‹ gross ›")
+		})
+	}
+
+	broken := new(MockStore)
+	broken.On("GetConfig", mock.Anything).Return("", errors.New("disk on fire"))
+	m := NewAppModel(broken, DefaultStyle(), &stubView{title: "Holdings"})
+
+	_, cmd := m.Update(keyPressed("c"))
+	m = driveApp(t, m, runCmd(t, cmd))
+	assert.Contains(t, ansi.Strip(m.View().Content), "get tax-rate: disk on fire")
+}
+
+// TestAppModel_ForwardsOtherMessagesToConfig covers messages that are not keys while the
+// configuration is open: the dialog gets them as well as the views, or the cursor of the field a
+// value is typed into would not blink and text that is pasted would not arrive.
+func TestAppModel_ForwardsOtherMessagesToConfig(t *testing.T) {
+	holdings := &stubView{title: "Holdings"}
+	m := openConfig(t, nil, nil, holdings)
+
+	m = driveApp(t, m, tea.KeyPressMsg{Code: tea.KeyEnter}, tea.PasteMsg{Content: "44.3"})
+
+	assert.Contains(t, ansi.Strip(m.View().Content), "> tax-rate   44.3")
+	assert.Equal(t, []tea.Msg{tea.PasteMsg{Content: "44.3"}}, holdings.msgs, "the views still get them")
+}
+
+// TestNew_RenderConfigDialog is the golden of the app with the configuration open: the dialog
+// floats in the middle of the Holdings view, tab bar included, and the frame keeps the height of
+// the window.
+func TestNew_RenderConfigDialog(t *testing.T) {
+	store := new(MockStore)
+	store.returns(testPortfolio())
+	store.On("SaveQuote", mock.Anything).Return(nil)
+
+	m := New(store, quotes{"PANW": "396.25"}, DefaultStyle())
+	m = driveApp(t, m, tea.WindowSizeMsg{Width: 100, Height: 21})
+	m = driveApp(t, m, PortfolioLoadedMsg{portfolio: testPortfolio()})
+
+	_, cmd := m.Update(keyPressed("c"))
+	m = driveApp(t, m, runCmd(t, cmd))
+
+	frame := ansi.Strip(m.View().Content)
+	assert.Equal(t, 21, lipgloss.Height(frame), "the frame should fill the window, and no more")
+	golden.RequireEqual(t, frame)
 }

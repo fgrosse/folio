@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/fgrosse/folio/internal/portfolio"
 )
@@ -18,12 +19,18 @@ const tabGap = " • "
 // tabBarHeight is the single line the tab bar takes up below the view on display.
 const tabBarHeight = 1
 
+// configKey is the key that opens the configuration of the account, from any view.
+const configKey = "c"
+
 // An AppModel shows one of several views at a time and switches between them: the digit keys select
-// a view by its number, and tab and shift+tab cycle through them.
+// a view by its number, and tab and shift+tab cycle through them. It also has the one dialog that
+// is not a view's, the configuration of the account, which applies to every view.
 type AppModel struct {
+	store    Store
 	style    Style
 	views    []ViewModel
 	selected int
+	config   *ConfigDialog // the configuration dialog, nil unless it is open
 }
 
 // A ViewModel is one of the views an AppModel can show: a tea.Model that also has a title, which is
@@ -45,7 +52,7 @@ type KeyCapturer interface {
 // and all rendered in style. It is the one place that says which views the app has and in what
 // order, so that the tab bar and the digit keys that select them follow from a single list.
 func New(store Store, quoter portfolio.Quoter, style Style) *AppModel {
-	return NewAppModel(style,
+	return NewAppModel(store, style,
 		NewHoldingsModel(store, quoter, style),
 		NewVestingModel(store, style),
 		NewGrantsModel(store, style),
@@ -53,14 +60,16 @@ func New(store Store, quoter portfolio.Quoter, style Style) *AppModel {
 	)
 }
 
-// NewAppModel returns an AppModel over views, showing the first of them. It panics if there is not
-// at least one view, which is a programming error rather than anything a user can cause.
-func NewAppModel(style Style, views ...ViewModel) *AppModel {
+// NewAppModel returns an AppModel over views, showing the first of them. store is where it reads
+// and writes the configuration of the account. It panics if there is not at least one view, which
+// is a programming error rather than anything a user can cause.
+func NewAppModel(store Store, style Style, views ...ViewModel) *AppModel {
 	if len(views) == 0 {
 		panic("views must not be empty")
 	}
 
 	return &AppModel{
+		store: store,
 		style: style,
 		views: views,
 	}
@@ -76,22 +85,68 @@ func (m *AppModel) Init() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// Update implements tea.Model by handling the keys that switch views.
+// Update implements tea.Model by handling the keys that switch views and the configuration dialog.
 func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		return m.handleKeyPress(msg)
+	case ConfigLoadedMsg:
+		// A configuration that could not be loaded opens the dialog too, which is where to say so.
+		m.config = NewConfigDialog(portfolio.ConfigKeys, msg.values, dialogWidth, m.style)
+		m.config.SetError(msg.err)
+		return m, nil
+	case ConfigClosedMsg:
+		m.config = nil
+		return m, nil
+	case SetConfigMsg:
+		return m, setConfigCmd(m.store, msg.key, msg.value)
+	case UnsetConfigMsg:
+		return m, unsetConfigCmd(m.store, msg.key)
+	case ConfigSavedMsg:
+		return m.handleConfigSaved(msg)
 	default:
 		return m.updateViews(msg)
 	}
 }
 
-// handleKeyPress switches views if msg is one of the keys that do, and otherwise leaves the key to
-// the view on display. The AppModel stays the model that comes out either way: a view returned here
-// would replace the whole app, tab bar and all.
-func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	if !m.activeViewCapturesKeys() && m.handleViewSwitch(msg) {
+// handleConfigSaved gives the dialog the configuration as it is since it was changed, if the dialog
+// is still open, and loads the portfolio again: what the views show depends on the configuration,
+// and they all receive what is loaded. A change that failed is the dialog's to report, and leaves
+// the views with what they have.
+func (m *AppModel) handleConfigSaved(msg ConfigSavedMsg) (tea.Model, tea.Cmd) {
+	if m.config != nil {
+		m.config.SetError(msg.err)
+		if msg.values != nil {
+			m.config.SetValues(msg.values)
+		}
+	}
+
+	if msg.err != nil {
 		return m, nil
+	}
+
+	return m, loadPortfolioCmd(m.store)
+}
+
+// handleKeyPress switches views if msg is one of the keys that do, loads the configuration for its
+// dialog if it is the key for that, and otherwise leaves the key to the view on display. While the
+// configuration is open, every key is its dialog's. The AppModel stays the model that comes out either way: a view returned here would replace the whole
+// app, tab bar and all.
+func (m *AppModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.config != nil {
+		return m, m.config.HandleKeyPress(msg)
+	}
+
+	if !m.activeViewCapturesKeys() {
+		if m.handleViewSwitch(msg) {
+			return m, nil
+		}
+
+		// The dialog opens once its values are here, rather than on values it would have to
+		// correct a moment later.
+		if msg.String() == configKey {
+			return m, loadConfigCmd(m.store)
+		}
 	}
 
 	updated, cmd := m.activeView().Update(msg)
@@ -159,6 +214,12 @@ func (m *AppModel) updateViews(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd) // tea.Batch ignores nil commands
 	}
 
+	// The open dialog is one more recipient: the ticks that blink the cursor of its field are
+	// messages like these.
+	if m.config != nil {
+		cmds = append(cmds, m.config.Update(msg))
+	}
+
 	return m, tea.Batch(cmds...)
 }
 
@@ -189,7 +250,18 @@ func (m *AppModel) View() tea.View {
 	content += "\n"
 	content += tabBar(titles, m.selected, m.style)
 
-	return tea.NewView(content)
+	if m.config == nil {
+		return tea.NewView(content)
+	}
+
+	// The dialog floats centered in front of everything else, as the dialog of a view does, and
+	// against the left edge of a frame that is narrower than it.
+	dialog := m.config.Layer()
+	dialog.X(max(0, (lipgloss.Width(content)-dialog.Width())/2))
+	dialog.Y(max(0, (lipgloss.Height(content)-dialog.Height())/2))
+
+	c := lipgloss.NewCompositor(lipgloss.NewLayer(content), dialog)
+	return tea.NewView(trimTrailingSpace(c.Render()))
 }
 
 // activeView is the view on display.
@@ -200,9 +272,10 @@ func (m *AppModel) activeView() ViewModel {
 // tabBar renders the line below the help that lists every view, each title after the number key
 // that selects it. It is separated and aligned like the help lines above it, so it reads as one
 // more of them. The tab at index selected is rendered in the style's TabSelected and every other
-// tab in its Tab.
+// tab in its Tab. The bar ends with the key that opens the configuration, which works in every view
+// and so has its place on the line that belongs to none of them.
 func tabBar(titles []string, selected int, style Style) string {
-	tabs := make([]string, len(titles))
+	tabs := make([]string, len(titles), len(titles)+1)
 	for i, title := range titles {
 		tabStyle := style.Tab
 		if i == selected {
@@ -211,6 +284,10 @@ func tabBar(titles []string, selected int, style Style) string {
 
 		tabs[i] = tabStyle.Render(strconv.Itoa(i+1) + " " + title)
 	}
+
+	// The configuration is no view, so it is never the selected tab: what its key opens floats in
+	// front of whichever view is. It is named as the tabs are and as its dialog is titled.
+	tabs = append(tabs, style.Tab.Render(configKey+" Configuration"))
 
 	return strings.Join(tabs, tabGap)
 }

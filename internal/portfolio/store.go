@@ -585,6 +585,14 @@ func (s *SQLiteStore) SetConfig(key, value string) error {
 	return err
 }
 
+// UnsetConfig takes the value of key out of the configuration, which leaves the key as it was
+// before it was first set: GetConfig fails with ErrNotSet. A key that has no value is left alone.
+// Not set is the row not being there rather than an empty value, so that there is one way to tell.
+func (s *SQLiteStore) UnsetConfig(key string) error {
+	_, err := s.db.Exec(`DELETE FROM settings WHERE name = ?`, key)
+	return err
+}
+
 // Close closes the database.
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()

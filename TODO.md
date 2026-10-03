@@ -38,14 +38,21 @@ Roughly in the order worth doing.
 - **How the account moved today**: the change of the total since the previous close, next to it
   in the header.
 
+- **The help of a view while the configuration is open** still lists the keys of the view, which
+  the dialog has taken. The lines could go empty, as they do under a dialog of the view's own.
+
+- **Slim the architecture decisions in `CLAUDE.md`.** The list gains an entry with nearly every
+  feature and is read in full at the start of every session. Most entries describe one feature and
+  say what the doc comment of its type says already. Decide what qualifies, such as a rule that
+  holds across packages and cannot be read off the code, and move the rest to the code it is about.
+
 ## Later
 
 - **Show values in another currency**, such as EUR, toggled with a key in the TUI and a flag on `folio status`. It needs an
   exchange rate, fetched and cached like a quote.
 - **Tax estimates**: the Vesting view shows each vest after tax at the rate of the account, and the
   header shows the potential value after tax with `folio config potential net`. Still to come:
-  the potential value after tax in `folio status`, a key in the TUI that sets the rate, which only
-  the command line does now, and one that switches the header between gross and net.
+  the potential value after tax in `folio status`.
   For what is held, the gain of a lot since its cost, which is recorded, and the tax on it if it
   was sold. Costs are in USD, and a tax return outside the US wants them in its own currency at
   the rate of the day, so this needs the exchange rate of a past day.

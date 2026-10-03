@@ -602,3 +602,24 @@ func TestStore_Config(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "EUR", value)
 }
+
+// TestStore_UnsetConfig covers taking a value of the configuration back: the key is then as if it
+// had never been set, and every other key keeps its value. Unsetting a key that is not set is not
+// an error, since what was asked for is already so.
+func TestStore_UnsetConfig(t *testing.T) {
+	s := NewTestingStore()
+
+	require.NoError(t, s.SetConfig("tax-rate", "44.3%"))
+	require.NoError(t, s.SetConfig("currency", "EUR"))
+
+	require.NoError(t, s.UnsetConfig("tax-rate"))
+
+	_, err := s.GetConfig("tax-rate")
+	require.ErrorIs(t, err, ErrNotSet)
+
+	value, err := s.GetConfig("currency")
+	require.NoError(t, err)
+	assert.Equal(t, "EUR", value)
+
+	require.NoError(t, s.UnsetConfig("tax-rate"))
+}

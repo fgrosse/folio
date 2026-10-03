@@ -172,3 +172,31 @@ func TestConfigCmd_Potential(t *testing.T) {
 	cmd, _ = NewTestingCmd(t, "config", "potential", "after-tax")
 	assert.EqualError(t, cmd.Execute(), `"after-tax" is neither gross nor net`)
 }
+
+// TestConfigCmd_Unset covers taking a value back: "folio config --unset tax-rate" leaves the key as
+// it was before it was set, so that vests are no longer taxed at any rate. It needs the key and
+// nothing else, since a value next to it would say to set and to unset at once.
+func TestConfigCmd_Unset(t *testing.T) {
+	set, dbPath := NewTestingCmd(t, "config", "tax-rate", "44.3%")
+	require.NoError(t, set.Execute())
+
+	cmd := New()
+	cmd.SetArgs([]string{"--db", dbPath, "config", "--unset", "tax-rate"})
+	require.NoError(t, cmd.Execute())
+
+	store, err := portfolio.NewStore(dbPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = store.Close() })
+
+	_, err = store.GetConfig("tax-rate")
+	assert.ErrorIs(t, err, portfolio.ErrNotSet)
+
+	cmd, _ = NewTestingCmd(t, "config", "--unset")
+	assert.EqualError(t, cmd.Execute(), "--unset takes the key to unset and nothing else")
+
+	cmd, _ = NewTestingCmd(t, "config", "--unset", "tax-rate", "44.3%")
+	assert.EqualError(t, cmd.Execute(), "--unset takes the key to unset and nothing else")
+
+	cmd, _ = NewTestingCmd(t, "config", "--unset", "tax")
+	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate, potential`)
+}
