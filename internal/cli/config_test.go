@@ -105,3 +105,10 @@ func TestConfigCmd_ListJSON(t *testing.T) {
 	require.NoError(t, cmd.Execute())
 	assert.Equal(t, `{"tax-rate":"44.3%"}`+"\n", out.String())
 }
+
+// TestConfigCmd_JSONWithKey covers --json with a key, which is refused rather than ignored: it is
+// the whole configuration that is printed as JSON, and a single value prints as itself.
+func TestConfigCmd_JSONWithKey(t *testing.T) {
+	cmd, _ := NewTestingCmd(t, "config", "--json", "tax-rate")
+	assert.EqualError(t, cmd.Execute(), "--json prints the whole configuration: leave out the key")
+}

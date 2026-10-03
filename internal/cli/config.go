@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -45,13 +46,14 @@ The keys are:
   folio config --json`,
 		Args: cobra.MaximumNArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				asJSON, err := c.Flags().GetBool("json")
-				if err != nil {
-					return err
-				}
-
+			asJSON, err := c.Flags().GetBool("json")
+			switch {
+			case err != nil:
+				return err
+			case len(args) == 0:
 				return cmd.printAllConfig(asJSON)
+			case asJSON:
+				return errors.New("--json prints the whole configuration: leave out the key")
 			}
 
 			key, err := configKeyNamed(args[0])
