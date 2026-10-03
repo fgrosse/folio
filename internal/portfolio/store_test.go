@@ -574,3 +574,24 @@ func TestStore_LotsWithSalesAreKept(t *testing.T) {
 	require.NoError(t, s.SaveLot(fewer))
 	require.NoError(t, s.DeleteLot(1))
 }
+
+// TestStore_TaxRate covers the rate that vests are taxed at, which is one for the whole account: a
+// fresh database has none, and a rate that is set comes back until another is set in its place.
+func TestStore_TaxRate(t *testing.T) {
+	s := NewTestingStore()
+
+	rate, err := s.TaxRate()
+	require.NoError(t, err)
+	assert.False(t, rate.Valid, "a fresh database should have no tax rate")
+
+	require.NoError(t, s.SetTaxRate(shares("44.3")))
+	rate, err = s.TaxRate()
+	require.NoError(t, err)
+	require.True(t, rate.Valid)
+	assert.Equal(t, "44.3", rate.Decimal.String())
+
+	require.NoError(t, s.SetTaxRate(shares("42")))
+	rate, err = s.TaxRate()
+	require.NoError(t, err)
+	assert.Equal(t, "42", rate.Decimal.String())
+}
