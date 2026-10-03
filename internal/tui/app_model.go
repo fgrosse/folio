@@ -272,9 +272,10 @@ func (m *AppModel) activeView() ViewModel {
 // tabBar renders the line below the help that lists every view, each title after the number key
 // that selects it. It is separated and aligned like the help lines above it, so it reads as one
 // more of them. The tab at index selected is rendered in the style's TabSelected and every other
-// tab in its Tab.
+// tab in its Tab. The bar ends with the key that opens the configuration, which works in every view
+// and so has its place on the line that belongs to none of them.
 func tabBar(titles []string, selected int, style Style) string {
-	tabs := make([]string, len(titles))
+	tabs := make([]string, len(titles), len(titles)+1)
 	for i, title := range titles {
 		tabStyle := style.Tab
 		if i == selected {
@@ -283,6 +284,10 @@ func tabBar(titles []string, selected int, style Style) string {
 
 		tabs[i] = tabStyle.Render(strconv.Itoa(i+1) + " " + title)
 	}
+
+	// The configuration is no view, and its key stays dim like the help it is: what it opens
+	// floats in front of whichever view is selected.
+	tabs = append(tabs, style.Tab.Render(configKey+" configuration"))
 
 	return strings.Join(tabs, tabGap)
 }

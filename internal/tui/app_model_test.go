@@ -72,10 +72,10 @@ func TestAppModel_RendersTabBarBelowActiveView(t *testing.T) {
 	vesting := &stubView{title: "Vesting", content: "the vests"}
 	m := NewAppModel(nil, DefaultStyle(), holdings, vesting)
 
-	assert.Equal(t, "the lots\n1 Holdings • 2 Vesting", ansi.Strip(m.View().Content))
+	assert.Equal(t, "the lots\n1 Holdings • 2 Vesting • c configuration", ansi.Strip(m.View().Content))
 
 	m = driveApp(t, m, keyPressed("2"))
-	assert.Equal(t, "the vests\n1 Holdings • 2 Vesting", ansi.Strip(m.View().Content))
+	assert.Equal(t, "the vests\n1 Holdings • 2 Vesting • c configuration", ansi.Strip(m.View().Content))
 }
 
 // TestAppModel_SwitchView covers the keys that move between views: a digit selects the view with
@@ -189,7 +189,8 @@ func driveApp(t *testing.T, m *AppModel, msgs ...tea.Msg) *AppModel {
 }
 
 // TestTabBar covers the text of the tab bar: every view's title after the number that selects it,
-// bulleted like the help lines above it. Which tab is selected only shows in the styling, so the
+// bulleted like the help lines above it, and after the views the key that opens the configuration,
+// which is there from every one of them. Which tab is selected only shows in the styling, so the
 // text is the same whichever one it is.
 func TestTabBar(t *testing.T) {
 	cases := map[string]struct {
@@ -198,11 +199,11 @@ func TestTabBar(t *testing.T) {
 	}{
 		"first tab selected": {
 			selected: 0,
-			expected: "1 Holdings • 2 Vesting",
+			expected: "1 Holdings • 2 Vesting • c configuration",
 		},
 		"second tab selected": {
 			selected: 1,
-			expected: "1 Holdings • 2 Vesting",
+			expected: "1 Holdings • 2 Vesting • c configuration",
 		},
 	}
 
@@ -229,11 +230,13 @@ func TestTabBar_Styled(t *testing.T) {
 	}{
 		"first tab selected": {
 			selected: 0,
-			expected: style.TabSelected.Render("1 Holdings") + " • " + style.Tab.Render("2 Vesting"),
+			expected: style.TabSelected.Render("1 Holdings") + " • " + style.Tab.Render("2 Vesting") +
+				" • " + style.Tab.Render("c configuration"),
 		},
 		"second tab selected": {
 			selected: 1,
-			expected: style.Tab.Render("1 Holdings") + " • " + style.TabSelected.Render("2 Vesting"),
+			expected: style.Tab.Render("1 Holdings") + " • " + style.TabSelected.Render("2 Vesting") +
+				" • " + style.Tab.Render("c configuration"),
 		},
 	}
 
