@@ -20,6 +20,7 @@ type Store interface {
 	SaveLot(lot portfolio.Lot) error
 	Lots() ([]portfolio.Lot, error)
 	SaveSale(sale portfolio.Sale) error
+	SetTaxRate(rate decimal.Decimal) error
 }
 
 // A stock is one that a demo account may hold, with a price to value it at until a real quote of it
@@ -40,7 +41,8 @@ var (
 // Fill writes a made-up account to store, as it could look on the day today: someone's stock from
 // work, in a grant that came with the job and vests every quarter and a second that pays out every
 // month, most of what has vested released and some of it sold, and a little stock they bought
-// themselves. Every stock in it gets a quote, so the account has its values without a network.
+// themselves. Every stock in it gets a quote, so the account has its values without a network, and
+// the account gets a tax rate, so that the vests have a value after tax.
 //
 // What the account holds comes out of rng, so two accounts of the same random numbers are the same
 // account, and others differ in the stock, the size and the age of everything. store should be
@@ -73,8 +75,16 @@ func Fill(store Store, rng *rand.Rand, today time.Time) error {
 		return fmt.Errorf("save sale: %w", err)
 	}
 
+	if err := store.SetTaxRate(taxRate); err != nil {
+		return fmt.Errorf("set tax rate: %w", err)
+	}
+
 	return nil
 }
+
+// taxRate is the rate in percent that the vests of a demo account are taxed at, about what the top
+// of a salary that comes with stock is taxed at in much of Europe.
+var taxRate = decimal.NewFromInt(42)
 
 // A generator makes up the parts of a demo account and writes them to its store.
 type generator struct {
