@@ -20,8 +20,9 @@ func (cmd *Folio) ConfigCmd() *cobra.Command {
 		Long: `
 Get and set the configuration of your account, the way git config does: with a key
 and a value it sets the key to that value, and with a key alone it prints the value
-the key is set to. Without a key it prints every key that is set, as YAML, or with
---json as a JSON object. The configuration is kept in the database of the account.
+the key is set to, or nothing and exits 1 if it is not set. Without a key it prints
+every key that is set, as YAML, or with --json as a JSON object. The configuration
+is kept in the database of the account.
 
 The keys are:
 
@@ -85,9 +86,6 @@ type configKey struct {
 
 	// set parses value and stores it as the value of the key.
 	set func(store *portfolio.SQLiteStore, value string) error
-
-	// unset is what folio config prints for a key that is not set.
-	unset string
 }
 
 // configKeys are the keys of the configuration, in the order they are listed in.
@@ -110,7 +108,6 @@ var configKeys = []configKey{
 
 			return store.SetTaxRate(rate)
 		},
-		unset: "No tax rate is set.",
 	},
 }
 
@@ -127,18 +124,22 @@ func configKeyNamed(name string) (configKey, error) {
 	return configKey{}, fmt.Errorf("%q is no key of the configuration: use %s", name, strings.Join(names, ", "))
 }
 
-// printConfig prints the value of key, or that it is not set.
+// errUnset is what folio config fails with for a key that is not set. Main exits 1 with it and
+// prints nothing, as git config does, so that a script tells an unset key from a value by the exit
+// code alone and never reads a message as the value.
+var errUnset = errors.New("the key is not set")
+
+// printConfig prints the value of key, and fails with errUnset if it is not set.
 func (cmd *Folio) printConfig(key configKey) error {
 	value, ok, err := key.get(cmd.store)
 	switch {
 	case err != nil:
 		return err
 	case !ok:
-		cmd.Println(key.unset)
-	default:
-		cmd.Println(value)
+		return errUnset
 	}
 
+	cmd.Println(value)
 	return nil
 }
 

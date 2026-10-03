@@ -163,7 +163,7 @@ folio grant "Payout: 10 PANW monthly x24 from 2026-01-15"
 folio grant --vests schedule.txt "Payout: PANW"    # the vests listed, "<YYYY-MM-DD> <shares>" a line
 folio release 2026-01-15 6 @380.12                 # 6 shares arrived, worth $380.12 each that day
 folio config tax-rate 44.3%                        # the rate vests are taxed at
-folio config tax-rate                              # print it
+folio config tax-rate                              # print it, or exit 1 if it is not set
 folio config                                       # the whole configuration, as YAML
 folio config --json                                # the whole configuration, as JSON
 folio status

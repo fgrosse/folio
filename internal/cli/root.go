@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -78,15 +79,19 @@ func New() *Folio {
 }
 
 // Main runs the command and returns the code for the process to exit with: 0 once the verb has
-// done what it was asked, and 1 when it could not, with the reason on stderr. It is main's whole
-// job, here rather than in package main so that a test can see what folio exits with.
+// done what it was asked, and 1 when it could not, with the reason on stderr. A key of the
+// configuration that is not set exits 1 too, but without a word, as git config does. It is main's
+// whole job, here rather than in package main so that a test can see what folio exits with.
 func (cmd *Folio) Main() int {
-	if err := cmd.Execute(); err != nil {
+	err := cmd.Execute()
+	switch {
+	case err == nil:
+		return 0
+	case !errors.Is(err, errUnset):
 		fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
-		return 1
 	}
 
-	return 0
+	return 1
 }
 
 // runProgram launches the interactive views over store and returns once the user quits. It hangs
