@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -12,14 +13,14 @@ import (
 
 // ConfigCmd returns the "folio config" command.
 func (cmd *Folio) ConfigCmd() *cobra.Command {
-	return &cobra.Command{
+	c := &cobra.Command{
 		Use:   "config [key] [value]",
 		Short: "Get and set the configuration of your account",
 		Long: `
 Get and set the configuration of your account, the way git config does: with a key
 and a value it sets the key to that value, and with a key alone it prints the value
-the key is set to. Without a key it prints every key that is set, as YAML. The
-configuration is kept in the database of the account.
+the key is set to. Without a key it prints every key that is set, as YAML, or with
+--json as a JSON object. The configuration is kept in the database of the account.
 
 The keys are:
 
@@ -38,11 +39,19 @@ The keys are:
   folio config tax-rate
 
   # Print the whole configuration
-  folio config`,
+  folio config
+
+  # Print the whole configuration for a script
+  folio config --json`,
 		Args: cobra.MaximumNArgs(2),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				return cmd.printAllConfig()
+				asJSON, err := c.Flags().GetBool("json")
+				if err != nil {
+					return err
+				}
+
+				return cmd.printAllConfig(asJSON)
 			}
 
 			key, err := configKeyNamed(args[0])
@@ -57,6 +66,10 @@ The keys are:
 			return key.set(cmd.store, args[1])
 		},
 	}
+
+	c.Flags().Bool("json", false, "print the whole configuration as a JSON object")
+
+	return c
 }
 
 // A configKey is a value of the configuration of an account, by the name that folio config knows
@@ -128,8 +141,8 @@ func (cmd *Folio) printConfig(key configKey) error {
 }
 
 // printAllConfig prints every key of the configuration that is set, with its value as printConfig
-// prints it, as YAML.
-func (cmd *Folio) printAllConfig() error {
+// prints it, as YAML, or as a JSON object if asJSON is set.
+func (cmd *Folio) printAllConfig(asJSON bool) error {
 	config := make(map[string]string)
 	for _, key := range configKeys {
 		value, ok, err := key.get(cmd.store)
@@ -139,6 +152,10 @@ func (cmd *Folio) printAllConfig() error {
 		if ok {
 			config[key.name] = value
 		}
+	}
+
+	if asJSON {
+		return json.NewEncoder(cmd.OutOrStdout()).Encode(config)
 	}
 
 	out, err := yaml.Marshal(config)

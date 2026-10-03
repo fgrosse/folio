@@ -82,3 +82,26 @@ func TestConfigCmd_List(t *testing.T) {
 	require.NoError(t, cmd.Execute())
 	assert.Equal(t, "tax-rate: 44.3%\n", out.String())
 }
+
+// TestConfigCmd_ListJSON covers "folio config --json", which prints the whole configuration as a
+// JSON object for a script to read, with the same keys and values as the YAML.
+func TestConfigCmd_ListJSON(t *testing.T) {
+	cmd, dbPath := NewTestingCmd(t, "config", "--json")
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	require.NoError(t, cmd.Execute())
+	assert.Equal(t, "{}\n", out.String())
+
+	set := New()
+	set.SetArgs([]string{"--db", dbPath, "config", "tax-rate", "44.3"})
+	require.NoError(t, set.Execute())
+
+	out.Reset()
+	cmd = New()
+	cmd.SetArgs([]string{"--db", dbPath, "config", "--json"})
+	cmd.SetOut(&out)
+
+	require.NoError(t, cmd.Execute())
+	assert.Equal(t, `{"tax-rate":"44.3%"}`+"\n", out.String())
+}
