@@ -105,6 +105,14 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
   value plus that, so that the values on screen add up. The current value is never taxed, since
   what is held was taxed when it vested. The rate is kept in the `settings` table, which holds what applies to the
   whole account, one value by name, so that it is in the database like everything else.
+- **The configuration is edited in a dialog of the app's.** `c` opens the `ConfigDialog` from any
+  view, with a row for each of `portfolio.ConfigKeys`, which is also what `folio config` takes: a
+  key added there shows up in both. A key with `Choices` is picked with the arrows and any other is
+  typed in its row, where an empty value unsets it. It is a dialog rather than a view so that a
+  change shows in the view behind it, and the app's rather than a view's because the configuration
+  applies to all of them: the `AppModel` stores each change at once and loads the portfolio again,
+  which every view receives. Not set is the row not being there (`UnsetConfig`), never an empty
+  value.
 - **Everything is in USD for now**, the currency the stock trades in. Showing another currency is
   in `TODO.md`.
 - **The demo is the one verb with a database of its own.** Every other verb shares the database of

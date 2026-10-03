@@ -152,6 +152,11 @@ are the bank's, before tax, unless you set `folio config potential net`: then th
 shows the potential value after tax, and the total as the current value and that added up. The
 potential value is marked `(gross)` or `(net)`, so that you can tell which one you are looking at.
 
+`c` opens the configuration from any view, with a row for each key that `folio config` has. `enter`
+edits the value of the selected row, and an empty value unsets it. A row with a few values to pick
+from, such as gross or net, changes with `←` and `→`. Each change is saved right away and shows in
+the view behind the dialog.
+
 Prices are fetched when the TUI starts and every five minutes after that. It opens with the last
 prices it saw, so it works without a network too.
 
@@ -167,6 +172,7 @@ folio release 2026-01-15 6 @380.12                 # 6 shares arrived, worth $38
 folio config tax-rate 44.3%                        # the rate vests are taxed at
 folio config tax-rate                              # print it
 folio config potential net                         # show the potential value after tax in the TUI
+folio config --unset tax-rate                      # take a value back
 folio config                                       # the whole configuration, as YAML
 folio config -o json                               # the whole configuration, as JSON
 folio status
