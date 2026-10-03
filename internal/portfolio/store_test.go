@@ -595,3 +595,31 @@ func TestStore_TaxRate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "42", rate.Decimal.String())
 }
+
+// TestStore_Config covers the configuration of the account, which the store keeps as text by key
+// and leaves the meaning of to whoever sets it: a key that was never set is an error that says so,
+// and a value that is set comes back until another is set in its place. Each key has a value of
+// its own.
+func TestStore_Config(t *testing.T) {
+	s := NewTestingStore()
+
+	_, err := s.GetConfig("tax-rate")
+	require.ErrorIs(t, err, ErrNotSet)
+	assert.EqualError(t, err, "tax-rate is not set")
+
+	require.NoError(t, s.SetConfig("tax-rate", "44.3%"))
+	require.NoError(t, s.SetConfig("currency", "EUR"))
+
+	value, err := s.GetConfig("tax-rate")
+	require.NoError(t, err)
+	assert.Equal(t, "44.3%", value)
+
+	require.NoError(t, s.SetConfig("tax-rate", "42%"))
+	value, err = s.GetConfig("tax-rate")
+	require.NoError(t, err)
+	assert.Equal(t, "42%", value)
+
+	value, err = s.GetConfig("currency")
+	require.NoError(t, err)
+	assert.Equal(t, "EUR", value)
+}
