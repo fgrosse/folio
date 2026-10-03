@@ -69,12 +69,24 @@ func New() *Folio {
 	cmd.AddCommand(cmd.LotCmd())
 	cmd.AddCommand(cmd.GrantCmd())
 	cmd.AddCommand(cmd.ReleaseCmd())
-	cmd.AddCommand(cmd.TaxRateCmd())
+	cmd.AddCommand(cmd.ConfigCmd())
 	cmd.AddCommand(cmd.StatusCmd())
 	cmd.AddCommand(cmd.DemoCmd())
 	cmd.AddCommand(cmd.VersionCmd())
 
 	return cmd
+}
+
+// Main runs the command and returns the code for the process to exit with: 0 once the verb has
+// done what it was asked, and 1 when it could not, with the reason on stderr. It is main's whole
+// job, here rather than in package main so that a test can see what folio exits with.
+func (cmd *Folio) Main() int {
+	if err := cmd.Execute(); err != nil {
+		fmt.Fprintln(cmd.ErrOrStderr(), "Error:", err)
+		return 1
+	}
+
+	return 0
 }
 
 // runProgram launches the interactive views over store and returns once the user quits. It hangs

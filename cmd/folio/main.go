@@ -2,7 +2,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/fgrosse/folio/internal/cli"
@@ -16,8 +15,5 @@ func main() {
 	cmd := cli.New()
 	cmd.BuildVersion = version
 
-	if err := cmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		os.Exit(1)
-	}
+	os.Exit(cmd.Main())
 }

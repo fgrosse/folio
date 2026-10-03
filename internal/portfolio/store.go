@@ -557,28 +557,29 @@ func (s *SQLiteStore) SaveQuote(quote Quote) error {
 	return err
 }
 
-// taxRateSetting is the name the tax rate is stored under in the settings, which hold what applies
-// to the whole account rather than to a lot or a grant, one value by name.
-const taxRateSetting = "tax_rate"
+// ErrNotSet is what GetConfig fails with for a key of the configuration that has no value.
+var ErrNotSet = errors.New("not set")
 
-// TaxRate returns the rate in percent that vests are taxed at, which is not valid if none was set.
-func (s *SQLiteStore) TaxRate() (decimal.NullDecimal, error) {
-	var rate decimal.NullDecimal
-	err := s.db.Get(&rate, `SELECT value FROM settings WHERE name = ?`, taxRateSetting)
+// GetConfig returns the value of the configuration that key is set to, as it was set, and fails
+// with ErrNotSet if it is not set. The configuration holds what applies to the whole account
+// rather than to a lot or a grant. The store does not know what a key means or what its value
+// has to look like: whoever sets a value is the one to check it.
+func (s *SQLiteStore) GetConfig(key string) (string, error) {
+	var value string
+	err := s.db.Get(&value, `SELECT value FROM settings WHERE name = ?`, key)
 	if errors.Is(err, sql.ErrNoRows) {
-		return decimal.NullDecimal{}, nil
+		return "", fmt.Errorf("%s is %w", key, ErrNotSet)
 	}
 
-	return rate, err
+	return value, err
 }
 
-// SetTaxRate records rate, in percent, as the one that vests are taxed at, in place of the one
-// before. See ParseTaxRate for what it is.
-func (s *SQLiteStore) SetTaxRate(rate decimal.Decimal) error {
+// SetConfig sets key of the configuration to value, in place of the one before.
+func (s *SQLiteStore) SetConfig(key, value string) error {
 	_, err := s.db.Exec(`
 		INSERT INTO settings (name, value) VALUES (?, ?)
 		ON CONFLICT (name) DO UPDATE SET value = excluded.value`,
-		taxRateSetting, rate,
+		key, value,
 	)
 
 	return err

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -59,4 +60,27 @@ func TestLoadPortfolioCmd(t *testing.T) {
 	assert.Equal(t, p, loaded.portfolio)
 	assert.Equal(t, "44.3", loaded.portfolio.TaxRate.Decimal.String())
 	store.AssertExpectations(t)
+}
+
+// TestLoadPortfolioCmd_TaxRate covers the rate that vests are taxed at, which the store keeps as
+// text among the configuration: an account without one has no rate rather than failing to load,
+// and a value that is no rate is an error that says which key it is in.
+func TestLoadPortfolioCmd_TaxRate(t *testing.T) {
+	p := testPortfolio()
+	p.TaxRate = decimal.NullDecimal{}
+	store := new(MockStore)
+	store.returns(p)
+
+	loaded, ok := runCmd(t, loadPortfolioCmd(store)).(PortfolioLoadedMsg)
+	require.True(t, ok)
+	require.NoError(t, loaded.err)
+	assert.False(t, loaded.portfolio.TaxRate.Valid, "an account without a rate should have none")
+
+	store = new(MockStore)
+	store.returnsAccount(testPortfolio())
+	store.On("GetConfig", portfolio.TaxRateKey).Return("high", nil)
+
+	loaded, ok = runCmd(t, loadPortfolioCmd(store)).(PortfolioLoadedMsg)
+	require.True(t, ok)
+	assert.EqualError(t, loaded.err, `tax-rate: "high" is not a tax rate such as 44.3%`)
 }

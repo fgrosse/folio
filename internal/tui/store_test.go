@@ -36,9 +36,9 @@ func (m *MockStore) Quotes() (map[string]portfolio.Quote, error) {
 	return nil, result.Error(1)
 }
 
-func (m *MockStore) TaxRate() (decimal.NullDecimal, error) {
-	result := m.Called()
-	return result.Get(0).(decimal.NullDecimal), result.Error(1)
+func (m *MockStore) GetConfig(key string) (string, error) {
+	result := m.Called(key)
+	return result.String(0), result.Error(1)
 }
 
 func (m *MockStore) SaveLot(lot portfolio.Lot) error {
@@ -111,9 +111,19 @@ func testPortfolio() Portfolio {
 
 // returns sets store up to answer with p whenever the portfolio is loaded.
 func (m *MockStore) returns(p Portfolio) {
+	m.returnsAccount(p)
+	if p.TaxRate.Valid {
+		m.On("GetConfig", portfolio.TaxRateKey).Return(p.TaxRate.Decimal.String()+"%", nil)
+	} else {
+		m.On("GetConfig", portfolio.TaxRateKey).Return("", portfolio.ErrNotSet)
+	}
+}
+
+// returnsAccount sets store up to answer with the lots, grants, quotes and sales of p, and leaves
+// the configuration to the test.
+func (m *MockStore) returnsAccount(p Portfolio) {
 	m.On("Lots").Return(p.Lots, nil)
 	m.On("Grants").Return(p.Grants, nil)
 	m.On("Quotes").Return(p.Quotes, nil)
 	m.On("Sales").Return(p.Sales, nil)
-	m.On("TaxRate").Return(p.TaxRate, nil)
 }

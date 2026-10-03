@@ -88,7 +88,7 @@ folio release 2026-02-20 6 @380.12
 folio lot 15 AAPL 2025-06-02 @201.50
 
 # The rate your vests are taxed at, for an estimate of what they are worth after tax
-folio tax-rate 44.3%
+folio config tax-rate 44.3%
 
 folio status
 ```
@@ -146,9 +146,9 @@ lines. `tab` moves between the fields, `enter` saves, and in the notes, where `e
 line, `ctrl+s` does. The note of a sale shows above the Sales table while the sale is selected.
 
 A vest is taxed as income when it vests, at a rate that depends on the rest of your income and where
-you live. folio does not work it out: it takes the rate you set with `folio tax-rate` for every
-vest, and the Vesting view shows what is left of each after tax at that rate. The three values stay
-the bank's, before tax.
+you live. folio does not work it out: it takes the rate you set with `folio config tax-rate` for
+every vest, and the Vesting view shows what is left of each after tax at that rate. The three values
+stay the bank's, before tax.
 
 Prices are fetched when the TUI starts and every five minutes after that. It opens with the last
 prices it saw, so it works without a network too.
@@ -162,7 +162,10 @@ folio lot 12.5 PANW 2026-03-15 @380.12
 folio grant "Payout: 10 PANW monthly x24 from 2026-01-15"
 folio grant --vests schedule.txt "Payout: PANW"    # the vests listed, "<YYYY-MM-DD> <shares>" a line
 folio release 2026-01-15 6 @380.12                 # 6 shares arrived, worth $380.12 each that day
-folio tax-rate 44.3%                               # the rate vests are taxed at; without one, print it
+folio config tax-rate 44.3%                        # the rate vests are taxed at
+folio config tax-rate                              # print it
+folio config                                       # the whole configuration, as YAML
+folio config -o json                               # the whole configuration, as JSON
 folio status
 folio status --json
 folio version                                      # which release this is

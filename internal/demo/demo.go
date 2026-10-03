@@ -20,7 +20,7 @@ type Store interface {
 	SaveLot(lot portfolio.Lot) error
 	Lots() ([]portfolio.Lot, error)
 	SaveSale(sale portfolio.Sale) error
-	SetTaxRate(rate decimal.Decimal) error
+	SetConfig(key, value string) error
 }
 
 // A stock is one that a demo account may hold, with a price to value it at until a real quote of it
@@ -75,7 +75,7 @@ func Fill(store Store, rng *rand.Rand, today time.Time) error {
 		return fmt.Errorf("save sale: %w", err)
 	}
 
-	if err := store.SetTaxRate(taxRate); err != nil {
+	if err := store.SetConfig(portfolio.TaxRateKey, taxRate); err != nil {
 		return fmt.Errorf("set tax rate: %w", err)
 	}
 
@@ -86,7 +86,7 @@ func Fill(store Store, rng *rand.Rand, today time.Time) error {
 // income tax in Germany, 45%, with the solidarity surcharge of 5.5% and church tax of 9% on it. A
 // salary that comes with stock is often taxed at the top rate, and a rate any lower would make
 // what is left of a vest look better than it is.
-var taxRate = decimal.RequireFromString("51.525")
+const taxRate = "51.525%"
 
 // A generator makes up the parts of a demo account and writes them to its store.
 type generator struct {

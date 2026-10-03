@@ -44,8 +44,8 @@ func TestFill(t *testing.T) {
 		require.NoError(t, err)
 		quotes, err := store.Quotes()
 		require.NoError(t, err)
-		taxRate, err := store.TaxRate()
-		require.NoError(t, err)
+		taxRate, err := store.GetConfig(portfolio.TaxRateKey)
+		require.NoError(t, err, "seed %d: the account should have a tax rate", seed)
 
 		require.GreaterOrEqual(t, len(grants), 2, "seed %d", seed)
 
@@ -84,7 +84,8 @@ func TestFill(t *testing.T) {
 		assert.True(t, account.Current.IsPositive(), "seed %d", seed)
 		assert.True(t, account.Potential.IsPositive(), "seed %d", seed)
 
-		assert.True(t, taxRate.Valid, "seed %d: the account should have a tax rate", seed)
+		_, err = portfolio.ParseTaxRate(taxRate)
+		assert.NoError(t, err, "seed %d", seed)
 	}
 }
 
