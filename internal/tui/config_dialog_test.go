@@ -131,3 +131,38 @@ func TestConfigDialog_Choose(t *testing.T) {
 	d.SetValues(map[string]string{"potential": "net"})
 	assert.Contains(t, dialogText(d), "‹ net ›")
 }
+
+// typeIntoConfig presses the keys of s in the dialog, one after the other.
+func typeIntoConfig(d *ConfigDialog, s string) {
+	for _, msg := range keysPressed(s) {
+		d.HandleKeyPress(msg.(tea.KeyPressMsg))
+	}
+}
+
+// TestConfigDialog_Edit covers changing a key that takes any text: enter turns its value into a
+// field with the value in it, which takes every key that is typed, the j and k that would move the
+// selection included. Enter in the field asks for what was typed to be set, written the way the key
+// stores it, and ends the edit.
+func TestConfigDialog_Edit(t *testing.T) {
+	enter := tea.KeyPressMsg{Code: tea.KeyEnter}
+	backspace := tea.KeyPressMsg{Code: tea.KeyBackspace}
+
+	d := NewConfigDialog(testConfigKeys(t), map[string]string{"tax-rate": "44.3%"}, dialogWidth, DefaultStyle())
+	assert.False(t, d.Editing())
+
+	d.HandleKeyPress(enter)
+	require.True(t, d.Editing())
+	assert.Contains(t, dialogText(d), "> tax-rate   44.3%")
+
+	typeIntoConfig(d, "jk")
+	assert.Contains(t, dialogText(d), "> tax-rate   44.3%jk", "a letter is typed rather than moving the selection")
+
+	for range "4.3%jk" {
+		d.HandleKeyPress(backspace)
+	}
+	typeIntoConfig(d, "2.50")
+
+	cmd := d.HandleKeyPress(enter)
+	assert.Equal(t, SetConfigMsg{key: "tax-rate", value: "42.5%"}, runCmd(t, cmd))
+	assert.False(t, d.Editing())
+}

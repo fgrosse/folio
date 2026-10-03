@@ -4,11 +4,16 @@ import (
 	"slices"
 	"strings"
 
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/fgrosse/folio/internal/portfolio"
 )
+
+// rowMark stands in front of the row of the selected key.
+const rowMark = "> "
 
 // notSet is what the dialog shows as the value of a key that has none and no default either.
 const notSet = "not set"
@@ -22,6 +27,8 @@ type ConfigDialog struct {
 	keys     []portfolio.ConfigKey
 	values   map[string]string // what each key is set to, by its name, without the keys that are not set
 	selected int               // the index of the selected key
+	editing  bool              // whether the value of the selected key is being typed into input
+	input    textinput.Model   // the field the value of the selected key is typed into
 	width    int               // how many columns the dialog has inside its border
 	style    Style
 }
@@ -49,19 +56,80 @@ func NewConfigDialog(keys []portfolio.ConfigKey, values map[string]string, width
 // that the parent should run. Down and up select the next key and the one before, around the ends,
 // and so do j and k, as in the tables. On a key that takes one of a few values, right and left ask
 // for the next of them and the one before to be set, and so do enter and space for the next.
+//
+// On a key that takes any text, enter turns the value into a field to type it into. While that is
+// open, enter asks for what it holds to be set, and every other key goes to the field, so that
+// letters such as "j" type rather than move the selection.
 func (d *ConfigDialog) HandleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
-	switch msg.String() {
-	case "down", "j":
+	if d.editing {
+		return d.handleEditKeyPress(msg)
+	}
+
+	choices := len(d.keys[d.selected].Choices) > 0
+
+	switch key := msg.String(); {
+	case key == "down", key == "j":
 		d.selectKey(d.selected + 1)
-	case "up", "k":
+	case key == "up", key == "k":
 		d.selectKey(d.selected - 1)
-	case "right", "enter", "space":
+	case key == "enter" && !choices:
+		return d.editCmd()
+	case key == "right", key == "enter", key == "space":
 		return d.chooseCmd(1)
-	case "left":
+	case key == "left":
 		return d.chooseCmd(-1)
 	}
 
 	return nil
+}
+
+// handleEditKeyPress reacts to a key pressed while the value of the selected key is being typed.
+func (d *ConfigDialog) handleEditKeyPress(msg tea.KeyPressMsg) tea.Cmd {
+	if msg.String() == "enter" {
+		return d.submitCmd()
+	}
+
+	var cmd tea.Cmd
+	d.input, cmd = d.input.Update(msg)
+	return cmd
+}
+
+// editCmd opens the field that the value of the selected key is typed into, with the value the key
+// is set to in it, and returns the command that starts its cursor blinking.
+func (d *ConfigDialog) editCmd() tea.Cmd {
+	d.input = textinput.New()
+	d.input.Prompt = ""
+	// As in InputDialog: the field draws a virtual cursor after padding to its width, so it is
+	// configured one column narrower than it renders.
+	d.input.SetWidth(d.valueWidth() - 1)
+	d.input.SetValue(d.values[d.keys[d.selected].Name])
+	d.input.CursorEnd()
+	d.editing = true
+
+	return d.input.Focus()
+}
+
+// submitCmd ends the edit and returns the command that asks for the selected key to be set to what
+// was typed, written the way the key stores it. The field is read right away rather than inside
+// the returned command, as in InputDialog.
+func (d *ConfigDialog) submitCmd() tea.Cmd {
+	key := d.keys[d.selected]
+
+	value, err := key.Parse(strings.TrimSpace(d.input.Value()))
+	if err != nil {
+		return nil
+	}
+
+	d.editing = false
+	set := SetConfigMsg{key: key.Name, value: value}
+
+	return func() tea.Msg { return set }
+}
+
+// Editing reports whether the value of the selected key is being typed, which is when esc and enter
+// are about that value rather than about the dialog.
+func (d *ConfigDialog) Editing() bool {
+	return d.editing
 }
 
 // chooseCmd returns the command that asks for the selected key to be set to the choice that is
@@ -117,14 +185,25 @@ func (d *ConfigDialog) Layer() *lipgloss.Layer {
 func (d *ConfigDialog) rowView(index int) string {
 	key := d.keys[index]
 
-	mark, nameStyle := "  ", d.style.Hint
+	mark, nameStyle := strings.Repeat(" ", len(rowMark)), d.style.Hint
 	if index == d.selected {
-		mark, nameStyle = "> ", d.style.DialogTitle
+		mark, nameStyle = rowMark, d.style.DialogTitle
 	}
 
 	padding := strings.Repeat(" ", d.nameWidth()-lipgloss.Width(key.Name)+labelGap)
 
-	return mark + nameStyle.Render(key.Name) + padding + d.valueView(key)
+	value := d.valueView(key)
+	if d.editing && index == d.selected {
+		// The field pads its view to its width, which truncating keeps it to.
+		value = ansi.Truncate(d.input.View(), d.valueWidth(), "")
+	}
+
+	return mark + nameStyle.Render(key.Name) + padding + value
+}
+
+// valueWidth is how many columns of a row are left for the value, after the mark and the names.
+func (d *ConfigDialog) valueWidth() int {
+	return d.width - len(rowMark) - d.nameWidth() - labelGap
 }
 
 // nameWidth is how many columns the longest name of a key takes.
