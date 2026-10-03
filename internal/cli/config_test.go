@@ -58,3 +58,27 @@ func TestConfigCmd_UnknownKey(t *testing.T) {
 	cmd, _ = NewTestingCmd(t, "config", "tax")
 	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate`)
 }
+
+// TestConfigCmd_List covers "folio config" without a key, which prints the whole configuration as
+// YAML: every key that is set, by its name, with the value it would print on its own. An account
+// that has none set has an empty configuration.
+func TestConfigCmd_List(t *testing.T) {
+	cmd, dbPath := NewTestingCmd(t, "config")
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	require.NoError(t, cmd.Execute())
+	assert.Equal(t, "{}\n", out.String())
+
+	set := New()
+	set.SetArgs([]string{"--db", dbPath, "config", "tax-rate", "44.3"})
+	require.NoError(t, set.Execute())
+
+	out.Reset()
+	cmd = New()
+	cmd.SetArgs([]string{"--db", dbPath, "config"})
+	cmd.SetOut(&out)
+
+	require.NoError(t, cmd.Execute())
+	assert.Equal(t, "tax-rate: 44.3%\n", out.String())
+}

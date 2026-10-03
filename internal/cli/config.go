@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"go.yaml.in/yaml/v3"
 
 	"github.com/fgrosse/folio/internal/portfolio"
 )
@@ -12,12 +13,13 @@ import (
 // ConfigCmd returns the "folio config" command.
 func (cmd *Folio) ConfigCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "config <key> [value]",
+		Use:   "config [key] [value]",
 		Short: "Get and set the configuration of your account",
 		Long: `
 Get and set the configuration of your account, the way git config does: with a key
 and a value it sets the key to that value, and with a key alone it prints the value
-the key is set to. The configuration is kept in the database of the account.
+the key is set to. Without a key it prints every key that is set, as YAML. The
+configuration is kept in the database of the account.
 
 The keys are:
 
@@ -33,9 +35,16 @@ The keys are:
   folio config tax-rate 44.3%
 
   # Print the rate that is set
-  folio config tax-rate`,
-		Args: cobra.RangeArgs(1, 2),
+  folio config tax-rate
+
+  # Print the whole configuration
+  folio config`,
+		Args: cobra.MaximumNArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return cmd.printAllConfig()
+			}
+
 			key, err := configKeyNamed(args[0])
 			if err != nil {
 				return err
@@ -116,4 +125,27 @@ func (cmd *Folio) printConfig(key configKey) error {
 	}
 
 	return nil
+}
+
+// printAllConfig prints every key of the configuration that is set, with its value as printConfig
+// prints it, as YAML.
+func (cmd *Folio) printAllConfig() error {
+	config := make(map[string]string)
+	for _, key := range configKeys {
+		value, ok, err := key.get(cmd.store)
+		if err != nil {
+			return fmt.Errorf("get %s: %w", key.name, err)
+		}
+		if ok {
+			config[key.name] = value
+		}
+	}
+
+	out, err := yaml.Marshal(config)
+	if err != nil {
+		return err
+	}
+
+	_, err = cmd.OutOrStdout().Write(out)
+	return err
 }
