@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -58,8 +59,8 @@ const headerGap = 2
 // potential value says whether it is gross or net, since the two differ by the tax on the vests and
 // the header is where the user compares folio with the bank.
 func accountParts(account portfolio.Account, basis portfolio.PotentialBasis) string {
-	return "Current " + portfolio.FormatUSD(account.Current) +
-		" · Potential (" + string(basis) + ") " + portfolio.FormatUSD(account.Potential)
+	return fmt.Sprintf("Current %s · Potential (%s) %s",
+		portfolio.FormatUSD(account.Current), basis, portfolio.FormatUSD(account.Potential))
 }
 
 // accountHeader renders the two lines above the table of a view. The right half is the same in
