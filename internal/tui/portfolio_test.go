@@ -84,3 +84,39 @@ func TestLoadPortfolioCmd_TaxRate(t *testing.T) {
 	require.True(t, ok)
 	assert.EqualError(t, loaded.err, `tax-rate: "high" is not a tax rate such as 44.3%`)
 }
+
+// TestLoadPortfolioCmd_PotentialBasis covers which potential value the header shows, which the
+// store keeps among the configuration: the bank's, before tax, unless the account says net, and a
+// value that is neither is an error that says which key it is in.
+func TestLoadPortfolioCmd_PotentialBasis(t *testing.T) {
+	tests := map[string]struct {
+		value    string
+		err      error
+		expected portfolio.PotentialBasis
+		error    string
+	}{
+		"not set": {err: portfolio.ErrNotSet, expected: portfolio.Gross},
+		"gross":   {value: "gross", expected: portfolio.Gross},
+		"net":     {value: "net", expected: portfolio.Net},
+		"neither": {value: "after-tax", error: `potential: "after-tax" is neither gross nor net`},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			store := new(MockStore)
+			store.returnsAccount(testPortfolio())
+			store.On("GetConfig", portfolio.TaxRateKey).Return("44.3%", nil)
+			store.On("GetConfig", portfolio.PotentialBasisKey).Return(tt.value, tt.err)
+
+			loaded, ok := runCmd(t, loadPortfolioCmd(store)).(PortfolioLoadedMsg)
+			require.True(t, ok)
+			if tt.error != "" {
+				assert.EqualError(t, loaded.err, tt.error)
+				return
+			}
+
+			require.NoError(t, loaded.err)
+			assert.Equal(t, tt.expected, loaded.portfolio.PotentialBasis)
+		})
+	}
+}

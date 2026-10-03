@@ -30,8 +30,9 @@ type Store interface {
 }
 
 // A Portfolio is everything the views show, as the store had it at one moment: the lots and grants
-// of the account, the quotes they are valued at, the sales that took shares out of the lots, and
-// the rate that vests are taxed at. Every view holds the latest one it was sent.
+// of the account, the quotes they are valued at, the sales that took shares out of the lots, the
+// rate that vests are taxed at, and whether the potential value is shown before or after that tax.
+// Every view holds the latest one it was sent.
 type Portfolio struct {
 	Lots   []portfolio.Lot
 	Grants []portfolio.Grant
@@ -40,6 +41,9 @@ type Portfolio struct {
 
 	// TaxRate is the rate in percent that vests are taxed at, not valid if none was set.
 	TaxRate decimal.NullDecimal
+
+	// PotentialBasis is whether the header shows the potential value before tax or after it.
+	PotentialBasis portfolio.PotentialBasis
 }
 
 // PortfolioLoadedMsg reports the result of loading the portfolio from the Store. Every view
@@ -116,7 +120,19 @@ func loadPortfolio(store Store) (Portfolio, error) {
 		return Portfolio{}, err
 	}
 
-	return Portfolio{Lots: lots, Grants: grants, Quotes: quotes, Sales: sales, TaxRate: taxRate}, nil
+	basis, err := loadPotentialBasis(store)
+	if err != nil {
+		return Portfolio{}, err
+	}
+
+	return Portfolio{
+		Lots:           lots,
+		Grants:         grants,
+		Quotes:         quotes,
+		Sales:          sales,
+		TaxRate:        taxRate,
+		PotentialBasis: basis,
+	}, nil
 }
 
 // loadTaxRate returns the rate that vests are taxed at, which is not valid if the account has none.
@@ -136,4 +152,23 @@ func loadTaxRate(store Store) (decimal.NullDecimal, error) {
 	}
 
 	return decimal.NewNullDecimal(rate), nil
+}
+
+// loadPotentialBasis returns which potential value the header shows. An account that has not said
+// shows the bank's, before tax, which is the number its web site has.
+func loadPotentialBasis(store Store) (portfolio.PotentialBasis, error) {
+	value, err := store.GetConfig(portfolio.PotentialBasisKey)
+	switch {
+	case errors.Is(err, portfolio.ErrNotSet):
+		return portfolio.Gross, nil
+	case err != nil:
+		return "", err
+	}
+
+	basis, err := portfolio.ParsePotentialBasis(value)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", portfolio.PotentialBasisKey, err)
+	}
+
+	return basis, nil
 }

@@ -100,7 +100,10 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
 - **Tax is an estimate at one rate.** A vest is taxed as income at a rate that depends on the rest
   of the year's income, which folio does not know, so the user sets one rate in percent for the
   whole account (`folio config tax-rate`) and folio takes it off each vest. The three values stay
-  the bank's, before tax. The rate is kept in the `settings` table, which holds what applies to the
+  the bank's, before tax, unless the user asks for the potential value after tax (`folio config
+  potential net`). Then the TUI's header shows that, marked `(net)`, with the total as the current
+  value plus that, so that the values on screen add up. The current value is never taxed, since
+  what is held was taxed when it vested. The rate is kept in the `settings` table, which holds what applies to the
   whole account, one value by name, so that it is in the database like everything else.
 - **Everything is in USD for now**, the currency the stock trades in. Showing another currency is
   in `TODO.md`.

@@ -56,10 +56,10 @@ func TestConfigCmd_Get(t *testing.T) {
 // neither set nor read: folio config says which keys there are.
 func TestConfigCmd_UnknownKey(t *testing.T) {
 	cmd, _ := NewTestingCmd(t, "config", "tax", "44.3%")
-	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate`)
+	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate, potential`)
 
 	cmd, _ = NewTestingCmd(t, "config", "tax")
-	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate`)
+	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate, potential`)
 }
 
 // TestConfigCmd_List covers "folio config" without a key, which prints the whole configuration as
@@ -152,4 +152,23 @@ func TestConfigCmd_Outputs(t *testing.T) {
 			assert.Equal(t, tt.expected, out.String())
 		})
 	}
+}
+
+// TestConfigCmd_Potential covers choosing which potential value the TUI shows in its header:
+// "folio config potential" with gross or net stores it, written the one way folio prints it, and
+// refuses anything else before it reaches the store.
+func TestConfigCmd_Potential(t *testing.T) {
+	cmd, dbPath := NewTestingCmd(t, "config", "potential", "Net")
+	require.NoError(t, cmd.Execute())
+
+	store, err := portfolio.NewStore(dbPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = store.Close() })
+
+	value, err := store.GetConfig("potential")
+	require.NoError(t, err)
+	assert.Equal(t, "net", value)
+
+	cmd, _ = NewTestingCmd(t, "config", "potential", "after-tax")
+	assert.EqualError(t, cmd.Execute(), `"after-tax" is neither gross nor net`)
 }

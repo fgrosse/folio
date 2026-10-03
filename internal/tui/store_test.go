@@ -105,7 +105,8 @@ func testPortfolio() Portfolio {
 		Quotes: map[string]portfolio.Quote{
 			"PANW": {Symbol: "PANW", Price: dec("396.25"), PreviousClose: dec("397.31"), Currency: "USD"},
 		},
-		TaxRate: decimal.NewNullDecimal(dec("44.3")),
+		TaxRate:        decimal.NewNullDecimal(dec("44.3")),
+		PotentialBasis: portfolio.Gross,
 	}
 }
 
@@ -117,6 +118,7 @@ func (m *MockStore) returns(p Portfolio) {
 	} else {
 		m.On("GetConfig", portfolio.TaxRateKey).Return("", portfolio.ErrNotSet)
 	}
+	m.On("GetConfig", portfolio.PotentialBasisKey).Return(string(p.PotentialBasis), nil)
 }
 
 // returnsAccount sets store up to answer with the lots, grants, quotes and sales of p, and leaves

@@ -65,6 +65,20 @@ func TestAccount_Total(t *testing.T) {
 	assert.Equal(t, "12779.57", account.Total().String())
 }
 
+// TestAccount_AfterTax covers the account with its potential value after tax, which is what the
+// vests will bring rather than what the bank states for them. What is held was taxed when it vested,
+// so the current value stays as it is, and the total is the two added up as ever.
+func TestAccount_AfterTax(t *testing.T) {
+	account := Account{Current: shares("3368.13"), Potential: shares("7925"), Unpriced: []string{"SAP.DE"}}
+
+	net := account.AfterTax(shares("44.3"))
+
+	assert.Equal(t, "3368.13", net.Current.String())
+	assert.Equal(t, "4414.23", net.Potential.String())
+	assert.Equal(t, "7782.36", net.Total().String())
+	assert.Equal(t, []string{"SAP.DE"}, net.Unpriced)
+}
+
 // TestNewAccount_Unpriced covers stock there is no quote of, such as right after a lot of a new
 // symbol was entered or when a symbol was mistyped. It is worth nothing in the values, since there
 // is nothing to value it at, and the account names the symbol so that a view can say the values are

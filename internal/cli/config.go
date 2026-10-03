@@ -25,6 +25,13 @@ var configKeys = []configKey{
 			return rate.String() + "%", nil
 		},
 	},
+	{
+		name: portfolio.PotentialBasisKey,
+		parse: func(value string) (string, error) {
+			basis, err := portfolio.ParsePotentialBasis(value)
+			return string(basis), err
+		},
+	},
 }
 
 // A configKey is a value of the configuration of an account, by the name that folio config knows
@@ -58,6 +65,12 @@ The keys are:
              it out. It takes one rate for every vest instead: your estimate of the
              rate at the top of your income. The Vesting view shows what each vest
              is worth after tax at this rate.
+
+  potential  Which potential value the TUI shows in its header: gross, the value
+             of the shares still to vest as the bank states it, or net, what is
+             left of it after tax at the tax rate. With net, the total is the
+             current value and the potential value after tax. It is gross if it
+             is not set, and gross too without a tax rate to take off.
 `,
 		Example: `
   # Have vests taxed at 44.3%
@@ -65,6 +78,9 @@ The keys are:
 
   # Print the rate that is set
   folio config tax-rate
+
+  # Show the potential value after tax in the TUI
+  folio config potential net
 
   # Print the whole configuration
   folio config

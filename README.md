@@ -148,7 +148,9 @@ line, `ctrl+s` does. The note of a sale shows above the Sales table while the sa
 A vest is taxed as income when it vests, at a rate that depends on the rest of your income and where
 you live. folio does not work it out: it takes the rate you set with `folio config tax-rate` for
 every vest, and the Vesting view shows what is left of each after tax at that rate. The three values
-stay the bank's, before tax.
+are the bank's, before tax, unless you set `folio config potential net`: then the header of the TUI
+shows the potential value after tax, and the total as the current value and that added up. The
+potential value is marked `(gross)` or `(net)`, so that you can tell which one you are looking at.
 
 Prices are fetched when the TUI starts and every five minutes after that. It opens with the last
 prices it saw, so it works without a network too.
@@ -164,6 +166,7 @@ folio grant --vests schedule.txt "Payout: PANW"    # the vests listed, "<YYYY-MM
 folio release 2026-01-15 6 @380.12                 # 6 shares arrived, worth $380.12 each that day
 folio config tax-rate 44.3%                        # the rate vests are taxed at
 folio config tax-rate                              # print it
+folio config potential net                         # show the potential value after tax in the TUI
 folio config                                       # the whole configuration, as YAML
 folio config -o json                               # the whole configuration, as JSON
 folio status
