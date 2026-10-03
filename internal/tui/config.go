@@ -40,6 +40,16 @@ func setConfigCmd(store Store, key, value string) tea.Cmd {
 	}
 }
 
+// unsetConfigCmd returns a command that takes the value of key of the configuration in store back
+// and then loads the configuration, as setConfigCmd does.
+func unsetConfigCmd(store Store, key string) tea.Cmd {
+	return func() tea.Msg {
+		_ = store.UnsetConfig(key)
+		values, _ := loadConfig(store)
+		return ConfigSavedMsg{values: values}
+	}
+}
+
 // loadConfig returns what every key of the configuration is set to in store, by the name of the
 // key, as text the way the store keeps it. A key that is not set is not in it.
 func loadConfig(store Store) (map[string]string, error) {

@@ -98,6 +98,8 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case SetConfigMsg:
 		return m, setConfigCmd(m.store, msg.key, msg.value)
+	case UnsetConfigMsg:
+		return m, unsetConfigCmd(m.store, msg.key)
 	case ConfigSavedMsg:
 		return m.handleConfigSaved(msg)
 	default:

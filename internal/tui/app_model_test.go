@@ -395,3 +395,28 @@ func TestAppModel_SetsConfig(t *testing.T) {
 	driveApp(t, m, loaded)
 	assert.Equal(t, []tea.Msg{loaded}, holdings.msgs, "and every view receives it")
 }
+
+// TestAppModel_UnsetsConfig covers what the app does when the dialog asks for a value to be taken
+// back: the key is unset in the store, and the dialog and the views are brought up to date as they
+// are after a value was set.
+func TestAppModel_UnsetsConfig(t *testing.T) {
+	store := new(MockStore)
+	store.returnsAccount(testPortfolio())
+	store.On("UnsetConfig", "tax-rate").Return(nil)
+	store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
+
+	holdings := &stubView{title: "Holdings", content: "the lots"}
+	m := openConfig(t, store, map[string]string{"tax-rate": "44.3%"}, holdings)
+
+	_, cmd := m.Update(UnsetConfigMsg{key: "tax-rate"})
+	saved := runCmd(t, cmd)
+	store.AssertCalled(t, "UnsetConfig", "tax-rate")
+	assert.Equal(t, ConfigSavedMsg{values: map[string]string{}}, saved)
+
+	_, cmd = m.Update(saved)
+	assert.Contains(t, ansi.Strip(m.View().Content), "> tax-rate   not set")
+
+	loaded, ok := runCmd(t, cmd).(PortfolioLoadedMsg)
+	require.True(t, ok, "the portfolio is loaded again")
+	assert.False(t, loaded.portfolio.TaxRate.Valid)
+}
