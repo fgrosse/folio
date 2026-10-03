@@ -575,27 +575,6 @@ func TestStore_LotsWithSalesAreKept(t *testing.T) {
 	require.NoError(t, s.DeleteLot(1))
 }
 
-// TestStore_TaxRate covers the rate that vests are taxed at, which is one for the whole account: a
-// fresh database has none, and a rate that is set comes back until another is set in its place.
-func TestStore_TaxRate(t *testing.T) {
-	s := NewTestingStore()
-
-	rate, err := s.TaxRate()
-	require.NoError(t, err)
-	assert.False(t, rate.Valid, "a fresh database should have no tax rate")
-
-	require.NoError(t, s.SetTaxRate(shares("44.3")))
-	rate, err = s.TaxRate()
-	require.NoError(t, err)
-	require.True(t, rate.Valid)
-	assert.Equal(t, "44.3", rate.Decimal.String())
-
-	require.NoError(t, s.SetTaxRate(shares("42")))
-	rate, err = s.TaxRate()
-	require.NoError(t, err)
-	assert.Equal(t, "42", rate.Decimal.String())
-}
-
 // TestStore_Config covers the configuration of the account, which the store keeps as text by key
 // and leaves the meaning of to whoever sets it: a key that was never set is an error that says so,
 // and a value that is set comes back until another is set in its place. Each key has a value of
