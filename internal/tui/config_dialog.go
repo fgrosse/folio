@@ -41,6 +41,11 @@ type SetConfigMsg struct {
 	value string
 }
 
+// UnsetConfigMsg asks for the value of the key of the configuration to be taken back.
+type UnsetConfigMsg struct {
+	key string
+}
+
 // NewConfigDialog returns a dialog over keys, the first of which is selected. values is what the
 // keys are set to, by name, without the ones that are not set. width is how many columns the
 // dialog occupies inside its border, and style is what Layer draws it with.
@@ -60,8 +65,8 @@ func NewConfigDialog(keys []portfolio.ConfigKey, values map[string]string, width
 //
 // On a key that takes any text, enter turns the value into a field to type it into. While that is
 // open, enter asks for what it holds to be set, and every other key goes to the field, so that
-// letters such as "j" type rather than move the selection. A value that the key refuses keeps the
-// field open, and the dialog shows why under the description.
+// letters such as "j" type rather than move the selection. An empty field asks for the
+// key to be unset. A value that the key refuses keeps the field open, and the dialog shows why under the description.
 func (d *ConfigDialog) HandleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 	if d.editing {
 		return d.handleEditKeyPress(msg)
@@ -101,6 +106,8 @@ func (d *ConfigDialog) handleEditKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 func (d *ConfigDialog) editCmd() tea.Cmd {
 	d.input = textinput.New()
 	d.input.Prompt = ""
+	// An empty field unsets the key, so it shows what the row will say then.
+	d.input.Placeholder = notSet
 	// As in InputDialog: the field draws a virtual cursor after padding to its width, so it is
 	// configured one column narrower than it renders.
 	d.input.SetWidth(d.valueWidth() - 1)
@@ -112,12 +119,22 @@ func (d *ConfigDialog) editCmd() tea.Cmd {
 }
 
 // submitCmd ends the edit and returns the command that asks for the selected key to be set to what
-// was typed, written the way the key stores it. The field is read right away rather than inside
+// was typed, written the way the key stores it, or to be unset if nothing was. The field is read right away rather than inside
 // the returned command, as in InputDialog.
 func (d *ConfigDialog) submitCmd() tea.Cmd {
 	key := d.keys[d.selected]
 
-	value, err := key.Parse(strings.TrimSpace(d.input.Value()))
+	typed := strings.TrimSpace(d.input.Value())
+	if typed == "" {
+		// Nothing is no value of any key, so it is how to say that the key should have none.
+		d.err = nil
+		d.editing = false
+		unset := UnsetConfigMsg{key: key.Name}
+
+		return func() tea.Msg { return unset }
+	}
+
+	value, err := key.Parse(typed)
 	if err != nil {
 		// Stay in the field with the text still in it, so the user can correct it.
 		d.err = err

@@ -187,3 +187,20 @@ func TestConfigDialog_Refused(t *testing.T) {
 	assert.Equal(t, SetConfigMsg{key: "tax-rate", value: "12%"}, runCmd(t, cmd))
 	assert.NotContains(t, dialogText(d), "a tax rate is between")
 }
+
+// TestConfigDialog_Unset covers taking a value back: enter on a field with nothing in it asks for
+// the key to be unset rather than handing nothing to the key, which would refuse it. The empty
+// field says what enter will leave the key as.
+func TestConfigDialog_Unset(t *testing.T) {
+	enter := tea.KeyPressMsg{Code: tea.KeyEnter}
+
+	d := NewConfigDialog(testConfigKeys(t), map[string]string{"tax-rate": "5%"}, dialogWidth, DefaultStyle())
+	d.HandleKeyPress(enter)
+	d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	assert.Contains(t, dialogText(d), "> tax-rate   not set")
+
+	cmd := d.HandleKeyPress(enter)
+	assert.Equal(t, UnsetConfigMsg{key: "tax-rate"}, runCmd(t, cmd))
+	assert.False(t, d.Editing())
+}
