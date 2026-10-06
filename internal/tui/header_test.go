@@ -15,8 +15,9 @@ import (
 
 // TestAccountHeader covers the two lines above the table of every view, which are where the account
 // values live: the total on the first line and the two values it is made of on the second, at the
-// right end where the table's values are. What the view itself has to say goes on the left, with a
-// status line under it.
+// right end where the table's values are. A badge in front of the total says whether the values are
+// gross or net, once for all three. What the view itself has to say goes on the left, with a status
+// line under it.
 func TestAccountHeader(t *testing.T) {
 	account := portfolio.Account{Current: dec("3368.13"), Potential: dec("7925")}
 
@@ -25,8 +26,8 @@ func TestAccountHeader(t *testing.T) {
 	header := accountHeader("8.5 PANW", "PANW $396.25", values, 66, DefaultStyle())
 
 	expected := "" +
-		"  8.5 PANW                                         Total: $11,293.13\n" +
-		"  PANW $396.25       Current $3,368.13 · Potential (gross) $7,925.00"
+		"  8.5 PANW                                 [GROSS] Total: $11,293.13\n" +
+		"  PANW $396.25               Current $3,368.13 · Potential $7,925.00"
 	assert.Equal(t, expected, ansi.Strip(header))
 
 	// Both lines end in the column the table's last cell does: the indent and the width given.
@@ -38,10 +39,10 @@ func TestAccountHeader(t *testing.T) {
 // TestPortfolioHeader_ShowNet covers the values the header shows, which are the bank's unless the
 // account asks for them after tax. Then the potential value is what is left of the vests after tax
 // at the tax rate, and the current value what the shares that are held would bring if they were
-// sold today, less the tax on the gain of each lot. Each says that it is net, and the total is the
-// two added up, so that the values on screen add up. A value without a rate to take off stays the
-// bank's and does not say net. The current value says nothing while it is the bank's: the line has
-// the prices to fit in as well.
+// sold today, less the tax on the gain of each lot. The total is the two added up, so that the
+// values on screen add up, and the badge in front of it says net for all three. A value without a
+// rate to take off stays the bank's, and is the one that says so under a badge that says net.
+// Without either rate nothing is net, whatever the account asks for.
 func TestPortfolioHeader_ShowNet(t *testing.T) {
 	cases := map[string]struct {
 		showNet        bool
@@ -51,25 +52,32 @@ func TestPortfolioHeader_ShowNet(t *testing.T) {
 		parts          string
 	}{
 		"gross": {
-			total: "Total: $11,293.13",
-			parts: "Current $3,368.13 · Potential (gross) $7,925.00",
+			total: " [GROSS] Total: $11,293.13",
+			parts: "  Current $3,368.13 · Potential $7,925.00",
 		},
 		"net": {
 			showNet: true,
-			total:   "Total: $7,756.81",
-			parts:   "Current (net) $3,342.58 · Potential (net) $4,414.23",
+			total:   " [NET] Total: $7,756.81",
+			parts:   "  Current $3,342.58 · Potential $4,414.23",
 		},
 		"net without a tax rate": {
 			showNet:   true,
 			noTaxRate: true,
-			total:     "Total: $11,267.58",
-			parts:     "Current (net) $3,342.58 · Potential (gross) $7,925.00",
+			total:     " [NET] Total: $11,267.58",
+			parts:     "  Current $3,342.58 · Potential (gross) $7,925.00",
 		},
 		"net without a gains tax rate": {
 			showNet:        true,
 			noGainsTaxRate: true,
-			total:          "Total: $7,782.36",
-			parts:          "Current $3,368.13 · Potential (net) $4,414.23",
+			total:          " [NET] Total: $7,782.36",
+			parts:          "  Current (gross) $3,368.13 · Potential $4,414.23",
+		},
+		"net without either rate": {
+			showNet:        true,
+			noTaxRate:      true,
+			noGainsTaxRate: true,
+			total:          " [GROSS] Total: $11,293.13",
+			parts:          "  Current $3,368.13 · Potential $7,925.00",
 		},
 	}
 
@@ -94,8 +102,8 @@ func TestPortfolioHeader_ShowNet(t *testing.T) {
 }
 
 // TestPortfolioHeader_CutsThePricesShort covers a header with more prices than its line has room
-// for next to the account values, which a second stock or a value marked net is enough for in a
-// narrow window. The prices are cut short rather than pushing the values past the end of the table,
+// for next to the account values, which a second stock is enough for in a narrow window, the more
+// so with a value marked as the gross one. The prices are cut short rather than pushing the values past the end of the table,
 // where the terminal would wrap them into the frame.
 func TestPortfolioHeader_CutsThePricesShort(t *testing.T) {
 	p := testPortfolio()
@@ -107,7 +115,7 @@ func TestPortfolioHeader_CutsThePricesShort(t *testing.T) {
 	lines := strings.Split(ansi.Strip(portfolioHeader("3 AAPL · 8.5 PANW", p, nil, 78, DefaultStyle())), "\n")
 
 	require.Len(t, lines, 2)
-	assert.Equal(t, "  AAPL $330.32 ▲ 1.6% · …  Current (net) $4,333.54 · Potential (gross) $7,925.00", lines[1])
+	assert.Equal(t, "  AAPL $330.32 ▲ 1.6% · PANW $…  Current $4,333.54 · Potential (gross) $7,925.00", lines[1])
 	assert.Equal(t, 80, lipgloss.Width(lines[1]))
 }
 

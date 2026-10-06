@@ -50,10 +50,16 @@ type shownValues struct {
 	potentialNet bool
 }
 
+// net reports whether the header calls the values net, which it does as soon as one of the two the
+// total is made of is after tax: the total is no longer the bank's then.
+func (v shownValues) net() bool {
+	return v.currentNet || v.potentialNet
+}
+
 // shownAccount returns the values of p that the header shows. They are the bank's numbers unless
 // the account asks for them after tax. Then each of the two the total is made of is after tax if
-// the account has a rate to take off it, and still the bank's number otherwise, so that the header
-// never calls a value net that is not. The two have a tax each: a vest is taxed as income, and what
+// the account has a rate to take off it, and still the bank's number otherwise, which the header
+// then says of that value, so that it never calls a value net that is not. The two have a tax each: a vest is taxed as income, and what
 // is held on the gain it made since.
 func shownAccount(p Portfolio) shownValues {
 	values := shownValues{account: portfolio.NewAccount(p.Lots, p.Grants, p.Quotes)}
@@ -76,18 +82,17 @@ func shownAccount(p Portfolio) shownValues {
 // headerGap is the least space between the two halves of a header line.
 const headerGap = 2
 
-// accountParts renders the two values the total is made of, for the second line of the header. The
-// potential value says whether it is gross or net, since the two differ by the tax on the vests and
-// the header is where the user compares folio with the bank. The current value only says so when
-// it is net: it is the bank's unless the account asks otherwise, and the line has the prices to fit
-// in as well.
+// accountParts renders the two values the total is made of, for the second line of the header.
+// Whether they are gross or net is said once, by the badge next to the total, so a value says
+// nothing of its own unless it is the exception: the one that is still the bank's among values that
+// are net, for want of a rate to take off it.
 func accountParts(values shownValues) string {
-	current, potential := "Current", "Potential (gross)"
-	if values.currentNet {
-		current += " (net)"
+	current, potential := "Current", "Potential"
+	if values.net() && !values.currentNet {
+		current += " (gross)"
 	}
-	if values.potentialNet {
-		potential = "Potential (net)"
+	if values.net() && !values.potentialNet {
+		potential += " (gross)"
 	}
 
 	return fmt.Sprintf("%s %s · %s %s",
@@ -97,14 +102,20 @@ func accountParts(values shownValues) string {
 
 // accountHeader renders the two lines above the table of a view. The right half is the same in
 // every view and is what folio is for: the total account value on the first line, in the one accent
-// of the header, and the current and potential value it is made of underneath, marked as before
-// or after tax. The left half is the view's own: what it has to say about the table below,
-// and a status line under it.
+// of the header, and the current and potential value it is made of underneath. A badge in front of
+// the total says whether the three are before or after tax, since the header is where the user
+// compares folio with the bank. The left half is the view's own: what it has to say about the table
+// below, and a status line under it.
 //
 // width is that of the table without the padding of its cells, so that the values end where the
 // last column's do.
 func accountHeader(left, status string, values shownValues, width int, style Style) string {
-	total := style.Total.Render("Total: " + portfolio.FormatUSD(values.account.Total()))
+	badge := "[GROSS]"
+	if values.net() {
+		badge = "[NET]"
+	}
+
+	total := style.Badge.Render(badge) + " " + style.Total.Render("Total: "+portfolio.FormatUSD(values.account.Total()))
 	parts := style.Hint.Render(accountParts(values))
 
 	return spread(left, total, width) + "\n" + spread(status, parts, width)

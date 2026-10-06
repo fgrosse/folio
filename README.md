@@ -161,8 +161,9 @@ columns or more, and the tax in one of 108.
 
 The three values are the bank's, before tax, unless you set `folio config show-net-summary true`.
 Then the header of the TUI shows the potential value after the tax on the vests and the current
-value after the tax on the gains, as if you sold everything today, each marked `(net)`. The total
-is the two added up. A value whose rate is not set stays the bank's.
+value after the tax on the gains, as if you sold everything today. The total is the two added up.
+A badge in front of the total says whether the values are `[GROSS]` or `[NET]`. A value whose rate
+is not set stays the bank's, and is marked `(gross)` when the other one is net.
 
 `c` opens the configuration from any view, with a row for each key that `folio config` has. `enter`
 edits the value of the selected row, and an empty value unsets it. A row with a few values to pick
