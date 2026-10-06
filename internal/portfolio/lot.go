@@ -143,6 +143,17 @@ func (l Lot) Growth(price decimal.Decimal) (growth decimal.Decimal, ok bool) {
 	return price.Sub(l.Cost).Div(l.Cost).Mul(hundred), true
 }
 
+// Gain is how much more the shares left of the lot are worth at price, that of one share now, than
+// they cost, and less than zero if they are worth less. It is what a sale of them at that price
+// would be taxed on. A lot without a cost has no gain to state, which ok says.
+func (l Lot) Gain(price decimal.Decimal) (gain decimal.Decimal, ok bool) {
+	if l.Cost.IsZero() {
+		return decimal.Zero, false
+	}
+
+	return price.Sub(l.Cost).Mul(l.Remaining()), true
+}
+
 // String renders the lot as its spec, in the syntax NewLot reads: "<shares> <symbol> <YYYY-MM-DD>",
 // and "@<cost>" after it if the lot has a cost.
 func (l Lot) String() string {

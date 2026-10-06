@@ -245,3 +245,31 @@ func TestLot_Growth(t *testing.T) {
 		})
 	}
 }
+
+// TestLot_Gain covers what the shares left of a lot are worth over what they cost, which is what a
+// sale of them at that price would be taxed on: the difference a share made, for every share that
+// is still held. It is less than zero for a lot that lost. A lot without a cost has no gain to
+// state, and says so.
+func TestLot_Gain(t *testing.T) {
+	tests := map[string]struct {
+		lot      Lot
+		expected string
+		unknown  bool
+	}{
+		"up":             {lot: Lot{Shares: shares("6"), Cost: shares("380.12")}, expected: "96.78"},
+		"down":           {lot: Lot{Shares: shares("3"), Cost: shares("452.86")}, expected: "-169.83"},
+		"partly sold":    {lot: Lot{Shares: shares("6"), Sold: shares("2"), Cost: shares("380.12")}, expected: "64.52"},
+		"without a cost": {lot: Lot{Shares: shares("2.5")}, unknown: true},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			gain, ok := tt.lot.Gain(shares("396.25"))
+
+			assert.Equal(t, !tt.unknown, ok)
+			if ok {
+				assert.Equal(t, tt.expected, gain.String())
+			}
+		})
+	}
+}
