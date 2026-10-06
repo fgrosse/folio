@@ -215,3 +215,33 @@ func TestParseRelease(t *testing.T) {
 		})
 	}
 }
+
+// TestLot_Growth covers how far the price of a share has moved from what the lot cost, in percent
+// of that cost: up, down, or not at all. A lot without a cost has nothing to measure from, and says
+// so rather than passing for a lot that has not moved.
+func TestLot_Growth(t *testing.T) {
+	tests := map[string]struct {
+		cost     string
+		price    string
+		expected string
+		unknown  bool
+	}{
+		"up":             {cost: "200", price: "446", expected: "123"},
+		"down":           {cost: "400", price: "350", expected: "-12.5"},
+		"where it was":   {cost: "380.12", price: "380.12", expected: "0"},
+		"without a cost": {cost: "0", price: "396.25", unknown: true},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			lot := Lot{Symbol: "PANW", Shares: shares("6"), Cost: shares(tt.cost)}
+
+			growth, ok := lot.Growth(shares(tt.price))
+
+			assert.Equal(t, !tt.unknown, ok)
+			if ok {
+				assert.Equal(t, tt.expected, growth.String())
+			}
+		})
+	}
+}

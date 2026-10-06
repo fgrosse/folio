@@ -131,6 +131,18 @@ func (l Lot) Remaining() decimal.Decimal {
 	return l.Shares.Sub(l.Sold)
 }
 
+// Growth is how far price, that of one share now, is from what a share of the lot cost, in percent
+// of that cost: 123 for a share that is worth more than twice as much, and less than zero for one
+// that lost. It is the same for every share of the lot, however many are left. A lot without a cost
+// has no growth, which ok says.
+func (l Lot) Growth(price decimal.Decimal) (growth decimal.Decimal, ok bool) {
+	if l.Cost.IsZero() {
+		return decimal.Zero, false
+	}
+
+	return price.Sub(l.Cost).Div(l.Cost).Mul(hundred), true
+}
+
 // String renders the lot as its spec, in the syntax NewLot reads: "<shares> <symbol> <YYYY-MM-DD>",
 // and "@<cost>" after it if the lot has a cost.
 func (l Lot) String() string {
