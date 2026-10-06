@@ -5,15 +5,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- `folio config` to get and set the configuration of the account, such as the tax rate
-- The Vesting view shows what each vest is worth after tax
+_Nothing yet_
+
+## [v1.1.0] - 2026-10-06
+This release is about tax. folio now estimates what the account is worth after it: what is left of
+each vest once it is taxed as income, and what selling a lot today would cost in tax on its gain.
+The rates are yours to set, with the new `folio config` or without leaving the TUI.
+
+- `folio config` gets and sets the configuration of the account, prints all of it as YAML or with `-o json`, and takes a value back with `--unset`
 - `c` opens the configuration in the TUI, to set and unset its values without leaving it
-- `folio config --unset` takes a value of the configuration back
-- The Holdings view shows the gain of each lot since it was acquired, in percent
+- `folio config tax-rate` sets the rate vests are taxed at, and the Vesting view shows what each vest is worth after tax
 - `folio config gains-tax-rate` sets the rate the gain of a sale is taxed at, and the details of a lot show the tax that selling it would cost
-- `folio config show-net-summary true` shows the potential and the current value after tax in the header of the TUI, each marked net
-- The Holdings view leaves out the gain in a terminal too narrow for it
+- `folio config show-net-summary true` shows the potential and the current value after tax in the header of the TUI, with a badge that says whether the values are `[GROSS]` or `[NET]`
+- The Holdings view shows the gain of each lot since it was acquired, in percent
 - `enter` in the Holdings view shows the details of the selected lot next to the table, with what it has gained since it was acquired
+- The Holdings view leaves out the gain in a terminal too narrow for it, and the header cuts the prices short where it has no room
+- `folio demo` opens on an account with both tax rates set
 
 ## [v1.0.0] - 2026-10-02
 - Initial release
@@ -27,5 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `folio demo` to try folio with a made-up account
 - `folio version` to print the version of folio
 
-[Unreleased]: https://github.com/fgrosse/folio/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/fgrosse/folio/compare/v1.1.0...HEAD
+[v1.1.0]: https://github.com/fgrosse/folio/compare/v1.0.0...v1.1.0
 [v1.0.0]: https://github.com/fgrosse/folio/releases/tag/v1.0.0
