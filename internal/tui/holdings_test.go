@@ -596,6 +596,16 @@ func TestHoldingsModel_ShowsDetails(t *testing.T) {
 	assert.NotContains(t, frame, "PANW of 2026-01-15")
 }
 
+// TestHoldingsModel_RenderDetails is the frame with the flyout open: it takes the right of the
+// table's box, from the top of it to the bottom, and leaves the left of every row in sight, which
+// says whose details these are.
+func TestHoldingsModel_RenderDetails(t *testing.T) {
+	m, _ := newTestingHoldings(t)
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	golden.RequireEqual(t, ansi.Strip(m.View().Content))
+}
+
 // TestHoldingsModel_ClosesDetails covers getting rid of the flyout: with the key that opened it, and
 // with esc, which closes whatever else is in front of the table as well.
 func TestHoldingsModel_ClosesDetails(t *testing.T) {
