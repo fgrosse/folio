@@ -131,6 +131,31 @@ func (l Lot) Remaining() decimal.Decimal {
 	return l.Shares.Sub(l.Sold)
 }
 
+// GrowthPercent returns how much one share of the lot has gained or lost since it was acquired, in
+// percent of its cost. [price] is what one share is worth now. The result is 123 for a share that
+// cost $200 and is worth $446, and negative for a share that is worth less than it cost. It does
+// not depend on how many shares are left. ok is false if the lot has no cost, since there is
+// nothing to measure from.
+func (l Lot) GrowthPercent(price decimal.Decimal) (percent decimal.Decimal, ok bool) {
+	if l.Cost.IsZero() {
+		return decimal.Zero, false
+	}
+
+	return price.Sub(l.Cost).Div(l.Cost).Mul(hundred), true
+}
+
+// Gain returns how much more the shares left of the lot are worth than they cost, in dollars.
+// [price] is what one share is worth now. The result is negative if the shares are worth less than
+// they cost. It is the amount a sale of them at [price] would be taxed on. ok is false if the lot
+// has no cost, since the gain is not known then.
+func (l Lot) Gain(price decimal.Decimal) (gain decimal.Decimal, ok bool) {
+	if l.Cost.IsZero() {
+		return decimal.Zero, false
+	}
+
+	return price.Sub(l.Cost).Mul(l.Remaining()), true
+}
+
 // String renders the lot as its spec, in the syntax NewLot reads: "<shares> <symbol> <YYYY-MM-DD>",
 // and "@<cost>" after it if the lot has a cost.
 func (l Lot) String() string {

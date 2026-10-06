@@ -327,8 +327,8 @@ func TestAppModel_OpensConfig(t *testing.T) {
 
 	m = driveApp(t, m, loaded)
 	frame := ansi.Strip(m.View().Content)
-	assert.Contains(t, frame, "> tax-rate   44.3%")
-	assert.Contains(t, frame, "  potential  ‹ gross ›")
+	assert.Contains(t, frame, "> tax-rate          44.3%")
+	assert.Contains(t, frame, "  show-net-summary  ‹ false ›")
 	assert.Empty(t, holdings.msgs, "the view sees neither the key nor what was loaded")
 
 	typing := &stubView{title: "Holdings", captures: true}
@@ -360,11 +360,11 @@ func TestAppModel_ConfigKeepsTheKeys(t *testing.T) {
 	assert.Empty(t, holdings.msgs, "and gets none of the keys")
 
 	m = driveApp(t, m, tea.KeyPressMsg{Code: tea.KeyDown})
-	assert.Contains(t, ansi.Strip(m.View().Content), "> potential", "the dialog gets them")
+	assert.Contains(t, ansi.Strip(m.View().Content), "> gains-tax-rate", "the dialog gets them")
 
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
 	m = driveApp(t, m, runCmd(t, cmd))
-	assert.NotContains(t, ansi.Strip(m.View().Content), "potential", "esc closes the dialog")
+	assert.NotContains(t, ansi.Strip(m.View().Content), "show-net-summary", "esc closes the dialog")
 	assert.Empty(t, holdings.msgs, "which is nothing a view has to know of")
 
 	m = driveApp(t, m, keyPressed("2"))
@@ -377,24 +377,24 @@ func TestAppModel_ConfigKeepsTheKeys(t *testing.T) {
 func TestAppModel_SetsConfig(t *testing.T) {
 	store := new(MockStore)
 	store.returnsAccount(testPortfolio())
-	store.On("SetConfig", "potential", "net").Return(nil)
-	store.On("GetConfig", portfolio.PotentialBasisKey).Return("net", nil)
+	store.On("SetConfig", "show-net-summary", "true").Return(nil)
+	store.On("GetConfig", portfolio.ShowNetSummaryKey).Return("true", nil)
 	store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
 
 	holdings := &stubView{title: "Holdings", content: "the lots"}
 	m := openConfig(t, store, nil, holdings)
 
-	_, cmd := m.Update(SetConfigMsg{key: "potential", value: "net"})
+	_, cmd := m.Update(SetConfigMsg{key: "show-net-summary", value: "true"})
 	saved := runCmd(t, cmd)
-	store.AssertCalled(t, "SetConfig", "potential", "net")
-	assert.Equal(t, ConfigSavedMsg{values: map[string]string{"potential": "net"}}, saved)
+	store.AssertCalled(t, "SetConfig", "show-net-summary", "true")
+	assert.Equal(t, ConfigSavedMsg{values: map[string]string{"show-net-summary": "true"}}, saved)
 
 	_, cmd = m.Update(saved)
-	assert.Contains(t, ansi.Strip(m.View().Content), "‹ net ›")
+	assert.Contains(t, ansi.Strip(m.View().Content), "‹ true ›")
 
 	loaded, ok := runCmd(t, cmd).(PortfolioLoadedMsg)
 	require.True(t, ok, "the portfolio is loaded again")
-	assert.Equal(t, portfolio.Net, loaded.portfolio.PotentialBasis)
+	assert.True(t, loaded.portfolio.ShowNet)
 
 	driveApp(t, m, loaded)
 	assert.Equal(t, []tea.Msg{loaded}, holdings.msgs, "and every view receives it")
@@ -418,7 +418,7 @@ func TestAppModel_UnsetsConfig(t *testing.T) {
 	assert.Equal(t, ConfigSavedMsg{values: map[string]string{}}, saved)
 
 	_, cmd = m.Update(saved)
-	assert.Contains(t, ansi.Strip(m.View().Content), "> tax-rate   not set")
+	assert.Contains(t, ansi.Strip(m.View().Content), "> tax-rate          not set")
 
 	loaded, ok := runCmd(t, cmd).(PortfolioLoadedMsg)
 	require.True(t, ok, "the portfolio is loaded again")
@@ -431,7 +431,7 @@ func TestAppModel_UnsetsConfig(t *testing.T) {
 // A configuration that cannot be loaded opens the dialog all the same, to say so.
 func TestAppModel_ConfigErrors(t *testing.T) {
 	store := new(MockStore)
-	store.On("SetConfig", "potential", "net").Return(errors.New("disk full"))
+	store.On("SetConfig", "show-net-summary", "true").Return(errors.New("disk full"))
 	store.On("UnsetConfig", "tax-rate").Return(errors.New("disk full"))
 	store.On("GetConfig", portfolio.TaxRateKey).Return("44.3%", nil)
 	store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
@@ -440,7 +440,7 @@ func TestAppModel_ConfigErrors(t *testing.T) {
 		msg      tea.Msg
 		expected string
 	}{
-		"set":   {msg: SetConfigMsg{key: "potential", value: "net"}, expected: "set potential: disk full"},
+		"set":   {msg: SetConfigMsg{key: "show-net-summary", value: "true"}, expected: "set show-net-summary: disk full"},
 		"unset": {msg: UnsetConfigMsg{key: "tax-rate"}, expected: "unset tax-rate: disk full"},
 	}
 
@@ -454,8 +454,8 @@ func TestAppModel_ConfigErrors(t *testing.T) {
 
 			frame := ansi.Strip(m.View().Content)
 			assert.Contains(t, frame, tt.expected)
-			assert.Contains(t, frame, "> tax-rate   44.3%")
-			assert.Contains(t, frame, "‹ gross ›")
+			assert.Contains(t, frame, "> tax-rate          44.3%")
+			assert.Contains(t, frame, "‹ false ›")
 		})
 	}
 
@@ -477,7 +477,7 @@ func TestAppModel_ForwardsOtherMessagesToConfig(t *testing.T) {
 
 	m = driveApp(t, m, tea.KeyPressMsg{Code: tea.KeyEnter}, tea.PasteMsg{Content: "44.3"})
 
-	assert.Contains(t, ansi.Strip(m.View().Content), "> tax-rate   44.3")
+	assert.Contains(t, ansi.Strip(m.View().Content), "> tax-rate          44.3")
 	assert.Equal(t, []tea.Msg{tea.PasteMsg{Content: "44.3"}}, holdings.msgs, "the views still get them")
 }
 

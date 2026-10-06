@@ -11,31 +11,22 @@ import (
 // percent and as ParseTaxRate reads it.
 const TaxRateKey = "tax-rate"
 
-// PotentialBasisKey is the key of the configuration that says which potential value the TUI shows
-// in its header, as ParsePotentialBasis reads it. It is gross when it is not set.
-const PotentialBasisKey = "potential"
+// GainsTaxRateKey is the key of the configuration that the rate the gain of a sale is taxed at is
+// set under, in percent and as ParseTaxRate reads it.
+const GainsTaxRateKey = "gains-tax-rate"
 
-const (
-	// Gross is the potential value before tax, as the bank states it.
-	Gross PotentialBasis = "gross"
-
-	// Net is the potential value after tax, at the rate of the account.
-	Net PotentialBasis = "net"
-)
+// ShowNetSummaryKey is the key of the configuration that says whether the TUI shows the values in
+// its header after tax, as ParseSwitch reads it. They are before tax when it is not set.
+const ShowNetSummaryKey = "show-net-summary"
 
 // hundred is all of something, in percent.
 var hundred = decimal.NewFromInt(100)
 
-// A PotentialBasis is whether the potential value of an account is shown as the bank states it,
-// before tax, or as what is left of it once the tax on the vests is taken off. The bank's number
-// is the one to compare with its web site, and the one after tax is closer to what the vests will
-// bring.
-type PotentialBasis string
-
-// ParseTaxRate parses the rate that a vest is taxed at, written as a percentage such as "44.3%" or
+// ParseTaxRate parses a rate that something is taxed at, written as a percentage such as "44.3%" or
 // "44.3", and returns it in percent. A vest is taxed as income, at a rate that depends on the rest
 // of the year's income and the country, so folio does not work it out but takes one rate for every
-// vest, which is the user's estimate of the rate at the top of their income.
+// vest, which is the user's estimate of the rate at the top of their income. The gain of a sale is
+// taxed at a rate of its own, which in many countries is the same whatever the income.
 func ParseTaxRate(spec string) (decimal.Decimal, error) {
 	number := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(spec), "%"))
 
@@ -56,12 +47,25 @@ func AfterTax(value, rate decimal.Decimal) decimal.Decimal {
 	return value.Mul(hundred.Sub(rate)).Div(hundred).Round(2)
 }
 
-// ParsePotentialBasis parses which potential value to show, written as "gross" or "net".
-func ParsePotentialBasis(value string) (PotentialBasis, error) {
-	switch basis := PotentialBasis(strings.ToLower(strings.TrimSpace(value))); basis {
-	case Gross, Net:
-		return basis, nil
+// GainsTax returns the tax that is due on gain, what a sale brought over what the shares cost, at
+// rate in percent and to the cent. A loss is not taxed. Neither does it earn anything back here:
+// what a loss is good for depends on the other sales of the year, which this does not know.
+func GainsTax(gain, rate decimal.Decimal) decimal.Decimal {
+	if !gain.IsPositive() {
+		return decimal.Zero
+	}
+
+	return gain.Mul(rate).Div(hundred).Round(2)
+}
+
+// ParseSwitch parses a setting that is on or off, written as "true" or "false".
+func ParseSwitch(value string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
 	default:
-		return "", fmt.Errorf("%q is neither gross nor net", value)
+		return false, fmt.Errorf("%q is neither true nor false", value)
 	}
 }
