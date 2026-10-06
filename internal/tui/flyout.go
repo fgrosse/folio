@@ -12,9 +12,7 @@ import (
 // the details cannot go stale. Unlike a dialog it takes no keys: the view keeps the keyboard, and
 // the flyout follows the selection.
 type Flyout struct {
-	// Title says what the details are of.
-	Title string
-
+	Title    string
 	Sections []FlyoutSection
 }
 
