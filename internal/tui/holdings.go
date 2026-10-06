@@ -576,21 +576,24 @@ func positions(lots []portfolio.Lot) string {
 // lotDetails is what the flyout says about a lot, valued at quote, which is the zero Quote if there
 // is none of the lot's stock. It has what the row has no room for: the shares the lot was acquired
 // with and how many of them were sold, where the row only has those that are left, and what those
-// cost in all next to what they are worth. What is not known is a dash, as it is in the row.
+// have gained since. What is not known is a dash, as it is in the row, and the gain is known only
+// if both the cost and the price are.
 func lotDetails(lot portfolio.Lot, quote portfolio.Quote) Flyout {
 	from := noValue
 	if lot.Grant != "" {
 		from = lot.Grant
 	}
 
-	cost, price, costLeft, valueLeft := noValue, noValue, noValue, noValue
+	cost, price, valueLeft, gain := noValue, noValue, noValue, noValue
 	if !lot.Cost.IsZero() {
 		cost = portfolio.FormatUSD(lot.Cost)
-		costLeft = portfolio.FormatUSD(lot.Remaining().Mul(lot.Cost))
 	}
 	if quote.Symbol != "" {
 		price = portfolio.FormatUSD(quote.Price)
 		valueLeft = portfolio.FormatUSD(lot.Remaining().Mul(quote.Price))
+	}
+	if !lot.Cost.IsZero() && quote.Symbol != "" {
+		gain = lotGain(lot, quote.Price)
 	}
 
 	return Flyout{
@@ -605,11 +608,27 @@ func lotDetails(lot portfolio.Lot, quote portfolio.Quote) Flyout {
 			{Title: "Value", Rows: []FlyoutRow{
 				{Label: "Cost per share", Value: cost},
 				{Label: "Price per share", Value: price},
-				{Label: "Cost of what is left", Value: costLeft},
 				{Label: "Value of what is left", Value: valueLeft},
+				{Label: "Gain", Value: gain},
 			}},
 		},
 	}
+}
+
+// lotGain renders what the shares that are left of lot have gained since they were acquired, at the
+// given price of one of them: in dollars, and in percent of what they cost, such as "$64.52 ▲ 4.2%"
+// or, for a loss, "-$5,019.25 ▼ 42.7%". The arrow carries the direction of the percentage, as it
+// does for the change of a price in the header. The lot has to have a cost.
+func lotGain(lot portfolio.Lot, price decimal.Decimal) string {
+	perShare := price.Sub(lot.Cost)
+	percent := perShare.Div(lot.Cost).Mul(decimal.NewFromInt(100))
+
+	arrow := "▲"
+	if perShare.IsNegative() {
+		arrow = "▼"
+	}
+
+	return portfolio.FormatUSD(lot.Remaining().Mul(perShare)) + " " + arrow + " " + percent.Abs().StringFixed(1) + "%"
 }
 
 // lotRow renders a lot as a row of the Holdings table, with the grant it was released from, if any,

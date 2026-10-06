@@ -580,13 +580,13 @@ func TestLotRow(t *testing.T) {
 // moves through the table, and the keys that switch views still do.
 func TestHoldingsModel_ShowsDetails(t *testing.T) {
 	m, _ := newTestingHoldings(t)
-	assert.NotContains(t, ansi.Strip(m.View().Content), "Cost of what is left")
+	assert.NotContains(t, ansi.Strip(m.View().Content), "Cost per share")
 
 	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	frame := ansi.Strip(m.View().Content)
 	assert.Contains(t, frame, "PANW of 2026-01-15")
-	assert.Contains(t, frame, "Cost of what is left")
+	assert.Contains(t, frame, "Cost per share")
 	assert.False(t, m.CapturesKeys(), "the flyout should leave the keys to the view")
 
 	m.Update(keyPressed("j"))
@@ -618,12 +618,12 @@ func TestHoldingsModel_ClosesDetails(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			m, _ := newTestingHoldings(t)
 			m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-			require.Contains(t, ansi.Strip(m.View().Content), "Cost of what is left")
+			require.Contains(t, ansi.Strip(m.View().Content), "Cost per share")
 
 			_, cmd := m.Update(key)
 
 			assert.Nil(t, cmd)
-			assert.NotContains(t, ansi.Strip(m.View().Content), "Cost of what is left")
+			assert.NotContains(t, ansi.Strip(m.View().Content), "Cost per share")
 		})
 	}
 }
@@ -642,7 +642,9 @@ func TestHoldingsModel_DetailsHelp(t *testing.T) {
 
 // TestLotDetails covers what the flyout says about a lot, which is what its row has no room for:
 // the shares it was acquired with next to those sold and those left, and what the ones that are left
-// cost and are worth in all. What is not known reads as a dash, as it does in the row.
+// have gained or lost since they were acquired, in dollars and in percent of what they cost. What
+// is not known reads as a dash, as it does in the row, and a gain is only known with both a cost and
+// a price.
 func TestLotDetails(t *testing.T) {
 	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
 
@@ -669,8 +671,29 @@ func TestLotDetails(t *testing.T) {
 					{Title: "Value", Rows: []FlyoutRow{
 						{Label: "Cost per share", Value: "$380.12"},
 						{Label: "Price per share", Value: "$396.25"},
-						{Label: "Cost of what is left", Value: "$1,520.48"},
 						{Label: "Value of what is left", Value: "$1,585.00"},
+						{Label: "Gain", Value: "$64.52 ▲ 4.2%"},
+					}},
+				},
+			},
+		},
+		"a lot that is worth less than it cost": {
+			lot:   portfolio.Lot{Symbol: "PANW", Shares: dec("17"), Acquired: day("2025-10-01"), Cost: dec("691.5")},
+			quote: panw,
+			expected: Flyout{
+				Title: "PANW of 2025-10-01",
+				Sections: []FlyoutSection{
+					{Title: "Shares", Rows: []FlyoutRow{
+						{Label: "From", Value: "-"},
+						{Label: "Acquired", Value: "17"},
+						{Label: "Sold", Value: "0"},
+						{Label: "Left", Value: "17"},
+					}},
+					{Title: "Value", Rows: []FlyoutRow{
+						{Label: "Cost per share", Value: "$691.50"},
+						{Label: "Price per share", Value: "$396.25"},
+						{Label: "Value of what is left", Value: "$6,736.25"},
+						{Label: "Gain", Value: "-$5,019.25 ▼ 42.7%"},
 					}},
 				},
 			},
@@ -690,8 +713,8 @@ func TestLotDetails(t *testing.T) {
 					{Title: "Value", Rows: []FlyoutRow{
 						{Label: "Cost per share", Value: "-"},
 						{Label: "Price per share", Value: "-"},
-						{Label: "Cost of what is left", Value: "-"},
 						{Label: "Value of what is left", Value: "-"},
+						{Label: "Gain", Value: "-"},
 					}},
 				},
 			},
