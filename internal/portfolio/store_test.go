@@ -1,11 +1,11 @@
 package portfolio
 
 import (
-	migrate "github.com/rubenv/sql-migrate"
 	"os"
 	"path/filepath"
 	"testing"
 
+	migrate "github.com/rubenv/sql-migrate"
 	"github.com/shopspring/decimal"
 
 	"github.com/stretchr/testify/assert"

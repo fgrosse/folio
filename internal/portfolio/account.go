@@ -86,7 +86,9 @@ func (a Account) AfterTax(rate decimal.Decimal) Account {
 // AfterGainsTax returns the account with its current value after the tax on the taxable gain at
 // rate, in percent: what the shares that are held would bring if they were all sold at these quotes,
 // rather than what the bank states for them. The potential value stays the same, since a vest is
-// taxed as income and has gained nothing yet.
+// taxed as income and has gained nothing yet. The tax is taken off the taxable gain as a whole,
+// as a tax office would, which is the same as the tax on each lot added up but for the rounding of
+// a cent: the Holdings view rounds the tax of every lot, and this rounds once.
 func (a Account) AfterGainsTax(rate decimal.Decimal) Account {
 	a.Current = a.Current.Sub(GainsTax(a.TaxableGain, rate))
 	return a
