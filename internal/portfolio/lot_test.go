@@ -216,11 +216,11 @@ func TestParseRelease(t *testing.T) {
 	}
 }
 
-// TestLot_Growth covers how far the price of a share has moved from what the lot cost, in percent
+// TestLot_GrowthPercent covers how far the price of a share has moved from what the lot cost, in percent
 // of that cost: up, down, or not at all. A lot without a cost has nothing to measure from, and says
 // so rather than passing for a lot that has not moved.
-func TestLot_Growth(t *testing.T) {
-	tests := map[string]struct {
+func TestLot_GrowthPercent(t *testing.T) {
+	cases := map[string]struct {
 		cost     string
 		price    string
 		expected string
@@ -232,11 +232,11 @@ func TestLot_Growth(t *testing.T) {
 		"without a cost": {cost: "0", price: "396.25", unknown: true},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			lot := Lot{Symbol: "PANW", Shares: shares("6"), Cost: shares(tt.cost)}
 
-			growth, ok := lot.Growth(shares(tt.price))
+			growth, ok := lot.GrowthPercent(shares(tt.price))
 
 			assert.Equal(t, !tt.unknown, ok)
 			if ok {
@@ -251,7 +251,7 @@ func TestLot_Growth(t *testing.T) {
 // is still held. It is less than zero for a lot that lost. A lot without a cost has no gain to
 // state, and says so.
 func TestLot_Gain(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		lot      Lot
 		expected string
 		unknown  bool
@@ -262,7 +262,7 @@ func TestLot_Gain(t *testing.T) {
 		"without a cost": {lot: Lot{Shares: shares("2.5")}, unknown: true},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			gain, ok := tt.lot.Gain(shares("396.25"))
 

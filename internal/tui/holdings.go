@@ -622,7 +622,7 @@ func lotRow(lot portfolio.Lot, quote portfolio.Quote, gainsTaxRate decimal.NullD
 	if quote.Symbol != "" {
 		price = portfolio.FormatUSD(quote.Price)
 		value = portfolio.FormatUSD(lot.Remaining().Mul(quote.Price))
-		if growth, ok := lot.Growth(quote.Price); ok {
+		if growth, ok := lot.GrowthPercent(quote.Price); ok {
 			gain = formatGrowth(growth)
 		}
 		if gained, ok := lot.Gain(quote.Price); ok && gainsTaxRate.Valid {
