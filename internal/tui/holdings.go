@@ -539,8 +539,15 @@ func (m *HoldingsModel) helpView() string {
 		}) + "\n"
 	}
 
+	// The flyout is no dialog and leaves every key what it was, so all it changes is which key
+	// is the one to know about it: the one that opens it, or the one that closes it.
+	details := m.keys.Details
+	if m.details {
+		details = m.keys.Close
+	}
+
 	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n" +
-		help.ShortHelpView([]key.Binding{m.keys.Add, m.keys.Edit, m.keys.Sell, m.keys.Delete})
+		help.ShortHelpView([]key.Binding{m.keys.Add, m.keys.Edit, m.keys.Sell, m.keys.Delete, details})
 }
 
 // positions sums up lots as how many shares of each stock are left of them, the stocks in alphabetical

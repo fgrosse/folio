@@ -618,6 +618,18 @@ func TestHoldingsModel_ClosesDetails(t *testing.T) {
 	}
 }
 
+// TestHoldingsModel_DetailsHelp covers how the flyout is found: the help names the key that opens
+// it, and while it is open the key that closes it in its place, since the other keys stay what they
+// were.
+func TestHoldingsModel_DetailsHelp(t *testing.T) {
+	m, _ := newTestingHoldings(t)
+	assert.Contains(t, ansi.Strip(m.View().Content), "a add • e edit • s sell • d delete • enter details\n")
+
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	assert.Contains(t, ansi.Strip(m.View().Content), "a add • e edit • s sell • d delete • esc close\n")
+}
+
 // TestLotDetails covers what the flyout says about a lot, which is what its row has no room for:
 // the shares it was acquired with next to those sold and those left, and what the ones that are left
 // cost and are worth in all. What is not known reads as a dash, as it does in the row.
