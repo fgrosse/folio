@@ -25,6 +25,15 @@ Sleep 3s
 Down@400ms 3
 Sleep 1s
 
+# The details of the selected lot, which follow the selection: its gain and the tax on it
+Enter
+Sleep 2.5s
+Up@700ms 3
+Sleep 2s
+Down@400ms 3
+Escape
+Sleep 1s
+
 # Sell some shares of the selected lot
 Type "s"
 Sleep 1s
