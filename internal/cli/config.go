@@ -36,8 +36,9 @@ The keys are:
   gains-tax-rate
       The rate that the gain of a sale is taxed at, as a percentage: what
       selling the shares you hold would cost of what they gained since you got
-      them. With it, the Holdings view shows the tax that selling each lot at
-      the price of today would cost. A lot that lost is not taxed.
+      them. With it, the details of a lot in the Holdings view show the tax
+      that selling it at the price of today would cost. A lot that lost is not
+      taxed.
 
   show-net-summary
       Whether the TUI shows the values in its header after tax, true or false.

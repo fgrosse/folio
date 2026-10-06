@@ -101,16 +101,16 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
   of the year's income, which folio does not know, so the user sets one rate in percent for the
   whole account (`folio config tax-rate`) and folio takes it off each vest. What is held was taxed
   when it vested, and a sale of it is taxed on the gain since, at a rate of its own
-  (`folio config gains-tax-rate`). Each lot is taxed on its own gain, as the Holdings view shows it:
-  a lot that lost is not taxed and takes nothing off the gain of another, and a lot without a cost
-  has no gain that is known. The three values stay the bank's, before tax, unless the user asks
-  for them after tax (`folio config show-net-summary true`). Then the TUI's header shows the
-  potential value after the tax on the vests and the current value after the tax on the gains,
-  and the total is the two added up, so that the values on screen add up. A badge in front of the
-  total says once whether the three are `[GROSS]` or `[NET]`, and a value that has no rate to take
-  off it is marked `(gross)` under a badge that says net.
-  The rates are kept in the `settings` table, which holds what applies to the whole account, one
-  value by name, so that it is in the database like everything else.
+  (`folio config gains-tax-rate`). Each lot is taxed on its own gain, as the details of a lot in the
+  Holdings view show it: a lot that lost is not taxed and takes nothing off the gain of another, and
+  a lot without a cost has no gain that is known. The three values stay the bank's, before tax,
+  unless the user asks for them after tax (`folio config show-net-summary true`). Then the TUI's
+  header shows the potential value after the tax on the vests and the current value after the tax on
+  the gains, and the total is the two added up, so that the values on screen add up. A badge in
+  front of the total says once whether the three are `[GROSS]` or `[NET]`, and a value that has no
+  rate to take off it is marked `(gross)` under a badge that says net. The rates are kept in the
+  `settings` table, which holds what applies to the whole account, one value by name, so that it is
+  in the database like everything else.
 - **Everything is in USD for now**, the currency the stock trades in. Showing another currency is
   in `TODO.md`.
 - **The demo is the one verb with a database of its own.** Every other verb shares the database of

@@ -154,11 +154,11 @@ every vest, and the Vesting view shows what is left of each after tax at that ra
 
 The shares you hold were taxed when they vested, and selling them is taxed again on what they
 gained since. The Holdings view shows that gain for each lot, as how far the price is from what the
-lot cost, such as `+4.2%`. With `folio config gains-tax-rate`, such as 26.4%, it also shows the tax
-that selling the lot today would cost. A lot that lost is not taxed, and its loss is not set
-against the gain of another lot. The two columns need room: the gain shows in a terminal of 92
-columns or more, and the tax in one of 108. `enter` shows both for the selected lot in a panel next
-to the table, however narrow the terminal is.
+lot cost, such as `+4.2%`, in a terminal of 92 columns or more. `enter` shows the details of the
+selected lot in a panel next to the table, with its gain in dollars as well. With
+`folio config gains-tax-rate`, such as 26.4%, the details also have the tax that selling the lot
+today would cost. A lot that lost is not taxed, and its loss is not set against the gain of another
+lot.
 
 The three values are the bank's, before tax, unless you set `folio config show-net-summary true`.
 Then the header of the TUI shows the potential value after the tax on the vests and the current
