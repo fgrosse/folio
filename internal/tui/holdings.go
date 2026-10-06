@@ -51,7 +51,7 @@ const (
 	// gainColumn and taxColumn are where the gain and the tax stand among all the columns, for
 	// leaving them out.
 	gainColumn = 6
-	taxColumn  = 8
+	taxColumn  = 7
 
 	// saleFormWidth is how many columns a field of the form that records a sale occupies, and
 	// saleNoteLines how many lines its notes have room for before they scroll.
@@ -188,8 +188,8 @@ func (m *HoldingsModel) columns() []table.Column {
 		{Title: fmt.Sprintf("%*s", priceColumnWidth, "Cost"), Width: priceColumnWidth},
 		{Title: fmt.Sprintf("%*s", priceColumnWidth, "Price"), Width: priceColumnWidth},
 		{Title: fmt.Sprintf("%*s", gainColumnWidth, "Gain"), Width: gainColumnWidth},
-		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Value"), Width: valueColumnWidth},
 		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Tax"), Width: valueColumnWidth},
+		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Value"), Width: valueColumnWidth},
 	})
 }
 
@@ -606,12 +606,14 @@ func positions(lots []portfolio.Lot) string {
 	return strings.Join(parts, " · ")
 }
 
-// lotRow renders a lot as a row of the Holdings table with all its columns, with the grant it was released from, if any,
-// the shares that are left of it, what one of them cost, if that is known, and valued at quote,
-// which is the zero Quote if there is none of the lot's stock. With both a cost and a quote, it says
-// how far the price is from the cost, and the tax that selling the shares at that price would cost at
-// gainsTaxRate, which is not valid if the account has none. The numbers are right-aligned for their digits to line up down
-// the column. The table has no alignment of its own, so the values are padded out here.
+// lotRow renders a lot as a row of the Holdings table with all its columns: the grant it was
+// released from, if any, the shares that are left of it, what one of them cost, if that is known,
+// and what they are worth at quote, which is the zero Quote if there is none of the lot's stock.
+// With both a cost and a quote, it says how far the price is from the cost, and the tax that
+// selling the shares at that price would cost at gainsTaxRate, which is not valid if the account
+// has none. The value comes last, where the header's values end, with the tax left of it. The
+// numbers are right-aligned for their digits to line up down the column. The table has no
+// alignment of its own, so the values are padded out here.
 func lotRow(lot portfolio.Lot, quote portfolio.Quote, gainsTaxRate decimal.NullDecimal) table.Row {
 	cost, price, gain, value, tax := noValue, noValue, noValue, noValue, noValue
 	if !lot.Cost.IsZero() {
@@ -636,8 +638,8 @@ func lotRow(lot portfolio.Lot, quote portfolio.Quote, gainsTaxRate decimal.NullD
 		fmt.Sprintf("%*s", priceColumnWidth, cost),
 		fmt.Sprintf("%*s", priceColumnWidth, price),
 		fmt.Sprintf("%*s", gainColumnWidth, gain),
-		fmt.Sprintf("%*s", valueColumnWidth, value),
 		fmt.Sprintf("%*s", valueColumnWidth, tax),
+		fmt.Sprintf("%*s", valueColumnWidth, value),
 	}
 }
 
