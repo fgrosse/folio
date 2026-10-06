@@ -539,6 +539,45 @@ func positions(lots []portfolio.Lot) string {
 	return strings.Join(parts, " · ")
 }
 
+// lotDetails is what the flyout says about a lot, valued at quote, which is the zero Quote if there
+// is none of the lot's stock. It has what the row has no room for: the shares the lot was acquired
+// with and how many of them were sold, where the row only has those that are left, and what those
+// cost in all next to what they are worth. What is not known is a dash, as it is in the row.
+func lotDetails(lot portfolio.Lot, quote portfolio.Quote) Flyout {
+	from := noValue
+	if lot.Grant != "" {
+		from = lot.Grant
+	}
+
+	cost, price, costLeft, valueLeft := noValue, noValue, noValue, noValue
+	if !lot.Cost.IsZero() {
+		cost = portfolio.FormatUSD(lot.Cost)
+		costLeft = portfolio.FormatUSD(lot.Remaining().Mul(lot.Cost))
+	}
+	if quote.Symbol != "" {
+		price = portfolio.FormatUSD(quote.Price)
+		valueLeft = portfolio.FormatUSD(lot.Remaining().Mul(quote.Price))
+	}
+
+	return Flyout{
+		Title: lot.Symbol + " of " + lot.Acquired.Format(time.DateOnly),
+		Sections: []FlyoutSection{
+			{Title: "Shares", Rows: []FlyoutRow{
+				{Label: "From", Value: from},
+				{Label: "Acquired", Value: lot.Shares.String()},
+				{Label: "Sold", Value: lot.Sold.String()},
+				{Label: "Left", Value: lot.Remaining().String()},
+			}},
+			{Title: "Value", Rows: []FlyoutRow{
+				{Label: "Cost per share", Value: cost},
+				{Label: "Price per share", Value: price},
+				{Label: "Cost of what is left", Value: costLeft},
+				{Label: "Value of what is left", Value: valueLeft},
+			}},
+		},
+	}
+}
+
 // lotRow renders a lot as a row of the Holdings table, with the grant it was released from, if any,
 // the shares that are left of it, what one of them cost, if that is known, and valued at quote, which is the zero Quote if there
 // is none of the lot's stock. The numbers are right-aligned for their digits to line up down

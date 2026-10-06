@@ -574,3 +574,68 @@ func TestLotRow(t *testing.T) {
 		})
 	}
 }
+
+// TestLotDetails covers what the flyout says about a lot, which is what its row has no room for:
+// the shares it was acquired with next to those sold and those left, and what the ones that are left
+// cost and are worth in all. What is not known reads as a dash, as it does in the row.
+func TestLotDetails(t *testing.T) {
+	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
+
+	tests := map[string]struct {
+		lot      portfolio.Lot
+		quote    portfolio.Quote
+		expected Flyout
+	}{
+		"a lot released from a grant, partly sold": {
+			lot: portfolio.Lot{
+				Symbol: "PANW", Shares: dec("6"), Sold: dec("2"), Acquired: day("2026-01-15"),
+				Cost: dec("380.12"), Grant: "Payout",
+			},
+			quote: panw,
+			expected: Flyout{
+				Title: "PANW of 2026-01-15",
+				Sections: []FlyoutSection{
+					{Title: "Shares", Rows: []FlyoutRow{
+						{Label: "From", Value: "Payout"},
+						{Label: "Acquired", Value: "6"},
+						{Label: "Sold", Value: "2"},
+						{Label: "Left", Value: "4"},
+					}},
+					{Title: "Value", Rows: []FlyoutRow{
+						{Label: "Cost per share", Value: "$380.12"},
+						{Label: "Price per share", Value: "$396.25"},
+						{Label: "Cost of what is left", Value: "$1,520.48"},
+						{Label: "Value of what is left", Value: "$1,585.00"},
+					}},
+				},
+			},
+		},
+		"a lot entered by hand, without a cost or a quote": {
+			lot:   portfolio.Lot{Symbol: "SAP.DE", Shares: dec("2.5"), Acquired: day("2026-02-15")},
+			quote: portfolio.Quote{},
+			expected: Flyout{
+				Title: "SAP.DE of 2026-02-15",
+				Sections: []FlyoutSection{
+					{Title: "Shares", Rows: []FlyoutRow{
+						{Label: "From", Value: "-"},
+						{Label: "Acquired", Value: "2.5"},
+						{Label: "Sold", Value: "0"},
+						{Label: "Left", Value: "2.5"},
+					}},
+					{Title: "Value", Rows: []FlyoutRow{
+						{Label: "Cost per share", Value: "-"},
+						{Label: "Price per share", Value: "-"},
+						{Label: "Cost of what is left", Value: "-"},
+						{Label: "Value of what is left", Value: "-"},
+					}},
+				},
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, lotDetails(tt.lot, tt.quote))
+		})
+	}
+}
