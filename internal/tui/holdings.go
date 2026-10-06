@@ -710,15 +710,15 @@ func lotDetails(lot portfolio.Lot, quote portfolio.Quote, style Style) Flyout {
 // as "▲ 4.2%", or "-$5,019.25" and "▼ 42.7%" for a loss. The arrow carries the direction of the
 // percentage, as it does for the change of a price in the header. The lot has to have a cost.
 func lotGain(lot portfolio.Lot, price decimal.Decimal) (dollars, percent string) {
-	perShare := price.Sub(lot.Cost)
-	change := perShare.Div(lot.Cost).Mul(decimal.NewFromInt(100))
+	gain, _ := lot.Gain(price)
+	growth, _ := lot.GrowthPercent(price)
 
 	arrow := "▲"
-	if perShare.IsNegative() {
+	if growth.IsNegative() {
 		arrow = "▼"
 	}
 
-	return portfolio.FormatUSD(lot.Remaining().Mul(perShare)), arrow + " " + change.Abs().StringFixed(1) + "%"
+	return portfolio.FormatUSD(gain), arrow + " " + growth.Abs().StringFixed(1) + "%"
 }
 
 // lotRow renders a lot as a row of the Holdings table with all its columns: the grant it was
