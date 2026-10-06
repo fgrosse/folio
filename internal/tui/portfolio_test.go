@@ -7,6 +7,7 @@ import (
 
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/fgrosse/folio/internal/portfolio"
@@ -85,38 +86,70 @@ func TestLoadPortfolioCmd_TaxRate(t *testing.T) {
 	assert.EqualError(t, loaded.err, `tax-rate: "high" is not a tax rate such as 44.3%`)
 }
 
-// TestLoadPortfolioCmd_PotentialBasis covers which potential value the header shows, which the
-// store keeps among the configuration: the bank's, before tax, unless the account says net, and a
-// value that is neither is an error that says which key it is in.
-func TestLoadPortfolioCmd_PotentialBasis(t *testing.T) {
-	tests := map[string]struct {
+// TestLoadPortfolioCmd_GainsTaxRate covers the rate that the gain of a sale is taxed at, which is
+// kept and loaded like the rate of the vests: it is part of the portfolio, an account without one
+// has none, and a value that is no rate is an error that says which key it is in.
+func TestLoadPortfolioCmd_GainsTaxRate(t *testing.T) {
+	p := testPortfolio()
+	store := new(MockStore)
+	store.returns(p)
+
+	loaded, ok := runCmd(t, loadPortfolioCmd(store)).(PortfolioLoadedMsg)
+	require.True(t, ok)
+	require.NoError(t, loaded.err)
+	assert.Equal(t, "26.4", loaded.portfolio.GainsTaxRate.Decimal.String())
+
+	p.GainsTaxRate = decimal.NullDecimal{}
+	store = new(MockStore)
+	store.returns(p)
+
+	loaded, ok = runCmd(t, loadPortfolioCmd(store)).(PortfolioLoadedMsg)
+	require.True(t, ok)
+	require.NoError(t, loaded.err)
+	assert.False(t, loaded.portfolio.GainsTaxRate.Valid, "an account without a rate should have none")
+
+	store = new(MockStore)
+	store.returnsAccount(testPortfolio())
+	store.On("GetConfig", portfolio.GainsTaxRateKey).Return("high", nil)
+	store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
+
+	loaded, ok = runCmd(t, loadPortfolioCmd(store)).(PortfolioLoadedMsg)
+	require.True(t, ok)
+	assert.EqualError(t, loaded.err, `gains-tax-rate: "high" is not a tax rate such as 44.3%`)
+}
+
+// TestLoadPortfolioCmd_ShowNet covers whether the header shows the values after tax, which the
+// store keeps among the configuration: the bank's, before tax, unless the account says true, and a
+// value that is neither true nor false is an error that says which key it is in.
+func TestLoadPortfolioCmd_ShowNet(t *testing.T) {
+	cases := map[string]struct {
 		value    string
 		err      error
-		expected portfolio.PotentialBasis
+		expected bool
 		error    string
 	}{
-		"not set": {err: portfolio.ErrNotSet, expected: portfolio.Gross},
-		"gross":   {value: "gross", expected: portfolio.Gross},
-		"net":     {value: "net", expected: portfolio.Net},
-		"neither": {value: "after-tax", error: `potential: "after-tax" is neither gross nor net`},
+		"not set": {err: portfolio.ErrNotSet, expected: false},
+		"false":   {value: "false", expected: false},
+		"true":    {value: "true", expected: true},
+		"neither": {value: "net", error: `show-net-summary: "net" is neither true nor false`},
 	}
 
-	for name, tt := range tests {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			store := new(MockStore)
 			store.returnsAccount(testPortfolio())
-			store.On("GetConfig", portfolio.TaxRateKey).Return("44.3%", nil)
-			store.On("GetConfig", portfolio.PotentialBasisKey).Return(tt.value, tt.err)
+			store.On("GetConfig", portfolio.ShowNetSummaryKey).Return(c.value, c.err)
+			store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
 
 			loaded, ok := runCmd(t, loadPortfolioCmd(store)).(PortfolioLoadedMsg)
 			require.True(t, ok)
-			if tt.error != "" {
-				assert.EqualError(t, loaded.err, tt.error)
+			if c.error != "" {
+				assert.EqualError(t, loaded.err, c.error)
 				return
 			}
 
 			require.NoError(t, loaded.err)
-			assert.Equal(t, tt.expected, loaded.portfolio.PotentialBasis)
+			assert.Equal(t, c.expected, loaded.portfolio.ShowNet)
 		})
 	}
 }

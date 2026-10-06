@@ -47,31 +47,40 @@ func TestAfterTax(t *testing.T) {
 	assert.Equal(t, "0", AfterTax(shares("3962.50"), shares("100")).String())
 }
 
-// TestParsePotentialBasis covers how the user says which potential value the header shows: the
-// bank's before tax, or what is left of it after tax, by name and however it is capitalized.
-func TestParsePotentialBasis(t *testing.T) {
-	tests := map[string]struct {
+// TestParseSwitch covers how a setting that is on or off is typed: as true or false, however it is
+// capitalized, and nothing else.
+func TestParseSwitch(t *testing.T) {
+	cases := map[string]struct {
 		value    string
-		expected PotentialBasis
+		expected bool
 		error    string
 	}{
-		"gross":      {value: "gross", expected: Gross},
-		"net":        {value: "net", expected: Net},
-		"capitals":   {value: " Net ", expected: Net},
-		"nothing":    {value: "", error: `"" is neither gross nor net`},
-		"other word": {value: "after-tax", error: `"after-tax" is neither gross nor net`},
+		"true":       {value: "true", expected: true},
+		"false":      {value: "false", expected: false},
+		"capitals":   {value: " True ", expected: true},
+		"nothing":    {value: "", error: `"" is neither true nor false`},
+		"other word": {value: "net", error: `"net" is neither true nor false`},
 	}
 
-	for name, tt := range tests {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			basis, err := ParsePotentialBasis(tt.value)
-			if tt.error != "" {
-				assert.EqualError(t, err, tt.error)
+			on, err := ParseSwitch(c.value)
+			if c.error != "" {
+				assert.EqualError(t, err, c.error)
 				return
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, basis)
+			assert.Equal(t, c.expected, on)
 		})
 	}
+}
+
+// TestGainsTax covers the tax that is due on the gain of a sale, at a rate in percent and to the
+// cent. A loss is not taxed, and neither is a sale at what the shares cost.
+func TestGainsTax(t *testing.T) {
+	assert.Equal(t, "25.55", GainsTax(shares("96.78"), shares("26.4")).String())
+	assert.Equal(t, "0", GainsTax(shares("96.78"), shares("0")).String())
+	assert.Equal(t, "0", GainsTax(shares("-169.83"), shares("26.4")).String())
+	assert.Equal(t, "0", GainsTax(shares("0"), shares("26.4")).String())
 }

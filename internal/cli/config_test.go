@@ -56,10 +56,10 @@ func TestConfigCmd_Get(t *testing.T) {
 // neither set nor read: folio config says which keys there are.
 func TestConfigCmd_UnknownKey(t *testing.T) {
 	cmd, _ := NewTestingCmd(t, "config", "tax", "44.3%")
-	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate, potential`)
+	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate, gains-tax-rate, show-net-summary`)
 
 	cmd, _ = NewTestingCmd(t, "config", "tax")
-	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate, potential`)
+	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate, gains-tax-rate, show-net-summary`)
 }
 
 // TestConfigCmd_List covers "folio config" without a key, which prints the whole configuration as
@@ -154,23 +154,23 @@ func TestConfigCmd_Outputs(t *testing.T) {
 	}
 }
 
-// TestConfigCmd_Potential covers choosing which potential value the TUI shows in its header:
-// "folio config potential" with gross or net stores it, written the one way folio prints it, and
-// refuses anything else before it reaches the store.
-func TestConfigCmd_Potential(t *testing.T) {
-	cmd, dbPath := NewTestingCmd(t, "config", "potential", "Net")
+// TestConfigCmd_ShowNetSummary covers choosing whether the TUI shows the values in its header after
+// tax: "folio config show-net-summary" with true or false stores it, written the one way folio
+// prints it, and refuses anything else before it reaches the store.
+func TestConfigCmd_ShowNetSummary(t *testing.T) {
+	cmd, dbPath := NewTestingCmd(t, "config", "show-net-summary", "True")
 	require.NoError(t, cmd.Execute())
 
 	store, err := portfolio.NewStore(dbPath)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = store.Close() })
 
-	value, err := store.GetConfig("potential")
+	value, err := store.GetConfig("show-net-summary")
 	require.NoError(t, err)
-	assert.Equal(t, "net", value)
+	assert.Equal(t, "true", value)
 
-	cmd, _ = NewTestingCmd(t, "config", "potential", "after-tax")
-	assert.EqualError(t, cmd.Execute(), `"after-tax" is neither gross nor net`)
+	cmd, _ = NewTestingCmd(t, "config", "show-net-summary", "net")
+	assert.EqualError(t, cmd.Execute(), `"net" is neither true nor false`)
 }
 
 // TestConfigCmd_Unset covers taking a value back: "folio config --unset tax-rate" leaves the key as
@@ -198,5 +198,5 @@ func TestConfigCmd_Unset(t *testing.T) {
 	assert.EqualError(t, cmd.Execute(), "--unset takes the key to unset and nothing else")
 
 	cmd, _ = NewTestingCmd(t, "config", "--unset", "tax")
-	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate, potential`)
+	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate, gains-tax-rate, show-net-summary`)
 }

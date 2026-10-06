@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	migrate "github.com/rubenv/sql-migrate"
 	"github.com/shopspring/decimal"
 
 	"github.com/stretchr/testify/assert"
@@ -622,4 +623,47 @@ func TestStore_UnsetConfig(t *testing.T) {
 	assert.Equal(t, "EUR", value)
 
 	require.NoError(t, s.UnsetConfig("tax-rate"))
+}
+
+// TestStore_MigratesPotentialToShowNetSummary covers an account that was configured before the
+// values after tax had one setting: its "potential net" becomes "show-net-summary true", so that
+// its header goes on showing what it showed, and the key that folio no longer knows is gone rather
+// than left in the database where nothing lists it.
+func TestStore_MigratesPotentialToShowNetSummary(t *testing.T) {
+	cases := map[string]struct {
+		potential string
+		expected  string
+	}{
+		"net":     {potential: "net", expected: "true"},
+		"gross":   {potential: "gross"},
+		"not set": {},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			s, err := NewStore(":memory:")
+			require.NoError(t, err)
+
+			// Up to the migration that created the settings, which is as far as such an account got.
+			_, err = migrate.ExecMax(s.db.DB, "sqlite3", migrations, migrate.Up, 7)
+			require.NoError(t, err)
+			if c.potential != "" {
+				require.NoError(t, s.SetConfig("potential", c.potential))
+			}
+
+			require.NoError(t, s.Migrate())
+
+			_, err = s.GetConfig("potential")
+			require.ErrorIs(t, err, ErrNotSet)
+
+			value, err := s.GetConfig("show-net-summary")
+			if c.expected == "" {
+				require.ErrorIs(t, err, ErrNotSet)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, c.expected, value)
+		})
+	}
 }

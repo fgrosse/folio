@@ -1,12 +1,12 @@
   8.5 PANW                                                                       Total: $11,293.13
   PANW $396.25 ▼ 0.3%                              Current $3,368.13 · Potential (gross) $7,925.00
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ Acquired    Symbol    From                        Shares        Cost       Price           Value │
-│──────────────────────────────────────────────────────────────────────────────────────────────────│
-│ 2026-01-15  PANW  ╭──────────────────────────────────────────────────────────╮25       $2,377.50 │
-│ 2026-02-15  PANW  │ Configuration                                            │25         $990.63 │
-│                   │ > tax-rate   44.3%                                       │                   │
-│                   │   potential  ‹ gross ›                                   │                   │
+│ Acquired    Symbol    From              Shares        Cost       Price      Gain           Value │
+│───────────────────╭──────────────────────────────────────────────────────────╮───────────────────│
+│ 2026-01-15  PANW  │ Configuration                                            │2%       $2,377.50 │
+│ 2026-02-15  PANW  │ > tax-rate          44.3%                                │ -         $990.63 │
+│                   │   gains-tax-rate    26.4%                                │                   │
+│                   │   show-net-summary  ‹ false ›                            │                   │
 │                   │                                                          │                   │
 │                   │ The rate that the shares still to vest are taxed at, as  │                   │
 │                   │ a percentage: your estimate of the rate at the top of    │                   │

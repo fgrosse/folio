@@ -79,6 +79,10 @@ func Fill(store Store, rng *rand.Rand, today time.Time) error {
 		return fmt.Errorf("set tax rate: %w", err)
 	}
 
+	if err := store.SetConfig(portfolio.GainsTaxRateKey, gainsTaxRate); err != nil {
+		return fmt.Errorf("set gains tax rate: %w", err)
+	}
+
 	return nil
 }
 
@@ -87,6 +91,12 @@ func Fill(store Store, rng *rand.Rand, today time.Time) error {
 // salary that comes with stock is often taxed at the top rate, and a rate any lower would make
 // what is left of a vest look better than it is.
 const taxRate = "51.525%"
+
+// gainsTaxRate is the rate in percent that the gain of a sale is taxed at in a demo account: the
+// flat tax on capital gains in Germany, 25%, with the same surcharge and church tax on it. It comes
+// to a little less than the three added up, since the flat tax is lowered for whoever pays church
+// tax.
+const gainsTaxRate = "27.995%"
 
 // A generator makes up the parts of a demo account and writes them to its store.
 type generator struct {

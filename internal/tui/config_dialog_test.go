@@ -12,17 +12,17 @@ import (
 )
 
 // testConfigKeys are the keys the tests of the dialog edit: the tax rate, which is typed, and the
-// potential basis, which is picked. They are named here rather than taken as portfolio.ConfigKeys
+// switch for the values after tax, which is picked. They are named here rather than taken as portfolio.ConfigKeys
 // so that a key added to folio does not change what these tests see.
 func testConfigKeys(t *testing.T) []portfolio.ConfigKey {
 	t.Helper()
 
 	taxRate, err := portfolio.ConfigKeyNamed(portfolio.TaxRateKey)
 	require.NoError(t, err)
-	potential, err := portfolio.ConfigKeyNamed(portfolio.PotentialBasisKey)
+	showNet, err := portfolio.ConfigKeyNamed(portfolio.ShowNetSummaryKey)
 	require.NoError(t, err)
 
-	return []portfolio.ConfigKey{taxRate, potential}
+	return []portfolio.ConfigKey{taxRate, showNet}
 }
 
 // dialogText is what the dialog shows, without its styling.
@@ -35,21 +35,21 @@ func dialogText(d *ConfigDialog) string {
 // when the dialog opens. A key that is not set shows its default, or says so if it has none. A key
 // that takes one of a few values shows its value between the arrows that change it.
 func TestConfigDialog_Rows(t *testing.T) {
-	values := map[string]string{"tax-rate": "44.3%", "potential": "net"}
+	values := map[string]string{"tax-rate": "44.3%", "show-net-summary": "true"}
 	d := NewConfigDialog(testConfigKeys(t), values, dialogWidth, DefaultStyle())
 
 	text := dialogText(d)
 	assert.Contains(t, text, "Configuration")
-	assert.Contains(t, text, "> tax-rate   44.3%")
-	assert.Contains(t, text, "  potential  ‹ net ›")
+	assert.Contains(t, text, "> tax-rate          44.3%")
+	assert.Contains(t, text, "  show-net-summary  ‹ true ›")
 	assert.Contains(t, text, "The rate that the shares still to vest are taxed at")
-	assert.NotContains(t, text, "Which potential value", "only the selected key is described")
+	assert.NotContains(t, text, "Whether the header shows", "only the selected key is described")
 
 	d = NewConfigDialog(testConfigKeys(t), nil, dialogWidth, DefaultStyle())
 
 	text = dialogText(d)
-	assert.Contains(t, text, "> tax-rate   not set")
-	assert.Contains(t, text, "  potential  ‹ gross ›")
+	assert.Contains(t, text, "> tax-rate          not set")
+	assert.Contains(t, text, "  show-net-summary  ‹ false ›")
 }
 
 // TestConfigDialog_Select covers moving through the keys: down and up select the next key and the
@@ -63,12 +63,12 @@ func TestConfigDialog_Select(t *testing.T) {
 		expected string
 	}{
 		"nothing pressed yet":       {expected: "> tax-rate"},
-		"down selects the next":     {keys: []tea.KeyPressMsg{down}, expected: "> potential"},
+		"down selects the next":     {keys: []tea.KeyPressMsg{down}, expected: "> show-net-summary"},
 		"down wraps around":         {keys: []tea.KeyPressMsg{down, down}, expected: "> tax-rate"},
 		"up selects the one before": {keys: []tea.KeyPressMsg{down, up}, expected: "> tax-rate"},
-		"up wraps around":           {keys: []tea.KeyPressMsg{up}, expected: "> potential"},
-		"j is down":                 {keys: []tea.KeyPressMsg{keyPressed("j")}, expected: "> potential"},
-		"k is up":                   {keys: []tea.KeyPressMsg{keyPressed("k")}, expected: "> potential"},
+		"up wraps around":           {keys: []tea.KeyPressMsg{up}, expected: "> show-net-summary"},
+		"j is down":                 {keys: []tea.KeyPressMsg{keyPressed("j")}, expected: "> show-net-summary"},
+		"k is up":                   {keys: []tea.KeyPressMsg{keyPressed("k")}, expected: "> show-net-summary"},
 	}
 
 	for name, tt := range tests {
@@ -84,7 +84,7 @@ func TestConfigDialog_Select(t *testing.T) {
 
 	d := NewConfigDialog(testConfigKeys(t), nil, dialogWidth, DefaultStyle())
 	d.HandleKeyPress(down)
-	assert.Contains(t, dialogText(d), "Which potential value the header shows")
+	assert.Contains(t, dialogText(d), "Whether the header shows the values after tax")
 }
 
 // TestConfigDialog_Choose covers changing a key that takes one of a few values: right and left
@@ -101,13 +101,13 @@ func TestConfigDialog_Choose(t *testing.T) {
 		key      tea.KeyPressMsg
 		expected string
 	}{
-		"right picks the next":      {values: map[string]string{"potential": "gross"}, key: right, expected: "net"},
-		"right wraps around":        {values: map[string]string{"potential": "net"}, key: right, expected: "gross"},
-		"left picks the one before": {values: map[string]string{"potential": "net"}, key: left, expected: "gross"},
-		"left wraps around":         {values: map[string]string{"potential": "gross"}, key: left, expected: "net"},
-		"from the default":          {key: right, expected: "net"},
-		"enter picks the next":      {key: enter, expected: "net"},
-		"space picks the next":      {key: space, expected: "net"},
+		"right picks the next":      {values: map[string]string{"show-net-summary": "false"}, key: right, expected: "true"},
+		"right wraps around":        {values: map[string]string{"show-net-summary": "true"}, key: right, expected: "false"},
+		"left picks the one before": {values: map[string]string{"show-net-summary": "true"}, key: left, expected: "false"},
+		"left wraps around":         {values: map[string]string{"show-net-summary": "false"}, key: left, expected: "true"},
+		"from the default":          {key: right, expected: "true"},
+		"enter picks the next":      {key: enter, expected: "true"},
+		"space picks the next":      {key: space, expected: "true"},
 	}
 
 	for name, tt := range tests {
@@ -116,7 +116,7 @@ func TestConfigDialog_Choose(t *testing.T) {
 			d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyDown})
 
 			cmd := d.HandleKeyPress(tt.key)
-			assert.Equal(t, SetConfigMsg{key: "potential", value: tt.expected}, runCmd(t, cmd))
+			assert.Equal(t, SetConfigMsg{key: "show-net-summary", value: tt.expected}, runCmd(t, cmd))
 		})
 	}
 
@@ -126,10 +126,10 @@ func TestConfigDialog_Choose(t *testing.T) {
 
 	d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyDown})
 	d.HandleKeyPress(right)
-	assert.Contains(t, dialogText(d), "‹ gross ›", "the value changes once it is stored")
+	assert.Contains(t, dialogText(d), "‹ false ›", "the value changes once it is stored")
 
-	d.SetValues(map[string]string{"potential": "net"})
-	assert.Contains(t, dialogText(d), "‹ net ›")
+	d.SetValues(map[string]string{"show-net-summary": "true"})
+	assert.Contains(t, dialogText(d), "‹ true ›")
 }
 
 // typeIntoConfig presses the keys of s in the dialog, one after the other.
@@ -152,10 +152,10 @@ func TestConfigDialog_Edit(t *testing.T) {
 
 	d.HandleKeyPress(enter)
 	require.True(t, d.Editing())
-	assert.Contains(t, dialogText(d), "> tax-rate   44.3%")
+	assert.Contains(t, dialogText(d), "> tax-rate          44.3%")
 
 	typeIntoConfig(d, "jk")
-	assert.Contains(t, dialogText(d), "> tax-rate   44.3%jk", "a letter is typed rather than moving the selection")
+	assert.Contains(t, dialogText(d), "> tax-rate          44.3%jk", "a letter is typed rather than moving the selection")
 
 	for range "4.3%jk" {
 		d.HandleKeyPress(backspace)
@@ -179,7 +179,7 @@ func TestConfigDialog_Refused(t *testing.T) {
 
 	assert.Nil(t, d.HandleKeyPress(enter), "a refused value should send nothing")
 	assert.True(t, d.Editing())
-	assert.Contains(t, dialogText(d), "> tax-rate   120")
+	assert.Contains(t, dialogText(d), "> tax-rate          120")
 	assert.Contains(t, dialogText(d), "a tax rate is between 0% and 100%, not 120%")
 
 	d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyBackspace})
@@ -198,7 +198,7 @@ func TestConfigDialog_Unset(t *testing.T) {
 	d.HandleKeyPress(enter)
 	d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyBackspace})
-	assert.Contains(t, dialogText(d), "> tax-rate   not set")
+	assert.Contains(t, dialogText(d), "> tax-rate          not set")
 
 	cmd := d.HandleKeyPress(enter)
 	assert.Equal(t, UnsetConfigMsg{key: "tax-rate"}, runCmd(t, cmd))
@@ -224,7 +224,7 @@ func TestConfigDialog_Close(t *testing.T) {
 
 	assert.Nil(t, d.HandleKeyPress(esc), "esc in the field should not close the dialog")
 	assert.False(t, d.Editing())
-	assert.Contains(t, dialogText(d), "> tax-rate   44.3%")
+	assert.Contains(t, dialogText(d), "> tax-rate          44.3%")
 	assert.NotContains(t, dialogText(d), "44.3%000")
 	assert.NotContains(t, dialogText(d), "is not a tax rate")
 
@@ -259,5 +259,5 @@ func TestConfigDialog_Update(t *testing.T) {
 	require.True(t, d.Editing())
 
 	d.Update(tea.PasteMsg{Content: "44.3"})
-	assert.Contains(t, dialogText(d), "> tax-rate   44.3")
+	assert.Contains(t, dialogText(d), "> tax-rate          44.3")
 }

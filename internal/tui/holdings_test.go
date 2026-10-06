@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/exp/golden"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -49,12 +50,14 @@ func TestHoldingsModel_LoadsPortfolio(t *testing.T) {
 	m := NewHoldingsModel(store, quotes{}, DefaultStyle())
 	assert.Equal(t, "Holdings", m.Title())
 
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
 	m.Update(runCmd(t, loadPortfolioCmd(store)))
 
 	rows := m.table.Rows()
 	require.Len(t, rows, 2)
-	assert.Equal(t, lotRow(p.Lots[0], p.Quotes["PANW"]), rows[0])
-	assert.Equal(t, lotRow(p.Lots[1], p.Quotes["PANW"]), rows[1])
+	assert.Equal(t, table.Row{"2026-01-15", "PANW", "Payout", "         6", "   $380.12", "   $396.25", "   +4.2%", "     $2,377.50"}, rows[0],
+		"all but the tax, for want of room")
+	assert.Equal(t, table.Row{"2026-02-15", "PANW", "", "       2.5", "         -", "   $396.25", "       -", "       $990.63"}, rows[1])
 	store.AssertExpectations(t)
 }
 
@@ -364,8 +367,57 @@ func TestHoldingsModel_ShowsWhatIsLeft(t *testing.T) {
 
 	rows := m.table.Rows()
 	require.Len(t, rows, 1)
-	assert.Equal(t, table.Row{"2026-01-15", "PANW", "Payout", "         4", "   $380.12", "   $396.25", "     $1,585.00"}, rows[0])
+	assert.Equal(t, table.Row{"2026-01-15", "PANW", "Payout", "         4", "   $380.12", "   $396.25", "   +4.2%", "     $1,585.00"}, rows[0])
 	assert.Contains(t, ansi.Strip(m.View().Content), "  4 PANW ")
+}
+
+// TestHoldingsModel_HidesColumnsInANarrowWindow covers a window that has no room for every column:
+// the table then leaves out the gain, which the cost and the price next to it say already, rather
+// than squeezing the grant away, and shows it again once the window is wide enough. The row that
+// was selected stays selected through it.
+func TestHoldingsModel_HidesColumnsInANarrowWindow(t *testing.T) {
+	m, _ := newTestingHoldings(t)
+	m.Update(keyPressed("j"))
+	require.Contains(t, ansi.Strip(m.View().Content), "Gain")
+	require.Len(t, m.table.Rows()[0], 8)
+
+	m.Update(tea.WindowSizeMsg{Width: 82, Height: 20})
+
+	frame := ansi.Strip(m.View().Content)
+	assert.NotContains(t, frame, "Gain")
+	assert.Contains(t, frame, "│ 2026-01-15  PANW      Pay…           6     $380.12     $396.25       $2,377.50 │")
+	assert.Equal(t, 1, m.table.Cursor(), "the selection should stay where it was")
+
+	m.Update(tea.WindowSizeMsg{Width: 92, Height: 20})
+
+	frame = ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "Gain")
+	assert.Contains(t, frame, "│ 2026-01-15  PANW      Pay…           6     $380.12     $396.25     +4.2%       $2,377.50 │")
+	assert.Equal(t, 1, m.table.Cursor())
+}
+
+// TestHoldingsModel_ShowsTheTaxOnALot covers the column that says what selling a lot would cost in
+// tax on its gain, left of the value, which stays the last column. It is the last one the table
+// makes room for, after the gain, so it takes a wide window, and it is only there for an account that has a rate to tax a gain at: a column of dashes
+// would take the room of the grant for nothing.
+func TestHoldingsModel_ShowsTheTaxOnALot(t *testing.T) {
+	m, _ := newTestingHoldings(t)
+	assert.NotContains(t, ansi.Strip(m.View().Content), "Tax", "a window of 100 columns has no room for it")
+
+	m.Update(tea.WindowSizeMsg{Width: 108, Height: 20})
+
+	frame := ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "│ Acquired    Symbol    From      Shares        Cost       Price      Gain             Tax           Value │")
+	assert.Contains(t, frame, "│ 2026-01-15  PANW      Pay…           6     $380.12     $396.25     +4.2%          $25.55       $2,377.50 │")
+	assert.Contains(t, frame, "│ 2026-02-15  PANW                   2.5           -     $396.25         -               -         $990.63 │")
+
+	p := testPortfolio()
+	p.GainsTaxRate = decimal.NullDecimal{}
+	m.Update(PortfolioLoadedMsg{portfolio: p})
+
+	frame = ansi.Strip(m.View().Content)
+	assert.NotContains(t, frame, "Tax")
+	assert.Contains(t, frame, "│ 2026-01-15  PANW      Payout                         6     $380.12     $396.25     +4.2%       $2,377.50 │")
 }
 
 // TestHoldingsModel_SellShares covers recording a sale: s on a lot opens a form that asks how many
@@ -531,46 +583,66 @@ func TestPositions(t *testing.T) {
 
 // TestLotRow covers how one lot reads as a row of the Holdings table: the day it was acquired, its
 // symbol and the grant it was released from, and then the numbers - how many shares, what one cost
-// and is worth now, and what all of them are worth - right-aligned so that their digits line up
-// down the column. The table has no alignment of its own, so the values are padded out to the width
-// of their column.
+// and is worth now, how far that is from the cost, with its sign, the tax that selling them would
+// cost at the rate of the account, and last what all of them are worth - right-aligned so that
+// their digits line up down the column. The table has no alignment of its own, so the values are padded
+// out to the width of their column.
 func TestLotRow(t *testing.T) {
 	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
+	rate := decimal.NewNullDecimal(dec("26.4"))
 
 	tests := map[string]struct {
 		lot      portfolio.Lot
 		quote    portfolio.Quote
+		rate     decimal.NullDecimal
 		expected table.Row
 	}{
 		"a lot released from a grant": {
 			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("6"), Acquired: day("2026-01-15"), Cost: dec("380.12"), Grant: "Payout"},
 			quote:    panw,
-			expected: table.Row{"2026-01-15", "PANW", "Payout", "         6", "   $380.12", "   $396.25", "     $2,377.50"},
+			rate:     rate,
+			expected: table.Row{"2026-01-15", "PANW", "Payout", "         6", "   $380.12", "   $396.25", "   +4.2%", "        $25.55", "     $2,377.50"},
 		},
 		// A lot entered by hand came from no grant, and says nothing about where it is from. One
-		// without a cost shows a dash for it, rather than shares that cost nothing.
+		// without a cost shows a dash for it, rather than shares that cost nothing, and for what
+		// is measured from the cost.
 		"a fraction of a share, entered by hand without a cost": {
 			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("2.125"), Acquired: day("2026-02-15")},
 			quote:    panw,
-			expected: table.Row{"2026-02-15", "PANW", "", "     2.125", "         -", "   $396.25", "       $842.03"},
+			rate:     rate,
+			expected: table.Row{"2026-02-15", "PANW", "", "     2.125", "         -", "   $396.25", "       -", "             -", "       $842.03"},
 		},
 		"a value in the millions": {
 			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("12000"), Acquired: day("2020-06-01"), Cost: dec("75.5")},
 			quote:    panw,
-			expected: table.Row{"2020-06-01", "PANW", "", "     12000", "    $75.50", "   $396.25", " $4,755,000.00"},
+			rate:     rate,
+			expected: table.Row{"2020-06-01", "PANW", "", "     12000", "    $75.50", "   $396.25", " +424.8%", " $1,016,136.00", " $4,755,000.00"},
+		},
+		// A sale at a loss is not taxed, which is no tax rather than none that is known.
+		"a lot that lost": {
+			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("3"), Acquired: day("2025-12-01"), Cost: dec("452.86")},
+			quote:    panw,
+			rate:     rate,
+			expected: table.Row{"2025-12-01", "PANW", "", "         3", "   $452.86", "   $396.25", "  -12.5%", "         $0.00", "     $1,188.75"},
 		},
 		// Without a quote there is nothing to value the lot at, which reads as a dash rather than
 		// as shares that are worth nothing.
 		"a lot without a quote": {
 			lot:      portfolio.Lot{Symbol: "SAP.DE", Shares: dec("5"), Acquired: day("2026-01-15"), Cost: dec("120")},
 			quote:    portfolio.Quote{},
-			expected: table.Row{"2026-01-15", "SAP.DE", "", "         5", "   $120.00", "         -", "             -"},
+			rate:     rate,
+			expected: table.Row{"2026-01-15", "SAP.DE", "", "         5", "   $120.00", "         -", "       -", "             -", "             -"},
+		},
+		"an account without a gains tax rate": {
+			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("6"), Acquired: day("2026-01-15"), Cost: dec("380.12")},
+			quote:    panw,
+			expected: table.Row{"2026-01-15", "PANW", "", "         6", "   $380.12", "   $396.25", "   +4.2%", "             -", "     $2,377.50"},
 		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, lotRow(tt.lot, tt.quote))
+			assert.Equal(t, tt.expected, lotRow(tt.lot, tt.quote, tt.rate))
 		})
 	}
 }

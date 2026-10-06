@@ -18,7 +18,9 @@ import (
 )
 
 // Column widths of the Holdings table. Every column except the grant a lot is from is bounded by
-// its own content, so that is the one that flexes to fill whatever room the window leaves.
+// its own content, so that is the one that flexes to fill whatever room the window leaves. Not every
+// column is in every window: the ones that say what the others imply are left out of a window too
+// narrow for them, which is what HoldingsModel.layout decides.
 const (
 	// dayColumnWidth fits a day written as YYYY-MM-DD.
 	dayColumnWidth = 10
@@ -30,13 +32,26 @@ const (
 	// and its price now are.
 	priceColumnWidth = 10
 
+	// gainColumnWidth fits how far a price is from a cost, in percent, up to +9999.9%.
+	gainColumnWidth = 8
+
 	// valueColumnWidth fits a value up to $9,999,999.99, which is as much as the header's total
 	// will ever have to add up.
 	valueColumnWidth = 14
 
-	// holdingsColumnsWidth is what every column other than the grant occupies, padding included.
+	// holdingsColumnsWidth is what the columns that are always there occupy, other than the grant
+	// and with their padding.
 	holdingsColumnsWidth = dayColumnWidth + symbolColumnWidth + sharesColumnWidth + 2*priceColumnWidth + valueColumnWidth +
 		6*cellPadding
+
+	// grantColumnMinWidth is the least the column of the grant is left with by a column that is not
+	// always there: what it has in the narrowest window, with none of them.
+	grantColumnMinWidth = minTableWidth - holdingsColumnsWidth - cellPadding
+
+	// gainColumn and taxColumn are where the gain and the tax stand among all the columns, for
+	// leaving them out.
+	gainColumn = 6
+	taxColumn  = 7
 
 	// saleFormWidth is how many columns a field of the form that records a sale occupies, and
 	// saleNoteLines how many lines its notes have room for before they scroll.
@@ -59,6 +74,8 @@ type HoldingsModel struct {
 	keys      keyMap
 	table     table.Model
 	width     int              // width of the table, which the header line is spread across
+	showGain  bool             // the window has room for the column of the gain
+	showTax   bool             // and for that of the tax on it, which the account has a rate for
 	now       func() time.Time // the clock that says what today is
 	portfolio Portfolio        // the account as it was last loaded
 	lots      []portfolio.Lot  // the lots on display, as the table shows them: those with shares left
@@ -113,19 +130,68 @@ func NewHoldingsModel(store Store, quoter portfolio.Quoter, style Style) *Holdin
 	return m
 }
 
+// layout decides which columns the table has room for at its width and sets it up with those, and
+// with the rows of the portfolio to match. The gain comes first, and the tax on it only where there
+// is room for both, and where the account has a rate to tax a gain at: a column of dashes would
+// take the room of the grant for nothing. The selection stays on the row it was on.
+func (m *HoldingsModel) layout() {
+	room := m.grantColumnWidth() - grantColumnMinWidth
+	m.showGain = room >= gainColumnWidth+cellPadding
+	m.showTax = m.portfolio.GainsTaxRate.Valid && room >= gainColumnWidth+valueColumnWidth+2*cellPadding
+
+	// The table renders as soon as it is given columns or rows, and panics over a row with more
+	// cells than it has columns. So the rows go before the columns change and come back after.
+	cursor := m.table.Cursor()
+	m.table.SetRows(nil)
+	m.table.SetColumns(m.columns())
+	m.updateRows()
+	m.table.SetCursor(cursor)
+}
+
+// grantColumnWidth is what the columns that are always there leave to the column of the grant.
+func (m *HoldingsModel) grantColumnWidth() int {
+	return m.width - holdingsColumnsWidth - cellPadding
+}
+
+// shown returns those of cells, which are one for every column of the table, whose columns the
+// window has room for. It is what keeps the columns and the cells of a row the same in number.
+func shown[T any](m *HoldingsModel, cells []T) []T {
+	cells = slices.Clone(cells)
+
+	// The one further back first, so that the other is still where its index says.
+	if !m.showTax {
+		cells = slices.Delete(cells, taxColumn, taxColumn+1)
+	}
+	if !m.showGain {
+		cells = slices.Delete(cells, gainColumn, gainColumn+1)
+	}
+
+	return cells
+}
+
 // columns returns the table's columns, the column of the grant taking whatever the width leaves. The
 // titles of the number columns are padded like the numbers under them, so that they end where the
 // numbers do.
 func (m *HoldingsModel) columns() []table.Column {
-	return []table.Column{
+	grantWidth := m.grantColumnWidth()
+	if m.showGain {
+		grantWidth -= gainColumnWidth + cellPadding
+	}
+	if m.showTax {
+		grantWidth -= valueColumnWidth + cellPadding
+	}
+
+	return shown(m, []table.Column{
 		{Title: "Acquired", Width: dayColumnWidth},
 		{Title: "Symbol", Width: symbolColumnWidth},
-		{Title: "From", Width: m.width - holdingsColumnsWidth - cellPadding},
+		{Title: "From", Width: grantWidth},
 		{Title: fmt.Sprintf("%*s", sharesColumnWidth, "Shares"), Width: sharesColumnWidth},
 		{Title: fmt.Sprintf("%*s", priceColumnWidth, "Cost"), Width: priceColumnWidth},
 		{Title: fmt.Sprintf("%*s", priceColumnWidth, "Price"), Width: priceColumnWidth},
+		{Title: fmt.Sprintf("%*s", gainColumnWidth, "Gain"), Width: gainColumnWidth},
+		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Tax"), Width: valueColumnWidth},
 		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Value"), Width: valueColumnWidth},
-	}
+	})
 }
 
 // Title implements ViewModel by naming the view in the app's tab bar.
@@ -157,7 +223,7 @@ func (m *HoldingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKeyPress(msg)
 	case tea.WindowSizeMsg:
 		m.width = tableWidth(msg.Width)
-		m.table.SetColumns(m.columns())
+		m.layout()
 		m.table.SetWidth(m.width)
 		m.table.SetHeight(msg.Height - chromeHeight)
 		return m, nil
@@ -197,7 +263,8 @@ func (m *HoldingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handlePortfolioLoaded takes over the portfolio that was loaded and fills the table with its lots.
+// handlePortfolioLoaded takes over the portfolio that was loaded and fills the table with its lots,
+// in the columns that this portfolio has, since the tax on a lot is only shown at a rate.
 // A load that failed leaves the one on display where it is, and its error to the header. Either way
 // it sees to it that the quotes are fetched again in a while.
 func (m *HoldingsModel) handlePortfolioLoaded(msg PortfolioLoadedMsg) (tea.Model, tea.Cmd) {
@@ -206,7 +273,7 @@ func (m *HoldingsModel) handlePortfolioLoaded(msg PortfolioLoadedMsg) (tea.Model
 		// Quotes that could not be refreshed do not make the portfolio any less the latest there is.
 		m.err = msg.quotesErr
 		m.portfolio = msg.portfolio
-		m.updateRows()
+		m.layout()
 	}
 
 	return m, m.scheduleRefreshCmd()
@@ -444,7 +511,7 @@ func (m *HoldingsModel) updateRows() {
 
 	rows := make([]table.Row, len(m.lots))
 	for i, lot := range m.lots {
-		rows[i] = lotRow(lot, m.portfolio.Quotes[lot.Symbol])
+		rows[i] = shown(m, lotRow(lot, m.portfolio.Quotes[lot.Symbol], m.portfolio.GainsTaxRate))
 	}
 
 	setRows(&m.table, rows)
@@ -654,18 +721,28 @@ func lotGain(lot portfolio.Lot, price decimal.Decimal) (dollars, percent string)
 	return portfolio.FormatUSD(lot.Remaining().Mul(perShare)), arrow + " " + change.Abs().StringFixed(1) + "%"
 }
 
-// lotRow renders a lot as a row of the Holdings table, with the grant it was released from, if any,
-// the shares that are left of it, what one of them cost, if that is known, and valued at quote, which is the zero Quote if there
-// is none of the lot's stock. The numbers are right-aligned for their digits to line up down
-// the column. The table has no alignment of its own, so the values are padded out here.
-func lotRow(lot portfolio.Lot, quote portfolio.Quote) table.Row {
-	cost, price, value := noValue, noValue, noValue
+// lotRow renders a lot as a row of the Holdings table with all its columns: the grant it was
+// released from, if any, the shares that are left of it, what one of them cost, if that is known,
+// and what they are worth at quote, which is the zero Quote if there is none of the lot's stock.
+// With both a cost and a quote, it says how far the price is from the cost, and the tax that
+// selling the shares at that price would cost at gainsTaxRate, which is not valid if the account
+// has none. The value comes last, where the header's values end, with the tax left of it. The
+// numbers are right-aligned for their digits to line up down the column. The table has no
+// alignment of its own, so the values are padded out here.
+func lotRow(lot portfolio.Lot, quote portfolio.Quote, gainsTaxRate decimal.NullDecimal) table.Row {
+	cost, price, gain, value, tax := noValue, noValue, noValue, noValue, noValue
 	if !lot.Cost.IsZero() {
 		cost = portfolio.FormatUSD(lot.Cost)
 	}
 	if quote.Symbol != "" {
 		price = portfolio.FormatUSD(quote.Price)
 		value = portfolio.FormatUSD(lot.Remaining().Mul(quote.Price))
+		if growth, ok := lot.GrowthPercent(quote.Price); ok {
+			gain = formatGrowth(growth)
+		}
+		if gained, ok := lot.Gain(quote.Price); ok && gainsTaxRate.Valid {
+			tax = portfolio.FormatUSD(portfolio.GainsTax(gained, gainsTaxRate.Decimal))
+		}
 	}
 
 	return table.Row{
@@ -675,6 +752,23 @@ func lotRow(lot portfolio.Lot, quote portfolio.Quote) table.Row {
 		fmt.Sprintf("%*s", sharesColumnWidth, lot.Remaining()),
 		fmt.Sprintf("%*s", priceColumnWidth, cost),
 		fmt.Sprintf("%*s", priceColumnWidth, price),
+		fmt.Sprintf("%*s", gainColumnWidth, gain),
+		fmt.Sprintf("%*s", valueColumnWidth, tax),
 		fmt.Sprintf("%*s", valueColumnWidth, value),
 	}
+}
+
+// formatGrowth renders a growth in percent to one decimal and with its sign, such as "+123.4%" or
+// "-12.5%". The sign is there for a gain as well, so that the column reads as changes rather than
+// as shares of something.
+func formatGrowth(growth decimal.Decimal) string {
+	// Rounded before the sign is read, so that next to nothing lost is not "-0.0%".
+	growth = growth.Round(1)
+
+	sign := "+"
+	if growth.IsNegative() {
+		sign = "-"
+	}
+
+	return sign + growth.Abs().StringFixed(1) + "%"
 }

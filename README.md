@@ -90,6 +90,9 @@ folio lot 15 AAPL 2025-06-02 @201.50
 # The rate your vests are taxed at, for an estimate of what they are worth after tax
 folio config tax-rate 44.3%
 
+# The rate the gain of a sale is taxed at, for an estimate of what selling would cost
+folio config gains-tax-rate 26.4%
+
 folio status
 ```
 
@@ -147,14 +150,23 @@ line, `ctrl+s` does. The note of a sale shows above the Sales table while the sa
 
 A vest is taxed as income when it vests, at a rate that depends on the rest of your income and where
 you live. folio does not work it out: it takes the rate you set with `folio config tax-rate` for
-every vest, and the Vesting view shows what is left of each after tax at that rate. The three values
-are the bank's, before tax, unless you set `folio config potential net`: then the header of the TUI
-shows the potential value after tax, and the total as the current value and that added up. The
-potential value is marked `(gross)` or `(net)`, so that you can tell which one you are looking at.
+every vest, and the Vesting view shows what is left of each after tax at that rate.
+
+The shares you hold were taxed when they vested, and selling them is taxed again on what they
+gained since. The Holdings view shows that gain for each lot, as how far the price is from what the
+lot cost, such as `+4.2%`. With `folio config gains-tax-rate`, such as 26.4%, it also shows the tax
+that selling the lot today would cost. A lot that lost is not taxed, and its loss is not set
+against the gain of another lot. The two columns need room: the gain shows in a terminal of 92
+columns or more, and the tax in one of 108.
+
+The three values are the bank's, before tax, unless you set `folio config show-net-summary true`.
+Then the header of the TUI shows the potential value after the tax on the vests and the current
+value after the tax on the gains, as if you sold everything today, each marked `(net)`. The total
+is the two added up. A value whose rate is not set stays the bank's.
 
 `c` opens the configuration from any view, with a row for each key that `folio config` has. `enter`
 edits the value of the selected row, and an empty value unsets it. A row with a few values to pick
-from, such as gross or net, changes with `←` and `→`. Each change is saved right away and shows in
+from, such as true or false, changes with `←` and `→`. Each change is saved right away and shows in
 the view behind the dialog.
 
 Prices are fetched when the TUI starts and every five minutes after that. It opens with the last
@@ -171,7 +183,8 @@ folio grant --vests schedule.txt "Payout: PANW"    # the vests listed, "<YYYY-MM
 folio release 2026-01-15 6 @380.12                 # 6 shares arrived, worth $380.12 each that day
 folio config tax-rate 44.3%                        # the rate vests are taxed at
 folio config tax-rate                              # print it
-folio config potential net                         # show the potential value after tax in the TUI
+folio config gains-tax-rate 26.4%                  # the rate the gain of a sale is taxed at
+folio config show-net-summary true                 # show the values after tax in the header of the TUI
 folio config --unset tax-rate                      # take a value back
 folio config                                       # the whole configuration, as YAML
 folio config -o json                               # the whole configuration, as JSON

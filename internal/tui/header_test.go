@@ -20,7 +20,9 @@ import (
 func TestAccountHeader(t *testing.T) {
 	account := portfolio.Account{Current: dec("3368.13"), Potential: dec("7925")}
 
-	header := accountHeader("8.5 PANW", "PANW $396.25", account, portfolio.Gross, 66, DefaultStyle())
+	values := shownValues{account: account}
+
+	header := accountHeader("8.5 PANW", "PANW $396.25", values, 66, DefaultStyle())
 
 	expected := "" +
 		"  8.5 PANW                                         Total: $11,293.13\n" +
@@ -33,51 +35,80 @@ func TestAccountHeader(t *testing.T) {
 	}
 }
 
-// TestPortfolioHeader_PotentialBasis covers the potential value the header shows, which is the
-// bank's unless the account asks for it after tax, and the word next to it that says which one it
-// is. After tax, the total is the current value and the potential one after tax, so that the
-// values on screen add up. Without a tax rate there is nothing to take off, and the header says it
-// shows the bank's number.
-func TestPortfolioHeader_PotentialBasis(t *testing.T) {
-	tests := map[string]struct {
-		basis     portfolio.PotentialBasis
-		noTaxRate bool
-		total     string
-		parts     string
+// TestPortfolioHeader_ShowNet covers the values the header shows, which are the bank's unless the
+// account asks for them after tax. Then the potential value is what is left of the vests after tax
+// at the tax rate, and the current value what the shares that are held would bring if they were
+// sold today, less the tax on the gain of each lot. Each says that it is net, and the total is the
+// two added up, so that the values on screen add up. A value without a rate to take off stays the
+// bank's and does not say net. The current value says nothing while it is the bank's: the line has
+// the prices to fit in as well.
+func TestPortfolioHeader_ShowNet(t *testing.T) {
+	cases := map[string]struct {
+		showNet        bool
+		noTaxRate      bool
+		noGainsTaxRate bool
+		total          string
+		parts          string
 	}{
 		"gross": {
-			basis: portfolio.Gross,
 			total: "Total: $11,293.13",
 			parts: "Current $3,368.13 · Potential (gross) $7,925.00",
 		},
 		"net": {
-			basis: portfolio.Net,
-			total: "Total: $7,782.36",
-			parts: "Current $3,368.13 · Potential (net) $4,414.23",
+			showNet: true,
+			total:   "Total: $7,756.81",
+			parts:   "Current (net) $3,342.58 · Potential (net) $4,414.23",
 		},
 		"net without a tax rate": {
-			basis:     portfolio.Net,
+			showNet:   true,
 			noTaxRate: true,
-			total:     "Total: $11,293.13",
-			parts:     "Current $3,368.13 · Potential (gross) $7,925.00",
+			total:     "Total: $11,267.58",
+			parts:     "Current (net) $3,342.58 · Potential (gross) $7,925.00",
+		},
+		"net without a gains tax rate": {
+			showNet:        true,
+			noGainsTaxRate: true,
+			total:          "Total: $7,782.36",
+			parts:          "Current $3,368.13 · Potential (net) $4,414.23",
 		},
 	}
 
-	for name, tt := range tests {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			p := testPortfolio()
-			p.PotentialBasis = tt.basis
-			if tt.noTaxRate {
+			p.ShowNet = c.showNet
+			if c.noTaxRate {
 				p.TaxRate = decimal.NullDecimal{}
+			}
+			if c.noGainsTaxRate {
+				p.GainsTaxRate = decimal.NullDecimal{}
 			}
 
 			lines := strings.Split(ansi.Strip(portfolioHeader("8.5 PANW", p, nil, 80, DefaultStyle())), "\n")
 
 			require.Len(t, lines, 2)
-			assert.True(t, strings.HasSuffix(lines[0], tt.total), "%q should end in %q", lines[0], tt.total)
-			assert.True(t, strings.HasSuffix(lines[1], tt.parts), "%q should end in %q", lines[1], tt.parts)
+			assert.True(t, strings.HasSuffix(lines[0], c.total), "%q should end in %q", lines[0], c.total)
+			assert.True(t, strings.HasSuffix(lines[1], c.parts), "%q should end in %q", lines[1], c.parts)
 		})
 	}
+}
+
+// TestPortfolioHeader_CutsThePricesShort covers a header with more prices than its line has room
+// for next to the account values, which a second stock or a value marked net is enough for in a
+// narrow window. The prices are cut short rather than pushing the values past the end of the table,
+// where the terminal would wrap them into the frame.
+func TestPortfolioHeader_CutsThePricesShort(t *testing.T) {
+	p := testPortfolio()
+	p.ShowNet = true
+	p.TaxRate = decimal.NullDecimal{}
+	p.Lots = append(p.Lots, portfolio.Lot{ID: 3, Symbol: "AAPL", Shares: dec("3"), Acquired: day("2025-11-02")})
+	p.Quotes["AAPL"] = portfolio.Quote{Symbol: "AAPL", Price: dec("330.32"), PreviousClose: dec("325")}
+
+	lines := strings.Split(ansi.Strip(portfolioHeader("3 AAPL · 8.5 PANW", p, nil, 78, DefaultStyle())), "\n")
+
+	require.Len(t, lines, 2)
+	assert.Equal(t, "  AAPL $330.32 ▲ 1.6% · …  Current (net) $4,333.54 · Potential (gross) $7,925.00", lines[1])
+	assert.Equal(t, 80, lipgloss.Width(lines[1]))
 }
 
 // TestQuoteStatus covers the status line under a view's own: the price each stock of the account is

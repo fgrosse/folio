@@ -33,8 +33,8 @@ type Store interface {
 
 // A Portfolio is everything the views show, as the store had it at one moment: the lots and grants
 // of the account, the quotes they are valued at, the sales that took shares out of the lots, the
-// rate that vests are taxed at, and whether the potential value is shown before or after that tax.
-// Every view holds the latest one it was sent.
+// rates that vests and the gain of a sale are taxed at, and whether the header shows the values
+// before or after tax. Every view holds the latest one it was sent.
 type Portfolio struct {
 	Lots   []portfolio.Lot
 	Grants []portfolio.Grant
@@ -44,8 +44,13 @@ type Portfolio struct {
 	// TaxRate is the rate in percent that vests are taxed at, not valid if none was set.
 	TaxRate decimal.NullDecimal
 
-	// PotentialBasis is whether the header shows the potential value before tax or after it.
-	PotentialBasis portfolio.PotentialBasis
+	// GainsTaxRate is the rate in percent that the gain of a sale is taxed at, not valid if none was
+	// set.
+	GainsTaxRate decimal.NullDecimal
+
+	// ShowNet is whether the header shows the potential and the current value after tax rather
+	// than as the bank states them.
+	ShowNet bool
 }
 
 // PortfolioLoadedMsg reports the result of loading the portfolio from the Store. Every view
@@ -117,30 +122,36 @@ func loadPortfolio(store Store) (Portfolio, error) {
 		return Portfolio{}, err
 	}
 
-	taxRate, err := loadTaxRate(store)
+	taxRate, err := loadTaxRate(store, portfolio.TaxRateKey)
 	if err != nil {
 		return Portfolio{}, err
 	}
 
-	basis, err := loadPotentialBasis(store)
+	gainsTaxRate, err := loadTaxRate(store, portfolio.GainsTaxRateKey)
+	if err != nil {
+		return Portfolio{}, err
+	}
+
+	showNet, err := loadSwitch(store, portfolio.ShowNetSummaryKey)
 	if err != nil {
 		return Portfolio{}, err
 	}
 
 	return Portfolio{
-		Lots:           lots,
-		Grants:         grants,
-		Quotes:         quotes,
-		Sales:          sales,
-		TaxRate:        taxRate,
-		PotentialBasis: basis,
+		Lots:         lots,
+		Grants:       grants,
+		Quotes:       quotes,
+		Sales:        sales,
+		TaxRate:      taxRate,
+		GainsTaxRate: gainsTaxRate,
+		ShowNet:      showNet,
 	}, nil
 }
 
-// loadTaxRate returns the rate that vests are taxed at, which is not valid if the account has none.
-// The store keeps it as text among the configuration, as folio config set it.
-func loadTaxRate(store Store) (decimal.NullDecimal, error) {
-	value, err := store.GetConfig(portfolio.TaxRateKey)
+// loadTaxRate returns the tax rate that is set under key, which is not valid if the account has
+// none. The store keeps it as text among the configuration, as folio config set it.
+func loadTaxRate(store Store, key string) (decimal.NullDecimal, error) {
+	value, err := store.GetConfig(key)
 	switch {
 	case errors.Is(err, portfolio.ErrNotSet):
 		return decimal.NullDecimal{}, nil
@@ -150,27 +161,27 @@ func loadTaxRate(store Store) (decimal.NullDecimal, error) {
 
 	rate, err := portfolio.ParseTaxRate(value)
 	if err != nil {
-		return decimal.NullDecimal{}, fmt.Errorf("%s: %w", portfolio.TaxRateKey, err)
+		return decimal.NullDecimal{}, fmt.Errorf("%s: %w", key, err)
 	}
 
 	return decimal.NewNullDecimal(rate), nil
 }
 
-// loadPotentialBasis returns which potential value the header shows. An account that has not said
-// shows the bank's, before tax, which is the number its web site has.
-func loadPotentialBasis(store Store) (portfolio.PotentialBasis, error) {
-	value, err := store.GetConfig(portfolio.PotentialBasisKey)
+// loadSwitch returns whether the setting under key is on. An account that has not said has it off,
+// which for the values of the header means the bank's numbers, before tax.
+func loadSwitch(store Store, key string) (bool, error) {
+	value, err := store.GetConfig(key)
 	switch {
 	case errors.Is(err, portfolio.ErrNotSet):
-		return portfolio.Gross, nil
+		return false, nil
 	case err != nil:
-		return "", err
+		return false, err
 	}
 
-	basis, err := portfolio.ParsePotentialBasis(value)
+	on, err := portfolio.ParseSwitch(value)
 	if err != nil {
-		return "", fmt.Errorf("%s: %w", portfolio.PotentialBasisKey, err)
+		return false, fmt.Errorf("%s: %w", key, err)
 	}
 
-	return basis, nil
+	return on, nil
 }

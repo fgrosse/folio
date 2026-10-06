@@ -215,3 +215,61 @@ func TestParseRelease(t *testing.T) {
 		})
 	}
 }
+
+// TestLot_GrowthPercent covers how far the price of a share has moved from what the lot cost, in percent
+// of that cost: up, down, or not at all. A lot without a cost has nothing to measure from, and says
+// so rather than passing for a lot that has not moved.
+func TestLot_GrowthPercent(t *testing.T) {
+	cases := map[string]struct {
+		cost     string
+		price    string
+		expected string
+		unknown  bool
+	}{
+		"up":             {cost: "200", price: "446", expected: "123"},
+		"down":           {cost: "400", price: "350", expected: "-12.5"},
+		"where it was":   {cost: "380.12", price: "380.12", expected: "0"},
+		"without a cost": {cost: "0", price: "396.25", unknown: true},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			lot := Lot{Symbol: "PANW", Shares: shares("6"), Cost: shares(c.cost)}
+
+			growth, ok := lot.GrowthPercent(shares(c.price))
+
+			assert.Equal(t, !c.unknown, ok)
+			if ok {
+				assert.Equal(t, c.expected, growth.String())
+			}
+		})
+	}
+}
+
+// TestLot_Gain covers what the shares left of a lot are worth over what they cost, which is what a
+// sale of them at that price would be taxed on: the difference a share made, for every share that
+// is still held. It is less than zero for a lot that lost. A lot without a cost has no gain to
+// state, and says so.
+func TestLot_Gain(t *testing.T) {
+	cases := map[string]struct {
+		lot      Lot
+		expected string
+		unknown  bool
+	}{
+		"up":             {lot: Lot{Shares: shares("6"), Cost: shares("380.12")}, expected: "96.78"},
+		"down":           {lot: Lot{Shares: shares("3"), Cost: shares("452.86")}, expected: "-169.83"},
+		"partly sold":    {lot: Lot{Shares: shares("6"), Sold: shares("2"), Cost: shares("380.12")}, expected: "64.52"},
+		"without a cost": {lot: Lot{Shares: shares("2.5")}, unknown: true},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			gain, ok := c.lot.Gain(shares("396.25"))
+
+			assert.Equal(t, !c.unknown, ok)
+			if ok {
+				assert.Equal(t, c.expected, gain.String())
+			}
+		})
+	}
+}
