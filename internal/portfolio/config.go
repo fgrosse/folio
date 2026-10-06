@@ -29,7 +29,7 @@ var ConfigKeys = []ConfigKey{
 		Choices: []string{string(Gross), string(Net)},
 		Default: string(Gross),
 		Parse: func(value string) (string, error) {
-			basis, err := ParsePotentialBasis(value)
+			basis, err := ParseBasis(value)
 			return string(basis), err
 		},
 	},

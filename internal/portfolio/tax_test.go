@@ -47,12 +47,12 @@ func TestAfterTax(t *testing.T) {
 	assert.Equal(t, "0", AfterTax(shares("3962.50"), shares("100")).String())
 }
 
-// TestParsePotentialBasis covers how the user says which potential value the header shows: the
+// TestParseBasis covers how the user says which of a value the header shows: the
 // bank's before tax, or what is left of it after tax, by name and however it is capitalized.
-func TestParsePotentialBasis(t *testing.T) {
+func TestParseBasis(t *testing.T) {
 	tests := map[string]struct {
 		value    string
-		expected PotentialBasis
+		expected Basis
 		error    string
 	}{
 		"gross":      {value: "gross", expected: Gross},
@@ -64,7 +64,7 @@ func TestParsePotentialBasis(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			basis, err := ParsePotentialBasis(tt.value)
+			basis, err := ParseBasis(tt.value)
 			if tt.error != "" {
 				assert.EqualError(t, err, tt.error)
 				return

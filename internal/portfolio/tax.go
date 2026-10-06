@@ -12,25 +12,24 @@ import (
 const TaxRateKey = "tax-rate"
 
 // PotentialBasisKey is the key of the configuration that says which potential value the TUI shows
-// in its header, as ParsePotentialBasis reads it. It is gross when it is not set.
+// in its header, as ParseBasis reads it. It is gross when it is not set.
 const PotentialBasisKey = "potential"
 
 const (
-	// Gross is the potential value before tax, as the bank states it.
-	Gross PotentialBasis = "gross"
+	// Gross is a value before tax, as the bank states it.
+	Gross Basis = "gross"
 
-	// Net is the potential value after tax, at the rate of the account.
-	Net PotentialBasis = "net"
+	// Net is a value after tax, at the rate the account has for it.
+	Net Basis = "net"
 )
 
 // hundred is all of something, in percent.
 var hundred = decimal.NewFromInt(100)
 
-// A PotentialBasis is whether the potential value of an account is shown as the bank states it,
-// before tax, or as what is left of it once the tax on the vests is taken off. The bank's number
-// is the one to compare with its web site, and the one after tax is closer to what the vests will
-// bring.
-type PotentialBasis string
+// A Basis is whether a value of an account is shown as the bank states it, before tax, or as what
+// is left of it once the tax on it is taken off. The bank's number is the one to compare with its
+// web site, and the one after tax is closer to what the shares will bring.
+type Basis string
 
 // ParseTaxRate parses the rate that a vest is taxed at, written as a percentage such as "44.3%" or
 // "44.3", and returns it in percent. A vest is taxed as income, at a rate that depends on the rest
@@ -56,9 +55,9 @@ func AfterTax(value, rate decimal.Decimal) decimal.Decimal {
 	return value.Mul(hundred.Sub(rate)).Div(hundred).Round(2)
 }
 
-// ParsePotentialBasis parses which potential value to show, written as "gross" or "net".
-func ParsePotentialBasis(value string) (PotentialBasis, error) {
-	switch basis := PotentialBasis(strings.ToLower(strings.TrimSpace(value))); basis {
+// ParseBasis parses which of a value to show, written as "gross" or "net".
+func ParseBasis(value string) (Basis, error) {
+	switch basis := Basis(strings.ToLower(strings.TrimSpace(value))); basis {
 	case Gross, Net:
 		return basis, nil
 	default:

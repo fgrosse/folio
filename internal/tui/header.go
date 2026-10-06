@@ -43,7 +43,7 @@ func notedHeader(left, note string, p Portfolio, err error, width int, style Sty
 // shownAccount returns the values of p that the header shows, and whether their potential value is
 // before or after tax. It is after tax only if the account asks for that and has a rate to take
 // off, and the bank's number otherwise, so that the header never calls a value net that is not.
-func shownAccount(p Portfolio) (portfolio.Account, portfolio.PotentialBasis) {
+func shownAccount(p Portfolio) (portfolio.Account, portfolio.Basis) {
 	account := portfolio.NewAccount(p.Lots, p.Grants, p.Quotes)
 	if p.PotentialBasis != portfolio.Net || !p.TaxRate.Valid {
 		return account, portfolio.Gross
@@ -58,7 +58,7 @@ const headerGap = 2
 // accountParts renders the two values the total is made of, for the second line of the header. The
 // potential value says whether it is gross or net, since the two differ by the tax on the vests and
 // the header is where the user compares folio with the bank.
-func accountParts(account portfolio.Account, basis portfolio.PotentialBasis) string {
+func accountParts(account portfolio.Account, basis portfolio.Basis) string {
 	return fmt.Sprintf("Current %s · Potential (%s) %s",
 		portfolio.FormatUSD(account.Current), basis, portfolio.FormatUSD(account.Potential))
 }
@@ -71,7 +71,7 @@ func accountParts(account portfolio.Account, basis portfolio.PotentialBasis) str
 //
 // width is that of the table without the padding of its cells, so that the values end where the
 // last column's do.
-func accountHeader(left, status string, account portfolio.Account, basis portfolio.PotentialBasis, width int, style Style) string {
+func accountHeader(left, status string, account portfolio.Account, basis portfolio.Basis, width int, style Style) string {
 	total := style.Total.Render("Total: " + portfolio.FormatUSD(account.Total()))
 	parts := style.Hint.Render(accountParts(account, basis))
 

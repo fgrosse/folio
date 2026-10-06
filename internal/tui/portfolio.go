@@ -45,7 +45,7 @@ type Portfolio struct {
 	TaxRate decimal.NullDecimal
 
 	// PotentialBasis is whether the header shows the potential value before tax or after it.
-	PotentialBasis portfolio.PotentialBasis
+	PotentialBasis portfolio.Basis
 }
 
 // PortfolioLoadedMsg reports the result of loading the portfolio from the Store. Every view
@@ -158,7 +158,7 @@ func loadTaxRate(store Store) (decimal.NullDecimal, error) {
 
 // loadPotentialBasis returns which potential value the header shows. An account that has not said
 // shows the bank's, before tax, which is the number its web site has.
-func loadPotentialBasis(store Store) (portfolio.PotentialBasis, error) {
+func loadPotentialBasis(store Store) (portfolio.Basis, error) {
 	value, err := store.GetConfig(portfolio.PotentialBasisKey)
 	switch {
 	case errors.Is(err, portfolio.ErrNotSet):
@@ -167,7 +167,7 @@ func loadPotentialBasis(store Store) (portfolio.PotentialBasis, error) {
 		return "", err
 	}
 
-	basis, err := portfolio.ParsePotentialBasis(value)
+	basis, err := portfolio.ParseBasis(value)
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", portfolio.PotentialBasisKey, err)
 	}

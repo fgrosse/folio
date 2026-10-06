@@ -40,7 +40,7 @@ func TestAccountHeader(t *testing.T) {
 // shows the bank's number.
 func TestPortfolioHeader_PotentialBasis(t *testing.T) {
 	tests := map[string]struct {
-		basis     portfolio.PotentialBasis
+		basis     portfolio.Basis
 		noTaxRate bool
 		total     string
 		parts     string
