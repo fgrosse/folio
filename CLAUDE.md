@@ -106,7 +106,9 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
   has no gain that is known. The three values stay the bank's, before tax, unless the user asks
   for them after tax (`folio config show-net-summary true`). Then the TUI's header shows the
   potential value after the tax on the vests and the current value after the tax on the gains,
-  each marked `(net)`, and the total is the two added up, so that the values on screen add up.
+  and the total is the two added up, so that the values on screen add up. A badge in front of the
+  total says once whether the three are `[GROSS]` or `[NET]`, and a value that has no rate to take
+  off it is marked `(gross)` under a badge that says net.
   The rates are kept in the `settings` table, which holds what applies to the whole account, one
   value by name, so that it is in the database like everything else.
 - **Everything is in USD for now**, the currency the stock trades in. Showing another currency is

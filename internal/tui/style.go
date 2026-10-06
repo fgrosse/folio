@@ -38,6 +38,11 @@ type Style struct {
 	Gain lipgloss.Style
 	Loss lipgloss.Style
 
+	// Badge says next to the total whether the account values are gross or net. Its place, its
+	// capitals and the brackets around it are what make it found, so it is as dim as the rest of the
+	// header and leaves the eye to the total.
+	Badge lipgloss.Style
+
 	// Hint is what the header says besides the total: the two values the total is made of, and how
 	// old the prices are. It is a footnote to the total, so it stays dim.
 	Hint lipgloss.Style
@@ -84,6 +89,8 @@ func DefaultStyle() Style {
 			Foreground(lipgloss.Color("78")),
 		Loss: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("203")),
+		Badge: lipgloss.NewStyle().
+			Foreground(borderColor),
 		Hint: lipgloss.NewStyle().
 			Foreground(borderColor),
 		Error: lipgloss.NewStyle().
