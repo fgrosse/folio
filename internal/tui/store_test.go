@@ -116,6 +116,7 @@ func testPortfolio() Portfolio {
 		TaxRate:        decimal.NewNullDecimal(dec("44.3")),
 		GainsTaxRate:   decimal.NewNullDecimal(dec("26.4")),
 		PotentialBasis: portfolio.Gross,
+		CurrentBasis:   portfolio.Gross,
 	}
 }
 
@@ -125,7 +126,7 @@ func (m *MockStore) returns(p Portfolio) {
 	m.returnsRate(portfolio.TaxRateKey, p.TaxRate)
 	m.returnsRate(portfolio.GainsTaxRateKey, p.GainsTaxRate)
 	m.On("GetConfig", portfolio.PotentialBasisKey).Return(string(p.PotentialBasis), nil)
-	m.On("GetConfig", portfolio.CurrentBasisKey).Return("", portfolio.ErrNotSet).Maybe()
+	m.On("GetConfig", portfolio.CurrentBasisKey).Return(string(p.CurrentBasis), nil)
 }
 
 // returnsRate sets store up to answer with rate for the key of a tax rate, written as folio config

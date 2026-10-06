@@ -33,8 +33,8 @@ type Store interface {
 
 // A Portfolio is everything the views show, as the store had it at one moment: the lots and grants
 // of the account, the quotes they are valued at, the sales that took shares out of the lots, the
-// rates that vests and the gain of a sale are taxed at, and whether the potential value is shown
-// before or after tax. Every view holds the latest one it was sent.
+// rates that vests and the gain of a sale are taxed at, and whether the potential and the current
+// value are shown before or after tax. Every view holds the latest one it was sent.
 type Portfolio struct {
 	Lots   []portfolio.Lot
 	Grants []portfolio.Grant
@@ -50,6 +50,10 @@ type Portfolio struct {
 
 	// PotentialBasis is whether the header shows the potential value before tax or after it.
 	PotentialBasis portfolio.Basis
+
+	// CurrentBasis is whether the header shows the current value before the tax on its gains or
+	// after it.
+	CurrentBasis portfolio.Basis
 }
 
 // PortfolioLoadedMsg reports the result of loading the portfolio from the Store. Every view
@@ -131,7 +135,12 @@ func loadPortfolio(store Store) (Portfolio, error) {
 		return Portfolio{}, err
 	}
 
-	basis, err := loadPotentialBasis(store)
+	potentialBasis, err := loadBasis(store, portfolio.PotentialBasisKey)
+	if err != nil {
+		return Portfolio{}, err
+	}
+
+	currentBasis, err := loadBasis(store, portfolio.CurrentBasisKey)
 	if err != nil {
 		return Portfolio{}, err
 	}
@@ -143,7 +152,8 @@ func loadPortfolio(store Store) (Portfolio, error) {
 		Sales:          sales,
 		TaxRate:        taxRate,
 		GainsTaxRate:   gainsTaxRate,
-		PotentialBasis: basis,
+		PotentialBasis: potentialBasis,
+		CurrentBasis:   currentBasis,
 	}, nil
 }
 
@@ -166,10 +176,10 @@ func loadTaxRate(store Store, key string) (decimal.NullDecimal, error) {
 	return decimal.NewNullDecimal(rate), nil
 }
 
-// loadPotentialBasis returns which potential value the header shows. An account that has not said
-// shows the bank's, before tax, which is the number its web site has.
-func loadPotentialBasis(store Store) (portfolio.Basis, error) {
-	value, err := store.GetConfig(portfolio.PotentialBasisKey)
+// loadBasis returns which of a value the header shows, as it is set under key. An account that has
+// not said shows the bank's, before tax, which is the number its web site has.
+func loadBasis(store Store, key string) (portfolio.Basis, error) {
+	value, err := store.GetConfig(key)
 	switch {
 	case errors.Is(err, portfolio.ErrNotSet):
 		return portfolio.Gross, nil
@@ -179,7 +189,7 @@ func loadPotentialBasis(store Store) (portfolio.Basis, error) {
 
 	basis, err := portfolio.ParseBasis(value)
 	if err != nil {
-		return "", fmt.Errorf("%s: %w", portfolio.PotentialBasisKey, err)
+		return "", fmt.Errorf("%s: %w", key, err)
 	}
 
 	return basis, nil
