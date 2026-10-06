@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `folio config potential net` shows the potential value after tax in the header of the TUI, marked gross or net
 - `c` opens the configuration in the TUI, to set and unset its values without leaving it
 - `folio config --unset` takes a value of the configuration back
+- The Holdings view shows the gain of each lot since it was acquired, in percent
+- `folio config gains-tax-rate` sets the rate the gain of a sale is taxed at, and the Holdings view shows the tax that selling each lot would cost
+- `folio config current net` shows the current value after tax on the gains in the header of the TUI, marked net
+- The Holdings view leaves out the gain and the tax in a terminal too narrow for them
 
 ## [v1.0.0] - 2026-10-02
 - Initial release

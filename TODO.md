@@ -50,13 +50,19 @@ Roughly in the order worth doing.
 
 - **Show values in another currency**, such as EUR, toggled with a key in the TUI and a flag on `folio status`. It needs an
   exchange rate, fetched and cached like a quote.
-- **Tax estimates**: the Vesting view shows each vest after tax at the rate of the account, and the
-  header shows the potential value after tax with `folio config potential net`. Still to come:
-  the potential value after tax in `folio status`.
-  For what is held, the gain of a lot since its cost, which is recorded, and the tax on it if it
-  was sold. Costs are in USD, and a tax return outside the US wants them in its own currency at
-  the rate of the day, so this needs the exchange rate of a past day.
-- **The gain of a lot** in the Holdings view, now that it has a cost: per lot and in the header.
+- **Tax estimates**: the header shows the potential and the current value after tax, with
+  `folio config potential net` and `folio config current net`. Still to come: the same in
+  `folio status`. Costs are in USD, and a tax return outside the US wants the gain in its own
+  currency at the rate of each day, so an exact tax on a gain needs the exchange rate of a past
+  day.
+- **Set losses against gains.** The tax on what is held counts every lot on its own, so a lot that
+  lost takes nothing off the tax on another. Sold in one year, the loss would, and so would the
+  losses of the sales that were recorded this year. The same goes for an allowance, such as the
+  Sparer-Pauschbetrag in Germany.
+- **The gain of the account in the header**, next to the values, now that each lot shows its own.
+- **More columns for wider windows.** The Holdings table leaves out the gain and the tax where it
+  has no room, and stops growing at 120 columns. The gain in dollars and the value after tax could
+  be columns of a window wider than that.
 - **The account value over time**, as a chart or a table by month.
 - **A status bar widget**, such as a module for Waybar, that shows the account value from
   `folio status --json`.

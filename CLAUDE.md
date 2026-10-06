@@ -97,14 +97,19 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
 - **Every view shows the same account.** They all receive the one `PortfolioLoadedMsg`, whichever
   of them asked for the load, and each renders the same header with the three values. The Holdings
   view is the one that keeps the quotes fresh: it fetches them on start and every five minutes.
-- **Tax is an estimate at one rate.** A vest is taxed as income at a rate that depends on the rest
+- **Tax is an estimate at two rates.** A vest is taxed as income at a rate that depends on the rest
   of the year's income, which folio does not know, so the user sets one rate in percent for the
-  whole account (`folio config tax-rate`) and folio takes it off each vest. The three values stay
-  the bank's, before tax, unless the user asks for the potential value after tax (`folio config
-  potential net`). Then the TUI's header shows that, marked `(net)`, with the total as the current
-  value plus that, so that the values on screen add up. The current value is never taxed, since
-  what is held was taxed when it vested. The rate is kept in the `settings` table, which holds what applies to the
-  whole account, one value by name, so that it is in the database like everything else.
+  whole account (`folio config tax-rate`) and folio takes it off each vest. What is held was taxed
+  when it vested, and a sale of it is taxed on the gain since, at a rate of its own
+  (`folio config gains-tax-rate`). Each lot is taxed on its own gain, as the Holdings view shows it:
+  a lot that lost is not taxed and takes nothing off the gain of another, and a lot without a cost
+  has no gain that is known. The three values stay the bank's, before tax, unless the user asks
+  for one after tax: `folio config potential net` for the potential value after the tax on the
+  vests, and `folio config current net` for the current value after the tax on the gains. The
+  TUI's header marks a value that is after tax `(net)`, and the total is the two values it shows,
+  so that the values on screen add up. The rates are kept in the `settings` table, which holds
+  what applies to the whole account, one value by name, so that it is in the database like
+  everything else.
 - **Everything is in USD for now**, the currency the stock trades in. Showing another currency is
   in `TODO.md`.
 - **The demo is the one verb with a database of its own.** Every other verb shares the database of
