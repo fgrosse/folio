@@ -232,15 +232,15 @@ func TestLot_GrowthPercent(t *testing.T) {
 		"without a cost": {cost: "0", price: "396.25", unknown: true},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			lot := Lot{Symbol: "PANW", Shares: shares("6"), Cost: shares(tt.cost)}
+			lot := Lot{Symbol: "PANW", Shares: shares("6"), Cost: shares(c.cost)}
 
-			growth, ok := lot.GrowthPercent(shares(tt.price))
+			growth, ok := lot.GrowthPercent(shares(c.price))
 
-			assert.Equal(t, !tt.unknown, ok)
+			assert.Equal(t, !c.unknown, ok)
 			if ok {
-				assert.Equal(t, tt.expected, growth.String())
+				assert.Equal(t, c.expected, growth.String())
 			}
 		})
 	}
@@ -262,13 +262,13 @@ func TestLot_Gain(t *testing.T) {
 		"without a cost": {lot: Lot{Shares: shares("2.5")}, unknown: true},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			gain, ok := tt.lot.Gain(shares("396.25"))
+			gain, ok := c.lot.Gain(shares("396.25"))
 
-			assert.Equal(t, !tt.unknown, ok)
+			assert.Equal(t, !c.unknown, ok)
 			if ok {
-				assert.Equal(t, tt.expected, gain.String())
+				assert.Equal(t, c.expected, gain.String())
 			}
 		})
 	}

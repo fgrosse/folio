@@ -639,7 +639,7 @@ func TestStore_MigratesPotentialToShowNetSummary(t *testing.T) {
 		"not set": {},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			s, err := NewStore(":memory:")
 			require.NoError(t, err)
@@ -647,8 +647,8 @@ func TestStore_MigratesPotentialToShowNetSummary(t *testing.T) {
 			// Up to the migration that created the settings, which is as far as such an account got.
 			_, err = migrate.ExecMax(s.db.DB, "sqlite3", migrations, migrate.Up, 7)
 			require.NoError(t, err)
-			if tt.potential != "" {
-				require.NoError(t, s.SetConfig("potential", tt.potential))
+			if c.potential != "" {
+				require.NoError(t, s.SetConfig("potential", c.potential))
 			}
 
 			require.NoError(t, s.Migrate())
@@ -657,13 +657,13 @@ func TestStore_MigratesPotentialToShowNetSummary(t *testing.T) {
 			require.ErrorIs(t, err, ErrNotSet)
 
 			value, err := s.GetConfig("show-net-summary")
-			if tt.expected == "" {
+			if c.expected == "" {
 				require.ErrorIs(t, err, ErrNotSet)
 				return
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, value)
+			assert.Equal(t, c.expected, value)
 		})
 	}
 }

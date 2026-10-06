@@ -134,22 +134,22 @@ func TestLoadPortfolioCmd_ShowNet(t *testing.T) {
 		"neither": {value: "net", error: `show-net-summary: "net" is neither true nor false`},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			store := new(MockStore)
 			store.returnsAccount(testPortfolio())
-			store.On("GetConfig", portfolio.ShowNetSummaryKey).Return(tt.value, tt.err)
+			store.On("GetConfig", portfolio.ShowNetSummaryKey).Return(c.value, c.err)
 			store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
 
 			loaded, ok := runCmd(t, loadPortfolioCmd(store)).(PortfolioLoadedMsg)
 			require.True(t, ok)
-			if tt.error != "" {
-				assert.EqualError(t, loaded.err, tt.error)
+			if c.error != "" {
+				assert.EqualError(t, loaded.err, c.error)
 				return
 			}
 
 			require.NoError(t, loaded.err)
-			assert.Equal(t, tt.expected, loaded.portfolio.ShowNet)
+			assert.Equal(t, c.expected, loaded.portfolio.ShowNet)
 		})
 	}
 }
