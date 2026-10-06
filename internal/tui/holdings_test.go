@@ -596,6 +596,28 @@ func TestHoldingsModel_ShowsDetails(t *testing.T) {
 	assert.NotContains(t, frame, "PANW of 2026-01-15")
 }
 
+// TestHoldingsModel_ClosesDetails covers getting rid of the flyout: with the key that opened it, and
+// with esc, which closes whatever else is in front of the table as well.
+func TestHoldingsModel_ClosesDetails(t *testing.T) {
+	keys := map[string]tea.KeyPressMsg{
+		"enter": {Code: tea.KeyEnter},
+		"esc":   {Code: tea.KeyEscape},
+	}
+
+	for name, key := range keys {
+		t.Run(name, func(t *testing.T) {
+			m, _ := newTestingHoldings(t)
+			m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+			require.Contains(t, ansi.Strip(m.View().Content), "Cost of what is left")
+
+			_, cmd := m.Update(key)
+
+			assert.Nil(t, cmd)
+			assert.NotContains(t, ansi.Strip(m.View().Content), "Cost of what is left")
+		})
+	}
+}
+
 // TestLotDetails covers what the flyout says about a lot, which is what its row has no room for:
 // the shares it was acquired with next to those sold and those left, and what the ones that are left
 // cost and are worth in all. What is not known reads as a dash, as it does in the row.

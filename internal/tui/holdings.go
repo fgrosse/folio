@@ -252,7 +252,10 @@ func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 	case key.Matches(msg, m.keys.Edit):
 		return m.editSelected()
 	case key.Matches(msg, m.keys.Details):
-		m.details = true
+		m.details = !m.details
+		return m, nil
+	case key.Matches(msg, m.keys.Close):
+		m.details = false
 		return m, nil
 	}
 
