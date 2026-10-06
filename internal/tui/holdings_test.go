@@ -466,7 +466,7 @@ func TestHoldingsModel_SellShares(t *testing.T) {
 // number, none, or more than the lot has left, a price that is none, and a day that is no day or
 // before the lot was acquired. The form stays open and says why under its fields.
 func TestHoldingsModel_SaleFormRefuses(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		shares, price, date string
 		error               string
 	}{
@@ -479,14 +479,14 @@ func TestHoldingsModel_SaleFormRefuses(t *testing.T) {
 		"before the lot was acquired": {shares: "4", price: "410.2", date: "2026-01-14", error: "the lot was only acquired on 2026-01-15"},
 	}
 
-	for name, tt := range tests {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			m, _ := newTestingHoldings(t)
 
-			msg, err := newSale(m.lots[0], day("2026-10-02"))([]string{tt.shares, tt.price, tt.date, ""})
+			msg, err := newSale(m.lots[0], day("2026-10-02"))([]string{c.shares, c.price, c.date, ""})
 
 			assert.Nil(t, msg)
-			assert.EqualError(t, err, tt.error)
+			assert.EqualError(t, err, c.error)
 		})
 	}
 
@@ -549,7 +549,7 @@ func TestHoldingsModel_RenderSaleForm(t *testing.T) {
 // stock the lots add up to, which no single row says. The stocks are in alphabetical order, and an
 // account without lots says so.
 func TestPositions(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		lots     []portfolio.Lot
 		expected string
 	}{
@@ -574,9 +574,9 @@ func TestPositions(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, positions(tt.lots))
+			assert.Equal(t, c.expected, positions(c.lots))
 		})
 	}
 }
@@ -591,7 +591,7 @@ func TestLotRow(t *testing.T) {
 	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
 	rate := decimal.NewNullDecimal(dec("26.4"))
 
-	tests := map[string]struct {
+	cases := map[string]struct {
 		lot      portfolio.Lot
 		quote    portfolio.Quote
 		rate     decimal.NullDecimal
@@ -640,9 +640,9 @@ func TestLotRow(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, lotRow(tt.lot, tt.quote, tt.rate))
+			assert.Equal(t, c.expected, lotRow(c.lot, c.quote, c.rate))
 		})
 	}
 }

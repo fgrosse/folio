@@ -61,7 +61,7 @@ func TestInputDialog_Refused(t *testing.T) {
 // TestInputDialog_Cancel covers the ways out of the dialog without submitting anything: esc, and
 // enter on a field with nothing in it, which means "never mind". Ctrl+c quits the program.
 func TestInputDialog_Cancel(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		typed    string
 		key      tea.KeyPressMsg
 		expected tea.Msg
@@ -72,14 +72,14 @@ func TestInputDialog_Cancel(t *testing.T) {
 		"ctrl+c":                  {typed: "12 PANW", key: tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}, expected: tea.QuitMsg{}},
 	}
 
-	for name, tt := range tests {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			d := newTestingDialog()
-			typeInto(d, tt.typed)
+			typeInto(d, c.typed)
 
-			cmd := d.HandleKeyPress(tt.key)
+			cmd := d.HandleKeyPress(c.key)
 			require.NotNil(t, cmd)
-			assert.Equal(t, tt.expected, cmd())
+			assert.Equal(t, c.expected, cmd())
 		})
 	}
 }

@@ -31,7 +31,7 @@ func TestVersionCmd(t *testing.T) {
 // built from, and says that. One built from a checkout that knows nothing says so, rather than
 // print a version that is not there.
 func TestVersionCmd_WithoutARelease(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		info     *debug.BuildInfo
 		expected string
 	}{
@@ -52,17 +52,17 @@ func TestVersionCmd_WithoutARelease(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			cmd, _ := NewTestingCmd(t, "version")
-			cmd.buildInfo = func() (*debug.BuildInfo, bool) { return tt.info, tt.info != nil }
+			cmd.buildInfo = func() (*debug.BuildInfo, bool) { return c.info, c.info != nil }
 
 			var out bytes.Buffer
 			cmd.SetOut(&out)
 
 			require.NoError(t, cmd.Execute())
 
-			assert.Equal(t, "folio version "+tt.expected+" "+runtime.GOOS+"/"+runtime.GOARCH+"\n", out.String())
+			assert.Equal(t, "folio version "+c.expected+" "+runtime.GOOS+"/"+runtime.GOARCH+"\n", out.String())
 		})
 	}
 }

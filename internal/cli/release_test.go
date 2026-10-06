@@ -53,7 +53,7 @@ func TestReleaseCmd_WhichVest(t *testing.T) {
 		Vests:  portfolio.Repeating(day("2026-11-15"), 12, 1, decimal.RequireFromString("50")),
 	}
 
-	tests := map[string]struct {
+	cases := map[string]struct {
 		args  []string
 		error string
 		lot   string // the grant the released lot is from, if the release goes through
@@ -76,15 +76,15 @@ func TestReleaseCmd_WhichVest(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			cmd, dbPath := NewTestingCmd(t, tt.args...)
+			cmd, dbPath := NewTestingCmd(t, c.args...)
 			seed(t, dbPath)
 			saveGrant(t, dbPath, bonus)
 
 			err := cmd.Execute()
-			if tt.error != "" {
-				assert.EqualError(t, err, tt.error)
+			if c.error != "" {
+				assert.EqualError(t, err, c.error)
 				assert.Len(t, lots(t, dbPath), 2, "nothing should be released")
 				return
 			}
@@ -92,7 +92,7 @@ func TestReleaseCmd_WhichVest(t *testing.T) {
 			require.NoError(t, err)
 			all := lots(t, dbPath)
 			require.Len(t, all, 3)
-			assert.Equal(t, tt.lot, all[2].Grant)
+			assert.Equal(t, c.lot, all[2].Grant)
 		})
 	}
 }

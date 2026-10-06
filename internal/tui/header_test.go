@@ -121,7 +121,7 @@ func TestQuoteStatus(t *testing.T) {
 		"NEW":  {Symbol: "NEW", Price: dec("12")}, // has no previous close to have moved from
 	}
 
-	tests := map[string]struct {
+	cases := map[string]struct {
 		symbols  []string
 		expected string
 	}{
@@ -133,9 +133,9 @@ func TestQuoteStatus(t *testing.T) {
 		"no stock at all":          {symbols: nil, expected: ""},
 	}
 
-	for name, tt := range tests {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, quoteStatus(tt.symbols, quotes))
+			assert.Equal(t, c.expected, quoteStatus(c.symbols, quotes))
 		})
 	}
 }
