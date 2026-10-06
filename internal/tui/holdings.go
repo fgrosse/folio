@@ -584,7 +584,7 @@ func lotDetails(lot portfolio.Lot, quote portfolio.Quote) Flyout {
 		from = lot.Grant
 	}
 
-	cost, price, valueLeft, gain := noValue, noValue, noValue, noValue
+	cost, price, valueLeft := noValue, noValue, noValue
 	if !lot.Cost.IsZero() {
 		cost = portfolio.FormatUSD(lot.Cost)
 	}
@@ -592,8 +592,19 @@ func lotDetails(lot portfolio.Lot, quote portfolio.Quote) Flyout {
 		price = portfolio.FormatUSD(quote.Price)
 		valueLeft = portfolio.FormatUSD(lot.Remaining().Mul(quote.Price))
 	}
+
+	value := []FlyoutRow{
+		{Label: "Cost per share", Value: cost},
+		{Label: "Price per share", Value: price},
+		{Label: "Value of what is left", Value: valueLeft},
+	}
 	if !lot.Cost.IsZero() && quote.Symbol != "" {
-		gain = lotGain(lot, quote.Price)
+		// The percentage goes on a row of its own, so that the dollars of the gain end where the
+		// dollars of the value above them do.
+		dollars, percent := lotGain(lot, quote.Price)
+		value = append(value, FlyoutRow{Label: "Gain", Value: dollars}, FlyoutRow{Value: percent})
+	} else {
+		value = append(value, FlyoutRow{Label: "Gain", Value: noValue})
 	}
 
 	return Flyout{
@@ -605,30 +616,25 @@ func lotDetails(lot portfolio.Lot, quote portfolio.Quote) Flyout {
 				{Label: "Sold", Value: lot.Sold.String()},
 				{Label: "Left", Value: lot.Remaining().String()},
 			}},
-			{Title: "Value", Rows: []FlyoutRow{
-				{Label: "Cost per share", Value: cost},
-				{Label: "Price per share", Value: price},
-				{Label: "Value of what is left", Value: valueLeft},
-				{Label: "Gain", Value: gain},
-			}},
+			{Title: "Value", Rows: value},
 		},
 	}
 }
 
 // lotGain renders what the shares that are left of lot have gained since they were acquired, at the
-// given price of one of them: in dollars, and in percent of what they cost, such as "$64.52 ▲ 4.2%"
-// or, for a loss, "-$5,019.25 ▼ 42.7%". The arrow carries the direction of the percentage, as it
-// does for the change of a price in the header. The lot has to have a cost.
-func lotGain(lot portfolio.Lot, price decimal.Decimal) string {
+// given price of one of them: in dollars, such as "$64.52", and in percent of what they cost, such
+// as "▲ 4.2%", or "-$5,019.25" and "▼ 42.7%" for a loss. The arrow carries the direction of the
+// percentage, as it does for the change of a price in the header. The lot has to have a cost.
+func lotGain(lot portfolio.Lot, price decimal.Decimal) (dollars, percent string) {
 	perShare := price.Sub(lot.Cost)
-	percent := perShare.Div(lot.Cost).Mul(decimal.NewFromInt(100))
+	change := perShare.Div(lot.Cost).Mul(decimal.NewFromInt(100))
 
 	arrow := "▲"
 	if perShare.IsNegative() {
 		arrow = "▼"
 	}
 
-	return portfolio.FormatUSD(lot.Remaining().Mul(perShare)) + " " + arrow + " " + percent.Abs().StringFixed(1) + "%"
+	return portfolio.FormatUSD(lot.Remaining().Mul(perShare)), arrow + " " + change.Abs().StringFixed(1) + "%"
 }
 
 // lotRow renders a lot as a row of the Holdings table, with the grant it was released from, if any,

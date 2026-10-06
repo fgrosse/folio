@@ -642,9 +642,10 @@ func TestHoldingsModel_DetailsHelp(t *testing.T) {
 
 // TestLotDetails covers what the flyout says about a lot, which is what its row has no room for:
 // the shares it was acquired with next to those sold and those left, and what the ones that are left
-// have gained or lost since they were acquired, in dollars and in percent of what they cost. What
-// is not known reads as a dash, as it does in the row, and a gain is only known with both a cost and
-// a price.
+// have gained or lost since they were acquired, in dollars and in percent of what they cost. The
+// percentage has a row of its own, without a label, so that the dollars stand under the value they
+// are part of. What is not known reads as a dash, as it does in the row, and a gain is only known
+// with both a cost and a price.
 func TestLotDetails(t *testing.T) {
 	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
 
@@ -672,7 +673,8 @@ func TestLotDetails(t *testing.T) {
 						{Label: "Cost per share", Value: "$380.12"},
 						{Label: "Price per share", Value: "$396.25"},
 						{Label: "Value of what is left", Value: "$1,585.00"},
-						{Label: "Gain", Value: "$64.52 ▲ 4.2%"},
+						{Label: "Gain", Value: "$64.52"},
+						{Value: "▲ 4.2%"},
 					}},
 				},
 			},
@@ -693,7 +695,8 @@ func TestLotDetails(t *testing.T) {
 						{Label: "Cost per share", Value: "$691.50"},
 						{Label: "Price per share", Value: "$396.25"},
 						{Label: "Value of what is left", Value: "$6,736.25"},
-						{Label: "Gain", Value: "-$5,019.25 ▼ 42.7%"},
+						{Label: "Gain", Value: "-$5,019.25"},
+						{Value: "▼ 42.7%"},
 					}},
 				},
 			},
