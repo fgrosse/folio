@@ -154,3 +154,16 @@ func TestNewAccount_TaxableGain(t *testing.T) {
 	// 6 × (396.25 - 380.12) + 4 × (396.25 - 200)
 	assert.Equal(t, "881.78", account.TaxableGain.String())
 }
+
+// TestAccount_AfterGainsTax covers the account with its current value after tax: what the shares
+// that are held would bring if they were sold, once the tax on their gain is paid. The potential
+// value stays as it is, since its tax is another one, and the total is the two added up as ever.
+func TestAccount_AfterGainsTax(t *testing.T) {
+	account := Account{Current: shares("3368.13"), Potential: shares("7925"), TaxableGain: shares("96.78")}
+
+	net := account.AfterGainsTax(shares("26.4"))
+
+	assert.Equal(t, "3342.58", net.Current.String())
+	assert.Equal(t, "7925", net.Potential.String())
+	assert.Equal(t, "11267.58", net.Total().String())
+}
