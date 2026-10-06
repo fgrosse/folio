@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 )
@@ -44,6 +45,25 @@ func TestFlyout_Layer(t *testing.T) {
 	assert.Equal(t, expected, ansi.Strip(layer.GetContent()))
 	assert.Equal(t, 30, layer.Width())
 	assert.Equal(t, 12, layer.Height())
+}
+
+// TestFlyout_LayerStylesValues covers a value that should stand out, such as a gain: a row can say
+// which style its value is in, and that takes up no room, so the value still ends at the right edge.
+func TestFlyout_LayerStylesValues(t *testing.T) {
+	green := lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	f := Flyout{
+		Title: "PANW of 2026-01-15",
+		Sections: []FlyoutSection{
+			{Title: "Value", Rows: []FlyoutRow{
+				{Label: "Gain", Value: "$96.78", ValueStyle: green},
+			}},
+		},
+	}
+
+	content := f.Layer(30, 6, DefaultStyle()).GetContent()
+
+	assert.Contains(t, content, green.Render("$96.78"))
+	assert.Contains(t, ansi.Strip(content), "│ Gain                $96.78 │")
 }
 
 // TestFlyout_LayerCutsOff covers a flyout that has more to say than it has room for, such as a lot

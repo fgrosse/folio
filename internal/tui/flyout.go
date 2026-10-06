@@ -28,6 +28,10 @@ type FlyoutSection struct {
 type FlyoutRow struct {
 	Label string
 	Value string
+
+	// ValueStyle is what the value is rendered in, for one that should stand out, such as a gain
+	// in green. The zero Style leaves the value as plain as the label.
+	ValueStyle lipgloss.Style
 }
 
 // Layer renders the flyout as a compositor layer of exactly width by height cells, border included,
@@ -43,7 +47,7 @@ func (f Flyout) Layer(width, height int, style Style) *lipgloss.Layer {
 		lines = append(lines, "", style.Hint.Render(section.Title))
 		for _, row := range section.Rows {
 			gap := max(inner-lipgloss.Width(row.Label)-lipgloss.Width(row.Value), 1)
-			lines = append(lines, row.Label+strings.Repeat(" ", gap)+row.Value)
+			lines = append(lines, row.Label+strings.Repeat(" ", gap)+row.ValueStyle.Render(row.Value))
 		}
 	}
 
