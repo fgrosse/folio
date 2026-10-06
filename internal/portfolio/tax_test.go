@@ -62,16 +62,16 @@ func TestParseSwitch(t *testing.T) {
 		"other word": {value: "net", error: `"net" is neither true nor false`},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			on, err := ParseSwitch(tt.value)
-			if tt.error != "" {
-				assert.EqualError(t, err, tt.error)
+			on, err := ParseSwitch(c.value)
+			if c.error != "" {
+				assert.EqualError(t, err, c.error)
 				return
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, on)
+			assert.Equal(t, c.expected, on)
 		})
 	}
 }

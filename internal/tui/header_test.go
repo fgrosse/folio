@@ -73,22 +73,22 @@ func TestPortfolioHeader_ShowNet(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			p := testPortfolio()
-			p.ShowNet = tt.showNet
-			if tt.noTaxRate {
+			p.ShowNet = c.showNet
+			if c.noTaxRate {
 				p.TaxRate = decimal.NullDecimal{}
 			}
-			if tt.noGainsTaxRate {
+			if c.noGainsTaxRate {
 				p.GainsTaxRate = decimal.NullDecimal{}
 			}
 
 			lines := strings.Split(ansi.Strip(portfolioHeader("8.5 PANW", p, nil, 80, DefaultStyle())), "\n")
 
 			require.Len(t, lines, 2)
-			assert.True(t, strings.HasSuffix(lines[0], tt.total), "%q should end in %q", lines[0], tt.total)
-			assert.True(t, strings.HasSuffix(lines[1], tt.parts), "%q should end in %q", lines[1], tt.parts)
+			assert.True(t, strings.HasSuffix(lines[0], c.total), "%q should end in %q", lines[0], c.total)
+			assert.True(t, strings.HasSuffix(lines[1], c.parts), "%q should end in %q", lines[1], c.parts)
 		})
 	}
 }
