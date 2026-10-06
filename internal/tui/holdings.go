@@ -48,10 +48,8 @@ const (
 	// always there: what it has in the narrowest window, with none of them.
 	grantColumnMinWidth = minTableWidth - holdingsColumnsWidth - cellPadding
 
-	// gainColumn and taxColumn are where the gain and the tax stand among all the columns, for
-	// leaving them out.
+	// gainColumn is where the gain stands among all the columns, for leaving it out.
 	gainColumn = 6
-	taxColumn  = 7
 
 	// saleFormWidth is how many columns a field of the form that records a sale occupies, and
 	// saleNoteLines how many lines its notes have room for before they scroll.
@@ -75,7 +73,6 @@ type HoldingsModel struct {
 	table     table.Model
 	width     int              // width of the table, which the header line is spread across
 	showGain  bool             // the window has room for the column of the gain
-	showTax   bool             // and for that of the tax on it, which the account has a rate for
 	now       func() time.Time // the clock that says what today is
 	portfolio Portfolio        // the account as it was last loaded
 	lots      []portfolio.Lot  // the lots on display, as the table shows them: those with shares left
@@ -131,13 +128,12 @@ func NewHoldingsModel(store Store, quoter portfolio.Quoter, style Style) *Holdin
 }
 
 // layout decides which columns the table has room for at its width and sets it up with those, and
-// with the rows of the portfolio to match. The gain comes first, and the tax on it only where there
-// is room for both, and where the account has a rate to tax a gain at: a column of dashes would
-// take the room of the grant for nothing. The selection stays on the row it was on.
+// with the rows of the portfolio to match. The gain is the one column that is not always there. The
+// tax on it has none however wide the window is: it is a detail of a lot, which the flyout has. The
+// selection stays on the row it was on.
 func (m *HoldingsModel) layout() {
 	room := m.grantColumnWidth() - grantColumnMinWidth
 	m.showGain = room >= gainColumnWidth+cellPadding
-	m.showTax = m.portfolio.GainsTaxRate.Valid && room >= gainColumnWidth+valueColumnWidth+2*cellPadding
 
 	// The table renders as soon as it is given columns or rows, and panics over a row with more
 	// cells than it has columns. So the rows go before the columns change and come back after.
@@ -157,11 +153,6 @@ func (m *HoldingsModel) grantColumnWidth() int {
 // window has room for. It is what keeps the columns and the cells of a row the same in number.
 func shown[T any](m *HoldingsModel, cells []T) []T {
 	cells = slices.Clone(cells)
-
-	// The one further back first, so that the other is still where its index says.
-	if !m.showTax {
-		cells = slices.Delete(cells, taxColumn, taxColumn+1)
-	}
 	if !m.showGain {
 		cells = slices.Delete(cells, gainColumn, gainColumn+1)
 	}
@@ -177,9 +168,6 @@ func (m *HoldingsModel) columns() []table.Column {
 	if m.showGain {
 		grantWidth -= gainColumnWidth + cellPadding
 	}
-	if m.showTax {
-		grantWidth -= valueColumnWidth + cellPadding
-	}
 
 	return shown(m, []table.Column{
 		{Title: "Acquired", Width: dayColumnWidth},
@@ -189,7 +177,6 @@ func (m *HoldingsModel) columns() []table.Column {
 		{Title: fmt.Sprintf("%*s", priceColumnWidth, "Cost"), Width: priceColumnWidth},
 		{Title: fmt.Sprintf("%*s", priceColumnWidth, "Price"), Width: priceColumnWidth},
 		{Title: fmt.Sprintf("%*s", gainColumnWidth, "Gain"), Width: gainColumnWidth},
-		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Tax"), Width: valueColumnWidth},
 		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Value"), Width: valueColumnWidth},
 	})
 }
@@ -263,8 +250,7 @@ func (m *HoldingsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handlePortfolioLoaded takes over the portfolio that was loaded and fills the table with its lots,
-// in the columns that this portfolio has, since the tax on a lot is only shown at a rate.
+// handlePortfolioLoaded takes over the portfolio that was loaded and fills the table with its lots.
 // A load that failed leaves the one on display where it is, and its error to the header. Either way
 // it sees to it that the quotes are fetched again in a while.
 func (m *HoldingsModel) handlePortfolioLoaded(msg PortfolioLoadedMsg) (tea.Model, tea.Cmd) {
@@ -273,7 +259,7 @@ func (m *HoldingsModel) handlePortfolioLoaded(msg PortfolioLoadedMsg) (tea.Model
 		// Quotes that could not be refreshed do not make the portfolio any less the latest there is.
 		m.err = msg.quotesErr
 		m.portfolio = msg.portfolio
-		m.layout()
+		m.updateRows()
 	}
 
 	return m, m.scheduleRefreshCmd()
@@ -511,7 +497,7 @@ func (m *HoldingsModel) updateRows() {
 
 	rows := make([]table.Row, len(m.lots))
 	for i, lot := range m.lots {
-		rows[i] = shown(m, lotRow(lot, m.portfolio.Quotes[lot.Symbol], m.portfolio.GainsTaxRate))
+		rows[i] = shown(m, lotRow(lot, m.portfolio.Quotes[lot.Symbol]))
 	}
 
 	setRows(&m.table, rows)
@@ -648,9 +634,8 @@ func positions(lots []portfolio.Lot) string {
 // have gained since. What is not known is a dash, as it is in the row, and the gain is known only
 // if both the cost and the price are. The value is in the gold of style, as the part of the total
 // that it is, and the gain in its green or, if it is a loss, its red. Under the gain is the tax that
-// selling the shares at that price would cost at gainsTaxRate, the number the row has in its Tax
-// column, which a narrow terminal leaves out. An account without that rate, where gainsTaxRate is
-// not valid, has no such row here either.
+// selling the shares at that price would cost at gainsTaxRate, which the table has no column for.
+// An account without that rate, where gainsTaxRate is not valid, has no such row.
 func lotDetails(lot portfolio.Lot, quote portfolio.Quote, gainsTaxRate decimal.NullDecimal, style Style) Flyout {
 	from := noValue
 	if lot.Grant != "" {
@@ -743,13 +728,12 @@ func lotTax(lot portfolio.Lot, quote portfolio.Quote, rate decimal.Decimal) stri
 // lotRow renders a lot as a row of the Holdings table with all its columns: the grant it was
 // released from, if any, the shares that are left of it, what one of them cost, if that is known,
 // and what they are worth at quote, which is the zero Quote if there is none of the lot's stock.
-// With both a cost and a quote, it says how far the price is from the cost, and the tax that
-// selling the shares at that price would cost at gainsTaxRate, which is not valid if the account
-// has none. The value comes last, where the header's values end, with the tax left of it. The
+// With both a cost and a quote, it says how far the price is from the cost. The value comes last,
+// where the header's values end. The
 // numbers are right-aligned for their digits to line up down the column. The table has no
 // alignment of its own, so the values are padded out here.
-func lotRow(lot portfolio.Lot, quote portfolio.Quote, gainsTaxRate decimal.NullDecimal) table.Row {
-	cost, price, gain, value, tax := noValue, noValue, noValue, noValue, noValue
+func lotRow(lot portfolio.Lot, quote portfolio.Quote) table.Row {
+	cost, price, gain, value := noValue, noValue, noValue, noValue
 	if !lot.Cost.IsZero() {
 		cost = portfolio.FormatUSD(lot.Cost)
 	}
@@ -758,9 +742,6 @@ func lotRow(lot portfolio.Lot, quote portfolio.Quote, gainsTaxRate decimal.NullD
 		value = portfolio.FormatUSD(lot.Remaining().Mul(quote.Price))
 		if growth, ok := lot.GrowthPercent(quote.Price); ok {
 			gain = formatGrowth(growth)
-		}
-		if gainsTaxRate.Valid {
-			tax = lotTax(lot, quote, gainsTaxRate.Decimal)
 		}
 	}
 
@@ -772,7 +753,6 @@ func lotRow(lot portfolio.Lot, quote portfolio.Quote, gainsTaxRate decimal.NullD
 		fmt.Sprintf("%*s", priceColumnWidth, cost),
 		fmt.Sprintf("%*s", priceColumnWidth, price),
 		fmt.Sprintf("%*s", gainColumnWidth, gain),
-		fmt.Sprintf("%*s", valueColumnWidth, tax),
 		fmt.Sprintf("%*s", valueColumnWidth, value),
 	}
 }
