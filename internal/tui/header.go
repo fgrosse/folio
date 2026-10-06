@@ -21,19 +21,21 @@ func portfolioHeader(left string, p Portfolio, err error, width int, style Style
 
 // notedHeader renders the header of a portfolio like portfolioHeader, with note in the place of the
 // prices unless it is empty. A view puts there what it has to say about the row that is selected.
-// An error still comes first, and a note too long for the room left of the account values is cut
-// short.
+// An error still comes first, and prices or a note too long for the room left of the account values
+// are cut short.
 func notedHeader(left, note string, p Portfolio, err error, width int, style Style) string {
 	values := shownAccount(p)
 
-	status := style.Hint.Render(quoteStatus(portfolio.Symbols(p.Lots, p.Grants), p.Quotes))
+	// The values on the right are about as wide as their labels and two amounts, and what is left
+	// of them is all the room the prices or the note have.
+	room := width - lipgloss.Width(accountParts(values)) - headerGap
+
+	status := style.Hint.Render(ansi.Truncate(quoteStatus(portfolio.Symbols(p.Lots, p.Grants), p.Quotes), room, "…"))
 	switch {
 	case err != nil:
 		// Errors of several quotes come joined by newlines, and the header has one line for them.
 		status = style.Error.Render(strings.ReplaceAll(err.Error(), "\n", " · "))
 	case note != "":
-		// The values on the right are about as wide as their labels and three amounts.
-		room := width - lipgloss.Width(accountParts(values)) - headerGap
 		status = style.Hint.Render(ansi.Truncate(note, room, "…"))
 	}
 

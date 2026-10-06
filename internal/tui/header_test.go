@@ -136,6 +136,23 @@ func TestPortfolioHeader_CurrentBasis(t *testing.T) {
 	}
 }
 
+// TestPortfolioHeader_CutsThePricesShort covers a header with more prices than its line has room
+// for next to the account values, which a second stock or a value marked net is enough for in a
+// narrow window. The prices are cut short rather than pushing the values past the end of the table,
+// where the terminal would wrap them into the frame.
+func TestPortfolioHeader_CutsThePricesShort(t *testing.T) {
+	p := testPortfolio()
+	p.CurrentBasis = portfolio.Net
+	p.Lots = append(p.Lots, portfolio.Lot{ID: 3, Symbol: "AAPL", Shares: dec("3"), Acquired: day("2025-11-02")})
+	p.Quotes["AAPL"] = portfolio.Quote{Symbol: "AAPL", Price: dec("330.32"), PreviousClose: dec("325")}
+
+	lines := strings.Split(ansi.Strip(portfolioHeader("3 AAPL · 8.5 PANW", p, nil, 78, DefaultStyle())), "\n")
+
+	require.Len(t, lines, 2)
+	assert.Equal(t, "  AAPL $330.32 ▲ 1.6% · …  Current (net) $4,333.54 · Potential (gross) $7,925.00", lines[1])
+	assert.Equal(t, 80, lipgloss.Width(lines[1]))
+}
+
 // TestQuoteStatus covers the status line under a view's own: the price each stock of the account is
 // valued at and how it moved since the previous close, the way the ticker in the status bar reads.
 // A stock without a quote says so, since its shares are missing from the values.
