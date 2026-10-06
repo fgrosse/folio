@@ -483,7 +483,7 @@ func (m *HoldingsModel) flyoutLayer(height int) *lipgloss.Layer {
 	}
 
 	lot := m.lots[i]
-	return lotDetails(lot, m.portfolio.Quotes[lot.Symbol]).Layer(flyoutWidth, height, m.style)
+	return lotDetails(lot, m.portfolio.Quotes[lot.Symbol], m.style).Layer(flyoutWidth, height, m.style)
 }
 
 // dialogLayer renders whichever dialog is open, or returns nil if none is.
@@ -577,8 +577,9 @@ func positions(lots []portfolio.Lot) string {
 // is none of the lot's stock. It has what the row has no room for: the shares the lot was acquired
 // with and how many of them were sold, where the row only has those that are left, and what those
 // have gained since. What is not known is a dash, as it is in the row, and the gain is known only
-// if both the cost and the price are.
-func lotDetails(lot portfolio.Lot, quote portfolio.Quote) Flyout {
+// if both the cost and the price are. The value is in the gold of style, as the part of the total
+// that it is, and the gain in its green or, if it is a loss, its red.
+func lotDetails(lot portfolio.Lot, quote portfolio.Quote, style Style) Flyout {
 	from := noValue
 	if lot.Grant != "" {
 		from = lot.Grant
@@ -593,16 +594,30 @@ func lotDetails(lot portfolio.Lot, quote portfolio.Quote) Flyout {
 		valueLeft = portfolio.FormatUSD(lot.Remaining().Mul(quote.Price))
 	}
 
+	// Only a value that is known stands out. A dash in gold would be a number that is not there.
+	var valueStyle lipgloss.Style
+	if quote.Symbol != "" {
+		valueStyle = style.Value
+	}
+
 	value := []FlyoutRow{
 		{Label: "Cost per share", Value: cost},
 		{Label: "Price per share", Value: price},
-		{Label: "Value of what is left", Value: valueLeft},
+		{Label: "Value of what is left", Value: valueLeft, ValueStyle: valueStyle},
 	}
 	if !lot.Cost.IsZero() && quote.Symbol != "" {
+		gainStyle := style.Gain
+		if quote.Price.LessThan(lot.Cost) {
+			gainStyle = style.Loss
+		}
+
 		// The percentage goes on a row of its own, so that the dollars of the gain end where the
 		// dollars of the value above them do.
 		dollars, percent := lotGain(lot, quote.Price)
-		value = append(value, FlyoutRow{Label: "Gain", Value: dollars}, FlyoutRow{Value: percent})
+		value = append(value,
+			FlyoutRow{Label: "Gain", Value: dollars, ValueStyle: gainStyle},
+			FlyoutRow{Value: percent, ValueStyle: gainStyle},
+		)
 	} else {
 		value = append(value, FlyoutRow{Label: "Gain", Value: noValue})
 	}

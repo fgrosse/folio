@@ -645,8 +645,10 @@ func TestHoldingsModel_DetailsHelp(t *testing.T) {
 // have gained or lost since they were acquired, in dollars and in percent of what they cost. The
 // percentage has a row of its own, without a label, so that the dollars stand under the value they
 // are part of. What is not known reads as a dash, as it does in the row, and a gain is only known
-// with both a cost and a price.
+// with both a cost and a price. The value is in the style of a value and the gain in that of a gain
+// or a loss, and a dash is in none.
 func TestLotDetails(t *testing.T) {
+	style := DefaultStyle()
 	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
 
 	tests := map[string]struct {
@@ -672,9 +674,9 @@ func TestLotDetails(t *testing.T) {
 					{Title: "Value", Rows: []FlyoutRow{
 						{Label: "Cost per share", Value: "$380.12"},
 						{Label: "Price per share", Value: "$396.25"},
-						{Label: "Value of what is left", Value: "$1,585.00"},
-						{Label: "Gain", Value: "$64.52"},
-						{Value: "▲ 4.2%"},
+						{Label: "Value of what is left", Value: "$1,585.00", ValueStyle: style.Value},
+						{Label: "Gain", Value: "$64.52", ValueStyle: style.Gain},
+						{Value: "▲ 4.2%", ValueStyle: style.Gain},
 					}},
 				},
 			},
@@ -694,9 +696,9 @@ func TestLotDetails(t *testing.T) {
 					{Title: "Value", Rows: []FlyoutRow{
 						{Label: "Cost per share", Value: "$691.50"},
 						{Label: "Price per share", Value: "$396.25"},
-						{Label: "Value of what is left", Value: "$6,736.25"},
-						{Label: "Gain", Value: "-$5,019.25"},
-						{Value: "▼ 42.7%"},
+						{Label: "Value of what is left", Value: "$6,736.25", ValueStyle: style.Value},
+						{Label: "Gain", Value: "-$5,019.25", ValueStyle: style.Loss},
+						{Value: "▼ 42.7%", ValueStyle: style.Loss},
 					}},
 				},
 			},
@@ -726,7 +728,7 @@ func TestLotDetails(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, lotDetails(tt.lot, tt.quote))
+			assert.Equal(t, tt.expected, lotDetails(tt.lot, tt.quote, style))
 		})
 	}
 }
