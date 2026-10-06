@@ -27,7 +27,7 @@ and prices come from Yahoo Finance.
 A tour of `folio` on a made-up account: selling shares of a lot, releasing a vest that is due, and
 the views of the grants and the sales.
 
-![A tour of folio on a demo account: selling shares, releasing a vest, and the grants and sales views](demo.gif)
+![A tour of folio on a demo account: the details of a lot, selling shares, releasing a vest, and the grants and sales views](demo.gif)
 
 `folio demo` opens an account like this one for you to look around in.
 
