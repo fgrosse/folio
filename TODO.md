@@ -28,6 +28,13 @@ Roughly in the order worth doing.
   shares on the day of the vest. With sales in place, that one could be a sale like any other, of
   shares that were never held. The confirmation itself, a PDF, could be attached to the release and
   kept in the database, so that every number has its source next to it.
+- **Decide on the flyout and fill it.** Enter in the Holdings view opens a `Flyout` with the details
+  of the selected lot, as a proof of concept. It says little that the row does not so far. What it
+  is for is what has no column: the sales of the lot with their notes, the gain since its cost and
+  the tax on it, the vest it was released from with the shares that were withheld. A note needs a
+  row that wraps, which the flyout does not have yet, and a long list needs it to scroll. Open as
+  well: whether it should sit next to the table rather than over it when the window is wide enough,
+  and the same flyout in the Vesting, Grants and Sales views.
 - **Say how old the prices are.** The header shows the prices but not when they are from, which
   matters at a weekend and without a network. The time of the quote is stored already.
 - **A key that fetches the quotes now**, rather than waiting for the five minutes to pass.
