@@ -91,7 +91,7 @@ func (m *MockStore) DeleteSale(id int) error {
 
 // testPortfolio is the account most tests of the views look at: PANW stock in two lots of 8.5
 // shares in all, and a grant with one vest released into the first of them and two still to come,
-// which are taxed at 44.3%.
+// which are taxed at 44.3%. The gain of a sale is taxed at 26.4%.
 func testPortfolio() Portfolio {
 	return Portfolio{
 		Lots: []portfolio.Lot{
@@ -114,6 +114,7 @@ func testPortfolio() Portfolio {
 			"PANW": {Symbol: "PANW", Price: dec("396.25"), PreviousClose: dec("397.31"), Currency: "USD"},
 		},
 		TaxRate:        decimal.NewNullDecimal(dec("44.3")),
+		GainsTaxRate:   decimal.NewNullDecimal(dec("26.4")),
 		PotentialBasis: portfolio.Gross,
 	}
 }
@@ -121,13 +122,20 @@ func testPortfolio() Portfolio {
 // returns sets store up to answer with p whenever the portfolio is loaded.
 func (m *MockStore) returns(p Portfolio) {
 	m.returnsAccount(p)
-	if p.TaxRate.Valid {
-		m.On("GetConfig", portfolio.TaxRateKey).Return(p.TaxRate.Decimal.String()+"%", nil)
-	} else {
-		m.On("GetConfig", portfolio.TaxRateKey).Return("", portfolio.ErrNotSet)
-	}
+	m.returnsRate(portfolio.TaxRateKey, p.TaxRate)
+	m.returnsRate(portfolio.GainsTaxRateKey, p.GainsTaxRate)
 	m.On("GetConfig", portfolio.PotentialBasisKey).Return(string(p.PotentialBasis), nil)
-	m.On("GetConfig", portfolio.GainsTaxRateKey).Return("", portfolio.ErrNotSet).Maybe()
+}
+
+// returnsRate sets store up to answer with rate for the key of a tax rate, written as folio config
+// stores it, or with that the key is not set if rate is not valid.
+func (m *MockStore) returnsRate(key string, rate decimal.NullDecimal) {
+	if !rate.Valid {
+		m.On("GetConfig", key).Return("", portfolio.ErrNotSet)
+		return
+	}
+
+	m.On("GetConfig", key).Return(rate.Decimal.String()+"%", nil)
 }
 
 // returnsAccount sets store up to answer with the lots, grants, quotes and sales of p, and leaves

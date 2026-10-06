@@ -7,6 +7,7 @@ import (
 
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/fgrosse/folio/internal/portfolio"
@@ -85,6 +86,38 @@ func TestLoadPortfolioCmd_TaxRate(t *testing.T) {
 	assert.EqualError(t, loaded.err, `tax-rate: "high" is not a tax rate such as 44.3%`)
 }
 
+// TestLoadPortfolioCmd_GainsTaxRate covers the rate that the gain of a sale is taxed at, which is
+// kept and loaded like the rate of the vests: it is part of the portfolio, an account without one
+// has none, and a value that is no rate is an error that says which key it is in.
+func TestLoadPortfolioCmd_GainsTaxRate(t *testing.T) {
+	p := testPortfolio()
+	store := new(MockStore)
+	store.returns(p)
+
+	loaded, ok := runCmd(t, loadPortfolioCmd(store)).(PortfolioLoadedMsg)
+	require.True(t, ok)
+	require.NoError(t, loaded.err)
+	assert.Equal(t, "26.4", loaded.portfolio.GainsTaxRate.Decimal.String())
+
+	p.GainsTaxRate = decimal.NullDecimal{}
+	store = new(MockStore)
+	store.returns(p)
+
+	loaded, ok = runCmd(t, loadPortfolioCmd(store)).(PortfolioLoadedMsg)
+	require.True(t, ok)
+	require.NoError(t, loaded.err)
+	assert.False(t, loaded.portfolio.GainsTaxRate.Valid, "an account without a rate should have none")
+
+	store = new(MockStore)
+	store.returnsAccount(testPortfolio())
+	store.On("GetConfig", portfolio.GainsTaxRateKey).Return("high", nil)
+	store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
+
+	loaded, ok = runCmd(t, loadPortfolioCmd(store)).(PortfolioLoadedMsg)
+	require.True(t, ok)
+	assert.EqualError(t, loaded.err, `gains-tax-rate: "high" is not a tax rate such as 44.3%`)
+}
+
 // TestLoadPortfolioCmd_PotentialBasis covers which potential value the header shows, which the
 // store keeps among the configuration: the bank's, before tax, unless the account says net, and a
 // value that is neither is an error that says which key it is in.
@@ -107,6 +140,7 @@ func TestLoadPortfolioCmd_PotentialBasis(t *testing.T) {
 			store.returnsAccount(testPortfolio())
 			store.On("GetConfig", portfolio.TaxRateKey).Return("44.3%", nil)
 			store.On("GetConfig", portfolio.PotentialBasisKey).Return(tt.value, tt.err)
+			store.On("GetConfig", portfolio.GainsTaxRateKey).Return("", portfolio.ErrNotSet).Maybe()
 
 			loaded, ok := runCmd(t, loadPortfolioCmd(store)).(PortfolioLoadedMsg)
 			require.True(t, ok)

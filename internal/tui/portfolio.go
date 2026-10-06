@@ -33,8 +33,8 @@ type Store interface {
 
 // A Portfolio is everything the views show, as the store had it at one moment: the lots and grants
 // of the account, the quotes they are valued at, the sales that took shares out of the lots, the
-// rate that vests are taxed at, and whether the potential value is shown before or after that tax.
-// Every view holds the latest one it was sent.
+// rates that vests and the gain of a sale are taxed at, and whether the potential value is shown
+// before or after tax. Every view holds the latest one it was sent.
 type Portfolio struct {
 	Lots   []portfolio.Lot
 	Grants []portfolio.Grant
@@ -43,6 +43,10 @@ type Portfolio struct {
 
 	// TaxRate is the rate in percent that vests are taxed at, not valid if none was set.
 	TaxRate decimal.NullDecimal
+
+	// GainsTaxRate is the rate in percent that the gain of a sale is taxed at, not valid if none was
+	// set.
+	GainsTaxRate decimal.NullDecimal
 
 	// PotentialBasis is whether the header shows the potential value before tax or after it.
 	PotentialBasis portfolio.Basis
@@ -117,7 +121,12 @@ func loadPortfolio(store Store) (Portfolio, error) {
 		return Portfolio{}, err
 	}
 
-	taxRate, err := loadTaxRate(store)
+	taxRate, err := loadTaxRate(store, portfolio.TaxRateKey)
+	if err != nil {
+		return Portfolio{}, err
+	}
+
+	gainsTaxRate, err := loadTaxRate(store, portfolio.GainsTaxRateKey)
 	if err != nil {
 		return Portfolio{}, err
 	}
@@ -133,14 +142,15 @@ func loadPortfolio(store Store) (Portfolio, error) {
 		Quotes:         quotes,
 		Sales:          sales,
 		TaxRate:        taxRate,
+		GainsTaxRate:   gainsTaxRate,
 		PotentialBasis: basis,
 	}, nil
 }
 
-// loadTaxRate returns the rate that vests are taxed at, which is not valid if the account has none.
-// The store keeps it as text among the configuration, as folio config set it.
-func loadTaxRate(store Store) (decimal.NullDecimal, error) {
-	value, err := store.GetConfig(portfolio.TaxRateKey)
+// loadTaxRate returns the tax rate that is set under key, which is not valid if the account has
+// none. The store keeps it as text among the configuration, as folio config set it.
+func loadTaxRate(store Store, key string) (decimal.NullDecimal, error) {
+	value, err := store.GetConfig(key)
 	switch {
 	case errors.Is(err, portfolio.ErrNotSet):
 		return decimal.NullDecimal{}, nil
@@ -150,7 +160,7 @@ func loadTaxRate(store Store) (decimal.NullDecimal, error) {
 
 	rate, err := portfolio.ParseTaxRate(value)
 	if err != nil {
-		return decimal.NullDecimal{}, fmt.Errorf("%s: %w", portfolio.TaxRateKey, err)
+		return decimal.NullDecimal{}, fmt.Errorf("%s: %w", key, err)
 	}
 
 	return decimal.NewNullDecimal(rate), nil
