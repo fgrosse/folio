@@ -17,6 +17,12 @@ type Account struct {
 	// released: the ones that have yet to vest, and the ones that have and are pending release.
 	Potential decimal.Decimal
 
+	// TaxableGain is what a sale of the shares that are held would be taxed on at these quotes: the
+	// gains of the lots that are worth more than they cost, added up. A lot that lost takes nothing
+	// off it, since every lot is taxed on its own, and neither does a lot without a cost, whose gain
+	// is not known.
+	TaxableGain decimal.Decimal
+
 	// Unpriced are the symbols of stock in the account that there was no quote of, in alphabetical
 	// order. Their shares are missing from the values.
 	Unpriced []string
@@ -35,9 +41,14 @@ func NewAccount(lots []Lot, grants []Grant, quotes map[string]Quote) Account {
 		return shares.Mul(quote.Price)
 	}
 
-	var current, potential decimal.Decimal
+	var current, potential, taxable decimal.Decimal
 	for _, lot := range lots {
 		current = current.Add(value(lot.Symbol, lot.Remaining()))
+
+		quote, priced := quotes[lot.Symbol]
+		if gain, ok := lot.Gain(quote.Price); priced && ok && gain.IsPositive() {
+			taxable = taxable.Add(gain)
+		}
 	}
 
 	for _, grant := range grants {
@@ -49,9 +60,10 @@ func NewAccount(lots []Lot, grants []Grant, quotes map[string]Quote) Account {
 	}
 
 	return Account{
-		Current:   current.Round(2),
-		Potential: potential.Round(2),
-		Unpriced:  slices.Sorted(maps.Keys(unpriced)),
+		Current:     current.Round(2),
+		Potential:   potential.Round(2),
+		TaxableGain: taxable.Round(2),
+		Unpriced:    slices.Sorted(maps.Keys(unpriced)),
 	}
 }
 

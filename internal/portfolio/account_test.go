@@ -134,3 +134,23 @@ func TestNewAccount_CountsWhatIsLeft(t *testing.T) {
 	// 190 × 400
 	assert.Equal(t, "76000", account.Current.String())
 }
+
+// TestNewAccount_TaxableGain covers what a sale of everything that is held would be taxed on: the
+// gain of every lot that is worth more than it cost, for the shares that are left of it. A lot that
+// lost takes nothing off the gain of another, as in the Holdings view, where each lot is taxed on
+// its own. A lot without a cost or without a quote has no gain that is known, and adds none.
+func TestNewAccount_TaxableGain(t *testing.T) {
+	lots := []Lot{
+		{Symbol: "PANW", Shares: shares("6"), Cost: shares("380.12")},
+		{Symbol: "PANW", Shares: shares("10"), Sold: shares("6"), Cost: shares("200")},
+		{Symbol: "PANW", Shares: shares("3"), Cost: shares("452.86")},
+		{Symbol: "PANW", Shares: shares("2.5")},
+		{Symbol: "SAP.DE", Shares: shares("5"), Cost: shares("120")},
+	}
+	quotes := map[string]Quote{"PANW": {Symbol: "PANW", Price: shares("396.25")}}
+
+	account := NewAccount(lots, nil, quotes)
+
+	// 6 × (396.25 - 380.12) + 4 × (396.25 - 200)
+	assert.Equal(t, "881.78", account.TaxableGain.String())
+}
