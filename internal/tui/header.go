@@ -74,19 +74,26 @@ func shownAccount(p Portfolio) shownValues {
 // headerGap is the least space between the two halves of a header line.
 const headerGap = 2
 
-// accountParts renders the two values the total is made of, for the second line of the header. Each
-// says whether it is gross or net, since the two differ by a tax and the header is where the user
-// compares folio with the bank.
+// accountParts renders the two values the total is made of, for the second line of the header. The
+// potential value says whether it is gross or net, since the two differ by the tax on the vests and
+// the header is where the user compares folio with the bank. The current value only says so when
+// it is net: it is the bank's unless the account asks otherwise, and the line has the prices to fit
+// in as well.
 func accountParts(values shownValues) string {
-	return fmt.Sprintf("Current (%s) %s · Potential (%s) %s",
-		values.current, portfolio.FormatUSD(values.account.Current),
+	current := "Current"
+	if values.current == portfolio.Net {
+		current += " (net)"
+	}
+
+	return fmt.Sprintf("%s %s · Potential (%s) %s",
+		current, portfolio.FormatUSD(values.account.Current),
 		values.potential, portfolio.FormatUSD(values.account.Potential))
 }
 
 // accountHeader renders the two lines above the table of a view. The right half is the same in
 // every view and is what folio is for: the total account value on the first line, in the one accent
-// of the header, and the current and potential value it is made of underneath, each marked as
-// before or after tax. The left half is the view's own: what it has to say about the table below,
+// of the header, and the current and potential value it is made of underneath, marked as before
+// or after tax. The left half is the view's own: what it has to say about the table below,
 // and a status line under it.
 //
 // width is that of the table without the padding of its cells, so that the values end where the

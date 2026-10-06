@@ -22,16 +22,16 @@ func TestAccountHeader(t *testing.T) {
 
 	values := shownValues{account: account, current: portfolio.Gross, potential: portfolio.Gross}
 
-	header := accountHeader("8.5 PANW", "PANW $396.25", values, 74, DefaultStyle())
+	header := accountHeader("8.5 PANW", "PANW $396.25", values, 66, DefaultStyle())
 
 	expected := "" +
-		"  8.5 PANW                                                 Total: $11,293.13\n" +
-		"  PANW $396.25       Current (gross) $3,368.13 · Potential (gross) $7,925.00"
+		"  8.5 PANW                                         Total: $11,293.13\n" +
+		"  PANW $396.25       Current $3,368.13 · Potential (gross) $7,925.00"
 	assert.Equal(t, expected, ansi.Strip(header))
 
 	// Both lines end in the column the table's last cell does: the indent and the width given.
 	for line := range strings.SplitSeq(expected, "\n") {
-		assert.Equal(t, 76, lipgloss.Width(line))
+		assert.Equal(t, 68, lipgloss.Width(line))
 	}
 }
 
@@ -50,18 +50,18 @@ func TestPortfolioHeader_PotentialBasis(t *testing.T) {
 		"gross": {
 			basis: portfolio.Gross,
 			total: "Total: $11,293.13",
-			parts: "Current (gross) $3,368.13 · Potential (gross) $7,925.00",
+			parts: "Current $3,368.13 · Potential (gross) $7,925.00",
 		},
 		"net": {
 			basis: portfolio.Net,
 			total: "Total: $7,782.36",
-			parts: "Current (gross) $3,368.13 · Potential (net) $4,414.23",
+			parts: "Current $3,368.13 · Potential (net) $4,414.23",
 		},
 		"net without a tax rate": {
 			basis:     portfolio.Net,
 			noTaxRate: true,
 			total:     "Total: $11,293.13",
-			parts:     "Current (gross) $3,368.13 · Potential (gross) $7,925.00",
+			parts:     "Current $3,368.13 · Potential (gross) $7,925.00",
 		},
 	}
 
@@ -86,7 +86,9 @@ func TestPortfolioHeader_PotentialBasis(t *testing.T) {
 // unless the account asks for it after tax: then it is what the shares that are held would bring
 // if they were sold today, less the tax on the gain of each lot, and says so. The total counts the
 // value that is shown, next to a potential value that has a basis of its own. Without a gains tax
-// rate there is nothing to take off, and the header says it shows the bank's number.
+// rate there is nothing to take off, and the header shows the bank's number, which it leaves
+// unmarked: the header has little room next to the prices, and the current value is the bank's
+// unless it says otherwise.
 func TestPortfolioHeader_CurrentBasis(t *testing.T) {
 	tests := map[string]struct {
 		current   portfolio.Basis
@@ -112,7 +114,7 @@ func TestPortfolioHeader_CurrentBasis(t *testing.T) {
 			potential: portfolio.Gross,
 			noRate:    true,
 			total:     "Total: $11,293.13",
-			parts:     "Current (gross) $3,368.13 · Potential (gross) $7,925.00",
+			parts:     "Current $3,368.13 · Potential (gross) $7,925.00",
 		},
 	}
 
