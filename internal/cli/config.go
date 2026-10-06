@@ -25,18 +25,26 @@ configuration is kept in the database of the account.
 
 The keys are:
 
-  tax-rate   The rate that the shares still to vest are taxed at, as a percentage.
-             A vest is taxed as income when it vests, at a rate that depends on the
-             rest of the year's income and on where you live, so folio does not work
-             it out. It takes one rate for every vest instead: your estimate of the
-             rate at the top of your income. The Vesting view shows what each vest
-             is worth after tax at this rate.
+  tax-rate
+      The rate that the shares still to vest are taxed at, as a percentage. A
+      vest is taxed as income when it vests, at a rate that depends on the rest
+      of the year's income and on where you live, so folio does not work it
+      out. It takes one rate for every vest instead: your estimate of the rate
+      at the top of your income. The Vesting view shows what each vest is worth
+      after tax at this rate.
 
-  potential  Which potential value the TUI shows in its header: gross, the value
-             of the shares still to vest as the bank states it, or net, what is
-             left of it after tax at the tax rate. With net, the total is the
-             current value and the potential value after tax. It is gross if it
-             is not set, and gross too without a tax rate to take off.
+  potential
+      Which potential value the TUI shows in its header: gross, the value of
+      the shares still to vest as the bank states it, or net, what is left of
+      it after tax at the tax rate. With net, the total is the current value
+      and the potential value after tax. It is gross if it is not set, and
+      gross too without a tax rate to take off.
+
+  gains-tax-rate
+      The rate that the gain of a sale is taxed at, as a percentage: what
+      selling the shares you hold would cost of what they gained since you got
+      them. With it, the Holdings view shows the tax that selling each lot at
+      the price of today would cost. A lot that lost is not taxed.
 `,
 		Example: `
   # Have vests taxed at 44.3%
@@ -47,6 +55,9 @@ The keys are:
 
   # Show the potential value after tax in the TUI
   folio config potential net
+
+  # Have the gain of a sale taxed at 26.4%
+  folio config gains-tax-rate 26.4%
 
   # Have vests taxed at no rate again
   folio config --unset tax-rate

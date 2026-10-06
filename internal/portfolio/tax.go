@@ -11,6 +11,10 @@ import (
 // percent and as ParseTaxRate reads it.
 const TaxRateKey = "tax-rate"
 
+// GainsTaxRateKey is the key of the configuration that the rate the gain of a sale is taxed at is
+// set under, in percent and as ParseTaxRate reads it.
+const GainsTaxRateKey = "gains-tax-rate"
+
 // PotentialBasisKey is the key of the configuration that says which potential value the TUI shows
 // in its header, as ParseBasis reads it. It is gross when it is not set.
 const PotentialBasisKey = "potential"
@@ -31,10 +35,11 @@ var hundred = decimal.NewFromInt(100)
 // web site, and the one after tax is closer to what the shares will bring.
 type Basis string
 
-// ParseTaxRate parses the rate that a vest is taxed at, written as a percentage such as "44.3%" or
+// ParseTaxRate parses a rate that something is taxed at, written as a percentage such as "44.3%" or
 // "44.3", and returns it in percent. A vest is taxed as income, at a rate that depends on the rest
 // of the year's income and the country, so folio does not work it out but takes one rate for every
-// vest, which is the user's estimate of the rate at the top of their income.
+// vest, which is the user's estimate of the rate at the top of their income. The gain of a sale is
+// taxed at a rate of its own, which in many countries is the same whatever the income.
 func ParseTaxRate(spec string) (decimal.Decimal, error) {
 	number := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(spec), "%"))
 

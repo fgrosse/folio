@@ -17,6 +17,7 @@ func TestConfigKeys(t *testing.T) {
 		defaultValue string
 	}{
 		TaxRateKey:        {},
+		GainsTaxRateKey:   {},
 		PotentialBasisKey: {choices: []string{"gross", "net"}, defaultValue: "gross"},
 	}
 

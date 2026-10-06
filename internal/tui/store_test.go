@@ -127,6 +127,7 @@ func (m *MockStore) returns(p Portfolio) {
 		m.On("GetConfig", portfolio.TaxRateKey).Return("", portfolio.ErrNotSet)
 	}
 	m.On("GetConfig", portfolio.PotentialBasisKey).Return(string(p.PotentialBasis), nil)
+	m.On("GetConfig", portfolio.GainsTaxRateKey).Return("", portfolio.ErrNotSet).Maybe()
 }
 
 // returnsAccount sets store up to answer with the lots, grants, quotes and sales of p, and leaves

@@ -13,14 +13,7 @@ var ConfigKeys = []ConfigKey{
 		Name: TaxRateKey,
 		Description: "The rate that the shares still to vest are taxed at, as a percentage: " +
 			"your estimate of the rate at the top of your income.",
-		Parse: func(value string) (string, error) {
-			rate, err := ParseTaxRate(value)
-			if err != nil {
-				return "", err
-			}
-
-			return rate.String() + "%", nil
-		},
+		Parse: parseStoredTaxRate,
 	},
 	{
 		Name: PotentialBasisKey,
@@ -33,6 +26,22 @@ var ConfigKeys = []ConfigKey{
 			return string(basis), err
 		},
 	},
+	{
+		Name: GainsTaxRateKey,
+		Description: "The rate that the gain of a sale is taxed at, as a percentage: what " +
+			"selling the shares you hold would cost of what they gained since you got them.",
+		Parse: parseStoredTaxRate,
+	},
+}
+
+// parseStoredTaxRate checks a tax rate and returns it as the store keeps it, with its percent sign.
+func parseStoredTaxRate(value string) (string, error) {
+	rate, err := ParseTaxRate(value)
+	if err != nil {
+		return "", err
+	}
+
+	return rate.String() + "%", nil
 }
 
 // A ConfigKey is a value of the configuration of an account, by the name that folio config knows

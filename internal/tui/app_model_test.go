@@ -327,8 +327,8 @@ func TestAppModel_OpensConfig(t *testing.T) {
 
 	m = driveApp(t, m, loaded)
 	frame := ansi.Strip(m.View().Content)
-	assert.Contains(t, frame, "> tax-rate   44.3%")
-	assert.Contains(t, frame, "  potential  ‹ gross ›")
+	assert.Contains(t, frame, "> tax-rate        44.3%")
+	assert.Contains(t, frame, "  potential       ‹ gross ›")
 	assert.Empty(t, holdings.msgs, "the view sees neither the key nor what was loaded")
 
 	typing := &stubView{title: "Holdings", captures: true}
@@ -418,7 +418,7 @@ func TestAppModel_UnsetsConfig(t *testing.T) {
 	assert.Equal(t, ConfigSavedMsg{values: map[string]string{}}, saved)
 
 	_, cmd = m.Update(saved)
-	assert.Contains(t, ansi.Strip(m.View().Content), "> tax-rate   not set")
+	assert.Contains(t, ansi.Strip(m.View().Content), "> tax-rate        not set")
 
 	loaded, ok := runCmd(t, cmd).(PortfolioLoadedMsg)
 	require.True(t, ok, "the portfolio is loaded again")
@@ -454,7 +454,7 @@ func TestAppModel_ConfigErrors(t *testing.T) {
 
 			frame := ansi.Strip(m.View().Content)
 			assert.Contains(t, frame, tt.expected)
-			assert.Contains(t, frame, "> tax-rate   44.3%")
+			assert.Contains(t, frame, "> tax-rate        44.3%")
 			assert.Contains(t, frame, "‹ gross ›")
 		})
 	}
@@ -477,7 +477,7 @@ func TestAppModel_ForwardsOtherMessagesToConfig(t *testing.T) {
 
 	m = driveApp(t, m, tea.KeyPressMsg{Code: tea.KeyEnter}, tea.PasteMsg{Content: "44.3"})
 
-	assert.Contains(t, ansi.Strip(m.View().Content), "> tax-rate   44.3")
+	assert.Contains(t, ansi.Strip(m.View().Content), "> tax-rate        44.3")
 	assert.Equal(t, []tea.Msg{tea.PasteMsg{Content: "44.3"}}, holdings.msgs, "the views still get them")
 }
 

@@ -56,10 +56,10 @@ func TestConfigCmd_Get(t *testing.T) {
 // neither set nor read: folio config says which keys there are.
 func TestConfigCmd_UnknownKey(t *testing.T) {
 	cmd, _ := NewTestingCmd(t, "config", "tax", "44.3%")
-	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate, potential`)
+	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate, potential, gains-tax-rate`)
 
 	cmd, _ = NewTestingCmd(t, "config", "tax")
-	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate, potential`)
+	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate, potential, gains-tax-rate`)
 }
 
 // TestConfigCmd_List covers "folio config" without a key, which prints the whole configuration as
@@ -198,5 +198,5 @@ func TestConfigCmd_Unset(t *testing.T) {
 	assert.EqualError(t, cmd.Execute(), "--unset takes the key to unset and nothing else")
 
 	cmd, _ = NewTestingCmd(t, "config", "--unset", "tax")
-	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate, potential`)
+	assert.EqualError(t, cmd.Execute(), `"tax" is no key of the configuration: use tax-rate, potential, gains-tax-rate`)
 }
