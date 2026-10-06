@@ -575,6 +575,27 @@ func TestLotRow(t *testing.T) {
 	}
 }
 
+// TestHoldingsModel_ShowsDetails covers the flyout of the view: enter opens it on the selected lot,
+// and it leaves the keyboard to the view, so that it shows one lot after the other as the selection
+// moves through the table, and the keys that switch views still do.
+func TestHoldingsModel_ShowsDetails(t *testing.T) {
+	m, _ := newTestingHoldings(t)
+	assert.NotContains(t, ansi.Strip(m.View().Content), "Cost of what is left")
+
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	frame := ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "PANW of 2026-01-15")
+	assert.Contains(t, frame, "Cost of what is left")
+	assert.False(t, m.CapturesKeys(), "the flyout should leave the keys to the view")
+
+	m.Update(keyPressed("j"))
+
+	frame = ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "PANW of 2026-02-15")
+	assert.NotContains(t, frame, "PANW of 2026-01-15")
+}
+
 // TestLotDetails covers what the flyout says about a lot, which is what its row has no room for:
 // the shares it was acquired with next to those sold and those left, and what the ones that are left
 // cost and are worth in all. What is not known reads as a dash, as it does in the row.

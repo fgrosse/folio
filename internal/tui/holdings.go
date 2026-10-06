@@ -69,6 +69,7 @@ type HoldingsModel struct {
 	input           *InputDialog   // the dialog that adds or edits a lot, nil unless it is open
 	confirm         *ConfirmDialog // the dialog asking whether to delete a lot, nil unless it is open
 	form            *FormDialog    // the form that records a sale, nil unless it is open
+	details         bool           // the flyout with the details of the selected lot is open
 }
 
 // RefreshQuotesMsg asks the view to fetch the quotes again, which it does every refreshInterval.
@@ -250,6 +251,9 @@ func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		return m, m.input.Init()
 	case key.Matches(msg, m.keys.Edit):
 		return m.editSelected()
+	case key.Matches(msg, m.keys.Details):
+		m.details = true
+		return m, nil
 	}
 
 	var cmd tea.Cmd
@@ -443,11 +447,18 @@ func (m *HoldingsModel) updateRows() {
 
 // View implements tea.Model by rendering the header above the table of lots, and the keys below it.
 func (m *HoldingsModel) View() tea.View {
-	frame := m.headerView() + "\n" +
-		m.style.Table.Render(m.table.View()) + "\n" +
-		m.helpView()
+	header := m.headerView()
+	box := m.style.Table.Render(m.table.View())
+	frame := header + "\n" + box + "\n" + m.helpView()
 
 	layers := []*lipgloss.Layer{lipgloss.NewLayer(frame)}
+	if flyout := m.flyoutLayer(lipgloss.Height(box)); flyout != nil {
+		// The flyout takes the right of the table's box, from its top to its bottom, and leaves the
+		// left of every row in sight, which is what says whose details these are.
+		flyout.X(lipgloss.Width(box) - flyout.Width())
+		flyout.Y(lipgloss.Height(header))
+		layers = append(layers, flyout)
+	}
 	if dialog := m.dialogLayer(); dialog != nil {
 		// The dialog floats centered in front of everything else.
 		dialog.X((lipgloss.Width(frame) - dialog.Width()) / 2)
@@ -457,6 +468,19 @@ func (m *HoldingsModel) View() tea.View {
 
 	c := lipgloss.NewCompositor(layers...)
 	return tea.NewView(trimTrailingSpace(c.Render()) + "\n")
+}
+
+// flyoutLayer renders the details of the selected lot as a flyout of the given height, or returns
+// nil if the flyout is closed or there is no lot to select. It is rendered from the selection every
+// time, so it shows another lot as soon as another row is selected.
+func (m *HoldingsModel) flyoutLayer(height int) *lipgloss.Layer {
+	i := m.table.Cursor()
+	if !m.details || i < 0 || i >= len(m.lots) {
+		return nil
+	}
+
+	lot := m.lots[i]
+	return lotDetails(lot, m.portfolio.Quotes[lot.Symbol]).Layer(flyoutWidth, height, m.style)
 }
 
 // dialogLayer renders whichever dialog is open, or returns nil if none is.
