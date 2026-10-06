@@ -86,6 +86,7 @@ type HoldingsModel struct {
 	input           *InputDialog   // the dialog that adds or edits a lot, nil unless it is open
 	confirm         *ConfirmDialog // the dialog asking whether to delete a lot, nil unless it is open
 	form            *FormDialog    // the form that records a sale, nil unless it is open
+	details         bool           // the flyout with the details of the selected lot is open
 }
 
 // RefreshQuotesMsg asks the view to fetch the quotes again, which it does every refreshInterval.
@@ -317,6 +318,14 @@ func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		return m, m.input.Init()
 	case key.Matches(msg, m.keys.Edit):
 		return m.editSelected()
+	case key.Matches(msg, m.keys.Details):
+		// Without a lot to select there are no details to open, as there is nothing to edit.
+		i := m.table.Cursor()
+		m.details = !m.details && i >= 0 && i < len(m.lots)
+		return m, nil
+	case key.Matches(msg, m.keys.Close):
+		m.details = false
+		return m, nil
 	}
 
 	var cmd tea.Cmd
@@ -510,11 +519,18 @@ func (m *HoldingsModel) updateRows() {
 
 // View implements tea.Model by rendering the header above the table of lots, and the keys below it.
 func (m *HoldingsModel) View() tea.View {
-	frame := m.headerView() + "\n" +
-		m.style.Table.Render(m.table.View()) + "\n" +
-		m.helpView()
+	header := m.headerView()
+	box := m.style.Table.Render(m.table.View())
+	frame := header + "\n" + box + "\n" + m.helpView()
 
 	layers := []*lipgloss.Layer{lipgloss.NewLayer(frame)}
+	if flyout := m.flyoutLayer(lipgloss.Height(box)); flyout != nil {
+		// The flyout takes the right of the table's box, from its top to its bottom, and leaves the
+		// left of every row in sight, which is what says whose details these are.
+		flyout.X(lipgloss.Width(box) - flyout.Width())
+		flyout.Y(lipgloss.Height(header))
+		layers = append(layers, flyout)
+	}
 	if dialog := m.dialogLayer(); dialog != nil {
 		// The dialog floats centered in front of everything else.
 		dialog.X((lipgloss.Width(frame) - dialog.Width()) / 2)
@@ -524,6 +540,19 @@ func (m *HoldingsModel) View() tea.View {
 
 	c := lipgloss.NewCompositor(layers...)
 	return tea.NewView(trimTrailingSpace(c.Render()) + "\n")
+}
+
+// flyoutLayer renders the details of the selected lot as a flyout of the given height, or returns
+// nil if the flyout is closed or there is no lot to select. It is rendered from the selection every
+// time, so it shows another lot as soon as another row is selected.
+func (m *HoldingsModel) flyoutLayer(height int) *lipgloss.Layer {
+	i := m.table.Cursor()
+	if !m.details || i < 0 || i >= len(m.lots) {
+		return nil
+	}
+
+	lot := m.lots[i]
+	return lotDetails(lot, m.portfolio.Quotes[lot.Symbol], m.style).Layer(flyoutWidth, height, m.style)
 }
 
 // dialogLayer renders whichever dialog is open, or returns nil if none is.
@@ -579,8 +608,15 @@ func (m *HoldingsModel) helpView() string {
 		}) + "\n"
 	}
 
+	// The flyout is no dialog and leaves every key what it was, so all it changes is which key
+	// is the one to know about it: the one that opens it, or the one that closes it.
+	details := m.keys.Details
+	if m.details {
+		details = m.keys.Close
+	}
+
 	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n" +
-		help.ShortHelpView([]key.Binding{m.keys.Add, m.keys.Edit, m.keys.Sell, m.keys.Delete})
+		help.ShortHelpView([]key.Binding{m.keys.Add, m.keys.Edit, m.keys.Sell, m.keys.Delete, details})
 }
 
 // positions sums up lots as how many shares of each stock are left of them, the stocks in alphabetical
@@ -604,6 +640,85 @@ func positions(lots []portfolio.Lot) string {
 	}
 
 	return strings.Join(parts, " · ")
+}
+
+// lotDetails is what the flyout says about a lot, valued at quote, which is the zero Quote if there
+// is none of the lot's stock. It has what the row has no room for: the shares the lot was acquired
+// with and how many of them were sold, where the row only has those that are left, and what those
+// have gained since. What is not known is a dash, as it is in the row, and the gain is known only
+// if both the cost and the price are. The value is in the gold of style, as the part of the total
+// that it is, and the gain in its green or, if it is a loss, its red.
+func lotDetails(lot portfolio.Lot, quote portfolio.Quote, style Style) Flyout {
+	from := noValue
+	if lot.Grant != "" {
+		from = lot.Grant
+	}
+
+	cost, price, valueLeft := noValue, noValue, noValue
+	if !lot.Cost.IsZero() {
+		cost = portfolio.FormatUSD(lot.Cost)
+	}
+	if quote.Symbol != "" {
+		price = portfolio.FormatUSD(quote.Price)
+		valueLeft = portfolio.FormatUSD(lot.Remaining().Mul(quote.Price))
+	}
+
+	// Only a value that is known stands out. A dash in gold would be a number that is not there.
+	var valueStyle lipgloss.Style
+	if quote.Symbol != "" {
+		valueStyle = style.Value
+	}
+
+	value := []FlyoutRow{
+		{Label: "Cost per share", Value: cost},
+		{Label: "Price per share", Value: price},
+		{Label: "Value of what is left", Value: valueLeft, ValueStyle: valueStyle},
+	}
+	if !lot.Cost.IsZero() && quote.Symbol != "" {
+		gainStyle := style.Gain
+		if quote.Price.LessThan(lot.Cost) {
+			gainStyle = style.Loss
+		}
+
+		// The percentage goes on a row of its own, so that the dollars of the gain end where the
+		// dollars of the value above them do.
+		dollars, percent := lotGain(lot, quote.Price)
+		value = append(value,
+			FlyoutRow{Label: "Gain", Value: dollars, ValueStyle: gainStyle},
+			FlyoutRow{Value: percent, ValueStyle: gainStyle},
+		)
+	} else {
+		value = append(value, FlyoutRow{Label: "Gain", Value: noValue})
+	}
+
+	return Flyout{
+		Title: lot.Symbol + " of " + lot.Acquired.Format(time.DateOnly),
+		Sections: []FlyoutSection{
+			{Title: "Shares", Rows: []FlyoutRow{
+				{Label: "From", Value: from},
+				{Label: "Acquired", Value: lot.Shares.String()},
+				{Label: "Sold", Value: lot.Sold.String()},
+				{Label: "Left", Value: lot.Remaining().String()},
+			}},
+			{Title: "Value", Rows: value},
+		},
+	}
+}
+
+// lotGain renders what the shares that are left of lot have gained since they were acquired, at the
+// given price of one of them: in dollars, such as "$64.52", and in percent of what they cost, such
+// as "▲ 4.2%", or "-$5,019.25" and "▼ 42.7%" for a loss. The arrow carries the direction of the
+// percentage, as it does for the change of a price in the header. The lot has to have a cost.
+func lotGain(lot portfolio.Lot, price decimal.Decimal) (dollars, percent string) {
+	gain, _ := lot.Gain(price)
+	growth, _ := lot.GrowthPercent(price)
+
+	arrow := "▲"
+	if growth.IsNegative() {
+		arrow = "▼"
+	}
+
+	return portfolio.FormatUSD(gain), arrow + " " + growth.Abs().StringFixed(1) + "%"
 }
 
 // lotRow renders a lot as a row of the Holdings table with all its columns: the grant it was

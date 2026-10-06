@@ -13,6 +13,8 @@ type keyMap struct {
 	Sell    key.Binding
 	Delete  key.Binding
 	Release key.Binding
+	Details key.Binding
+	Close   key.Binding
 	Quit    key.Binding
 }
 
@@ -23,6 +25,8 @@ func defaultKeyMap() keyMap {
 		Sell:    key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sell")),
 		Delete:  key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "delete")),
 		Release: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "release")),
+		Details: key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "details")),
+		Close:   key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
 		Quit:    key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 	}
 }

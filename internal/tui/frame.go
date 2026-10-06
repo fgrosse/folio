@@ -34,6 +34,11 @@ const (
 	// dialogWidth is how many columns the text field of a dialog occupies. A grant spec is a long
 	// line, and this fits one with a name of some length.
 	dialogWidth = 56
+
+	// flyoutWidth is how many columns a flyout occupies, border included. It is half of the
+	// narrowest table, which leaves the columns that say which row is selected in sight, and fits a
+	// label next to a value in the millions.
+	flyoutWidth = minTableWidth / 2
 )
 
 // newTable returns a focused table with the given columns, styled the way every table in the TUI is:

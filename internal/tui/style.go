@@ -25,8 +25,18 @@ type Style struct {
 	TabSelected lipgloss.Style
 
 	// Total is the total account value, the one number worth glancing at, so it is the only thing
-	// that is gold.
+	// that is gold and bold.
 	Total lipgloss.Style
+
+	// Value is what something that is held is worth, where that is the number its surroundings
+	// lead up to, such as in the details of a lot. It is a part of the total, so it has the total's
+	// gold, without the weight.
+	Value lipgloss.Style
+
+	// Gain and Loss are what a value has moved by since it was acquired, in the colors that mean
+	// up and down wherever stock is shown.
+	Gain lipgloss.Style
+	Loss lipgloss.Style
 
 	// Hint is what the header says besides the total: the two values the total is made of, and how
 	// old the prices are. It is a footnote to the total, so it stays dim.
@@ -49,7 +59,7 @@ func DefaultStyle() Style {
 	border := lipgloss.NormalBorder()
 	borderColor := lipgloss.Color("240")
 	accent := lipgloss.Color("99") // in the same purple family as the table's selection color
-	gold := lipgloss.Color("220")  // for the total alone, which the eye should land on first
+	gold := lipgloss.Color("220")  // for the total, which the eye should land on first, and its parts
 	return Style{
 		Table: lipgloss.NewStyle().
 			BorderStyle(border).
@@ -68,6 +78,12 @@ func DefaultStyle() Style {
 		Total: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(gold),
+		Value: lipgloss.NewStyle().
+			Foreground(gold),
+		Gain: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("78")),
+		Loss: lipgloss.NewStyle().
+			Foreground(lipgloss.Color("203")),
 		Hint: lipgloss.NewStyle().
 			Foreground(borderColor),
 		Error: lipgloss.NewStyle().

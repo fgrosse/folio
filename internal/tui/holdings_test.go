@@ -646,3 +646,177 @@ func TestLotRow(t *testing.T) {
 		})
 	}
 }
+
+// TestHoldingsModel_ShowsDetails covers the flyout of the view: enter opens it on the selected lot,
+// and it leaves the keyboard to the view, so that it shows one lot after the other as the selection
+// moves through the table, and the keys that switch views still do.
+func TestHoldingsModel_ShowsDetails(t *testing.T) {
+	m, _ := newTestingHoldings(t)
+	assert.NotContains(t, ansi.Strip(m.View().Content), "Cost per share")
+
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	frame := ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "PANW of 2026-01-15")
+	assert.Contains(t, frame, "Cost per share")
+	assert.False(t, m.CapturesKeys(), "the flyout should leave the keys to the view")
+
+	m.Update(keyPressed("j"))
+
+	frame = ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "PANW of 2026-02-15")
+	assert.NotContains(t, frame, "PANW of 2026-01-15")
+}
+
+// TestHoldingsModel_RenderDetails is the frame with the flyout open: it takes the right of the
+// table's box, from the top of it to the bottom, and leaves the left of every row in sight, which
+// says whose details these are.
+func TestHoldingsModel_RenderDetails(t *testing.T) {
+	m, _ := newTestingHoldings(t)
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	golden.RequireEqual(t, ansi.Strip(m.View().Content))
+}
+
+// TestHoldingsModel_DetailsWithNothingSelected covers enter in an account without lots: there are no
+// details to show, so nothing opens, and the help does not offer to close what is not there.
+func TestHoldingsModel_DetailsWithNothingSelected(t *testing.T) {
+	store := new(MockStore)
+	store.returns(Portfolio{})
+	m := NewHoldingsModel(store, quotes{}, DefaultStyle())
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
+	m.Update(runCmd(t, loadPortfolioCmd(store)))
+
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	frame := ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "enter details")
+	assert.NotContains(t, frame, "esc close")
+}
+
+// TestHoldingsModel_ClosesDetails covers getting rid of the flyout: with the key that opened it, and
+// with esc, which closes whatever else is in front of the table as well.
+func TestHoldingsModel_ClosesDetails(t *testing.T) {
+	keys := map[string]tea.KeyPressMsg{
+		"enter": {Code: tea.KeyEnter},
+		"esc":   {Code: tea.KeyEscape},
+	}
+
+	for name, key := range keys {
+		t.Run(name, func(t *testing.T) {
+			m, _ := newTestingHoldings(t)
+			m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+			require.Contains(t, ansi.Strip(m.View().Content), "Cost per share")
+
+			_, cmd := m.Update(key)
+
+			assert.Nil(t, cmd)
+			assert.NotContains(t, ansi.Strip(m.View().Content), "Cost per share")
+		})
+	}
+}
+
+// TestHoldingsModel_DetailsHelp covers how the flyout is found: the help names the key that opens
+// it, and while it is open the key that closes it in its place, since the other keys stay what they
+// were.
+func TestHoldingsModel_DetailsHelp(t *testing.T) {
+	m, _ := newTestingHoldings(t)
+	assert.Contains(t, ansi.Strip(m.View().Content), "a add • e edit • s sell • d delete • enter details\n")
+
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	assert.Contains(t, ansi.Strip(m.View().Content), "a add • e edit • s sell • d delete • esc close\n")
+}
+
+// TestLotDetails covers what the flyout says about a lot, which is what its row has no room for:
+// the shares it was acquired with next to those sold and those left, and what the ones that are left
+// have gained or lost since they were acquired, in dollars and in percent of what they cost. The
+// percentage has a row of its own, without a label, so that the dollars stand under the value they
+// are part of. What is not known reads as a dash, as it does in the row, and a gain is only known
+// with both a cost and a price. The value is in the style of a value and the gain in that of a gain
+// or a loss, and a dash is in none.
+func TestLotDetails(t *testing.T) {
+	style := DefaultStyle()
+	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
+
+	tests := map[string]struct {
+		lot      portfolio.Lot
+		quote    portfolio.Quote
+		expected Flyout
+	}{
+		"a lot released from a grant, partly sold": {
+			lot: portfolio.Lot{
+				Symbol: "PANW", Shares: dec("6"), Sold: dec("2"), Acquired: day("2026-01-15"),
+				Cost: dec("380.12"), Grant: "Payout",
+			},
+			quote: panw,
+			expected: Flyout{
+				Title: "PANW of 2026-01-15",
+				Sections: []FlyoutSection{
+					{Title: "Shares", Rows: []FlyoutRow{
+						{Label: "From", Value: "Payout"},
+						{Label: "Acquired", Value: "6"},
+						{Label: "Sold", Value: "2"},
+						{Label: "Left", Value: "4"},
+					}},
+					{Title: "Value", Rows: []FlyoutRow{
+						{Label: "Cost per share", Value: "$380.12"},
+						{Label: "Price per share", Value: "$396.25"},
+						{Label: "Value of what is left", Value: "$1,585.00", ValueStyle: style.Value},
+						{Label: "Gain", Value: "$64.52", ValueStyle: style.Gain},
+						{Value: "▲ 4.2%", ValueStyle: style.Gain},
+					}},
+				},
+			},
+		},
+		"a lot that is worth less than it cost": {
+			lot:   portfolio.Lot{Symbol: "PANW", Shares: dec("17"), Acquired: day("2025-10-01"), Cost: dec("691.5")},
+			quote: panw,
+			expected: Flyout{
+				Title: "PANW of 2025-10-01",
+				Sections: []FlyoutSection{
+					{Title: "Shares", Rows: []FlyoutRow{
+						{Label: "From", Value: "-"},
+						{Label: "Acquired", Value: "17"},
+						{Label: "Sold", Value: "0"},
+						{Label: "Left", Value: "17"},
+					}},
+					{Title: "Value", Rows: []FlyoutRow{
+						{Label: "Cost per share", Value: "$691.50"},
+						{Label: "Price per share", Value: "$396.25"},
+						{Label: "Value of what is left", Value: "$6,736.25", ValueStyle: style.Value},
+						{Label: "Gain", Value: "-$5,019.25", ValueStyle: style.Loss},
+						{Value: "▼ 42.7%", ValueStyle: style.Loss},
+					}},
+				},
+			},
+		},
+		"a lot entered by hand, without a cost or a quote": {
+			lot:   portfolio.Lot{Symbol: "SAP.DE", Shares: dec("2.5"), Acquired: day("2026-02-15")},
+			quote: portfolio.Quote{},
+			expected: Flyout{
+				Title: "SAP.DE of 2026-02-15",
+				Sections: []FlyoutSection{
+					{Title: "Shares", Rows: []FlyoutRow{
+						{Label: "From", Value: "-"},
+						{Label: "Acquired", Value: "2.5"},
+						{Label: "Sold", Value: "0"},
+						{Label: "Left", Value: "2.5"},
+					}},
+					{Title: "Value", Rows: []FlyoutRow{
+						{Label: "Cost per share", Value: "-"},
+						{Label: "Price per share", Value: "-"},
+						{Label: "Value of what is left", Value: "-"},
+						{Label: "Gain", Value: "-"},
+					}},
+				},
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, lotDetails(tt.lot, tt.quote, style))
+		})
+	}
+}
