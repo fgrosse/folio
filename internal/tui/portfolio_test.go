@@ -118,28 +118,27 @@ func TestLoadPortfolioCmd_GainsTaxRate(t *testing.T) {
 	assert.EqualError(t, loaded.err, `gains-tax-rate: "high" is not a tax rate such as 44.3%`)
 }
 
-// TestLoadPortfolioCmd_PotentialBasis covers which potential value the header shows, which the
-// store keeps among the configuration: the bank's, before tax, unless the account says net, and a
-// value that is neither is an error that says which key it is in.
-func TestLoadPortfolioCmd_PotentialBasis(t *testing.T) {
-	tests := map[string]struct {
+// TestLoadPortfolioCmd_ShowNet covers whether the header shows the values after tax, which the
+// store keeps among the configuration: the bank's, before tax, unless the account says true, and a
+// value that is neither true nor false is an error that says which key it is in.
+func TestLoadPortfolioCmd_ShowNet(t *testing.T) {
+	cases := map[string]struct {
 		value    string
 		err      error
-		expected portfolio.Basis
+		expected bool
 		error    string
 	}{
-		"not set": {err: portfolio.ErrNotSet, expected: portfolio.Gross},
-		"gross":   {value: "gross", expected: portfolio.Gross},
-		"net":     {value: "net", expected: portfolio.Net},
-		"neither": {value: "after-tax", error: `potential: "after-tax" is neither gross nor net`},
+		"not set": {err: portfolio.ErrNotSet, expected: false},
+		"false":   {value: "false", expected: false},
+		"true":    {value: "true", expected: true},
+		"neither": {value: "net", error: `show-net-summary: "net" is neither true nor false`},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			store := new(MockStore)
 			store.returnsAccount(testPortfolio())
-			store.On("GetConfig", portfolio.TaxRateKey).Return("44.3%", nil)
-			store.On("GetConfig", portfolio.PotentialBasisKey).Return(tt.value, tt.err)
+			store.On("GetConfig", portfolio.ShowNetSummaryKey).Return(tt.value, tt.err)
 			store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
 
 			loaded, ok := runCmd(t, loadPortfolioCmd(store)).(PortfolioLoadedMsg)
@@ -150,43 +149,7 @@ func TestLoadPortfolioCmd_PotentialBasis(t *testing.T) {
 			}
 
 			require.NoError(t, loaded.err)
-			assert.Equal(t, tt.expected, loaded.portfolio.PotentialBasis)
-		})
-	}
-}
-
-// TestLoadPortfolioCmd_CurrentBasis covers which current value the header shows, which is kept and
-// loaded like that of the potential value: the bank's, before tax, unless the account says net, and
-// a value that is neither is an error that says which key it is in.
-func TestLoadPortfolioCmd_CurrentBasis(t *testing.T) {
-	tests := map[string]struct {
-		value    string
-		err      error
-		expected portfolio.Basis
-		error    string
-	}{
-		"not set": {err: portfolio.ErrNotSet, expected: portfolio.Gross},
-		"gross":   {value: "gross", expected: portfolio.Gross},
-		"net":     {value: "net", expected: portfolio.Net},
-		"neither": {value: "after-tax", error: `current: "after-tax" is neither gross nor net`},
-	}
-
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			store := new(MockStore)
-			store.returnsAccount(testPortfolio())
-			store.On("GetConfig", portfolio.CurrentBasisKey).Return(tt.value, tt.err)
-			store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
-
-			loaded, ok := runCmd(t, loadPortfolioCmd(store)).(PortfolioLoadedMsg)
-			require.True(t, ok)
-			if tt.error != "" {
-				assert.EqualError(t, loaded.err, tt.error)
-				return
-			}
-
-			require.NoError(t, loaded.err)
-			assert.Equal(t, tt.expected, loaded.portfolio.CurrentBasis)
+			assert.Equal(t, tt.expected, loaded.portfolio.ShowNet)
 		})
 	}
 }

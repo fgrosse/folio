@@ -159,15 +159,14 @@ that selling the lot today would cost. A lot that lost is not taxed, and its los
 against the gain of another lot. The two columns need room: the gain shows in a terminal of 92
 columns or more, and the tax in one of 108.
 
-The three values are the bank's, before tax, unless you ask for them after tax. With
-`folio config potential net` the header of the TUI shows the potential value after the tax on the
-vests, marked `(net)` rather than `(gross)`. With `folio config current net` it shows the current
-value after the tax on the gains, as if you sold everything today, marked `(net)` as well. The
-total is the two values that are shown, added up.
+The three values are the bank's, before tax, unless you set `folio config show-net-summary true`.
+Then the header of the TUI shows the potential value after the tax on the vests and the current
+value after the tax on the gains, as if you sold everything today, each marked `(net)`. The total
+is the two added up. A value whose rate is not set stays the bank's.
 
 `c` opens the configuration from any view, with a row for each key that `folio config` has. `enter`
 edits the value of the selected row, and an empty value unsets it. A row with a few values to pick
-from, such as gross or net, changes with `←` and `→`. Each change is saved right away and shows in
+from, such as true or false, changes with `←` and `→`. Each change is saved right away and shows in
 the view behind the dialog.
 
 Prices are fetched when the TUI starts and every five minutes after that. It opens with the last
@@ -185,8 +184,7 @@ folio release 2026-01-15 6 @380.12                 # 6 shares arrived, worth $38
 folio config tax-rate 44.3%                        # the rate vests are taxed at
 folio config tax-rate                              # print it
 folio config gains-tax-rate 26.4%                  # the rate the gain of a sale is taxed at
-folio config potential net                         # show the potential value after tax in the TUI
-folio config current net                           # show the current value after tax on its gains
+folio config show-net-summary true                 # show the values after tax in the header of the TUI
 folio config --unset tax-rate                      # take a value back
 folio config                                       # the whole configuration, as YAML
 folio config -o json                               # the whole configuration, as JSON

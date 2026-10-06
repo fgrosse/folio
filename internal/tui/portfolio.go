@@ -33,8 +33,8 @@ type Store interface {
 
 // A Portfolio is everything the views show, as the store had it at one moment: the lots and grants
 // of the account, the quotes they are valued at, the sales that took shares out of the lots, the
-// rates that vests and the gain of a sale are taxed at, and whether the potential and the current
-// value are shown before or after tax. Every view holds the latest one it was sent.
+// rates that vests and the gain of a sale are taxed at, and whether the header shows the values
+// before or after tax. Every view holds the latest one it was sent.
 type Portfolio struct {
 	Lots   []portfolio.Lot
 	Grants []portfolio.Grant
@@ -48,12 +48,9 @@ type Portfolio struct {
 	// set.
 	GainsTaxRate decimal.NullDecimal
 
-	// PotentialBasis is whether the header shows the potential value before tax or after it.
-	PotentialBasis portfolio.Basis
-
-	// CurrentBasis is whether the header shows the current value before the tax on its gains or
-	// after it.
-	CurrentBasis portfolio.Basis
+	// ShowNet is whether the header shows the potential and the current value after tax rather
+	// than as the bank states them.
+	ShowNet bool
 }
 
 // PortfolioLoadedMsg reports the result of loading the portfolio from the Store. Every view
@@ -135,25 +132,19 @@ func loadPortfolio(store Store) (Portfolio, error) {
 		return Portfolio{}, err
 	}
 
-	potentialBasis, err := loadBasis(store, portfolio.PotentialBasisKey)
-	if err != nil {
-		return Portfolio{}, err
-	}
-
-	currentBasis, err := loadBasis(store, portfolio.CurrentBasisKey)
+	showNet, err := loadSwitch(store, portfolio.ShowNetSummaryKey)
 	if err != nil {
 		return Portfolio{}, err
 	}
 
 	return Portfolio{
-		Lots:           lots,
-		Grants:         grants,
-		Quotes:         quotes,
-		Sales:          sales,
-		TaxRate:        taxRate,
-		GainsTaxRate:   gainsTaxRate,
-		PotentialBasis: potentialBasis,
-		CurrentBasis:   currentBasis,
+		Lots:         lots,
+		Grants:       grants,
+		Quotes:       quotes,
+		Sales:        sales,
+		TaxRate:      taxRate,
+		GainsTaxRate: gainsTaxRate,
+		ShowNet:      showNet,
 	}, nil
 }
 
@@ -176,21 +167,21 @@ func loadTaxRate(store Store, key string) (decimal.NullDecimal, error) {
 	return decimal.NewNullDecimal(rate), nil
 }
 
-// loadBasis returns which of a value the header shows, as it is set under key. An account that has
-// not said shows the bank's, before tax, which is the number its web site has.
-func loadBasis(store Store, key string) (portfolio.Basis, error) {
+// loadSwitch returns whether the setting under key is on. An account that has not said has it off,
+// which for the values of the header means the bank's numbers, before tax.
+func loadSwitch(store Store, key string) (bool, error) {
 	value, err := store.GetConfig(key)
 	switch {
 	case errors.Is(err, portfolio.ErrNotSet):
-		return portfolio.Gross, nil
+		return false, nil
 	case err != nil:
-		return "", err
+		return false, err
 	}
 
-	basis, err := portfolio.ParseBasis(value)
+	on, err := portfolio.ParseSwitch(value)
 	if err != nil {
-		return "", fmt.Errorf("%s: %w", key, err)
+		return false, fmt.Errorf("%s: %w", key, err)
 	}
 
-	return basis, nil
+	return on, nil
 }

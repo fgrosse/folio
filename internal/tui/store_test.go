@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"strconv"
+
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/mock"
 
@@ -113,10 +115,8 @@ func testPortfolio() Portfolio {
 		Quotes: map[string]portfolio.Quote{
 			"PANW": {Symbol: "PANW", Price: dec("396.25"), PreviousClose: dec("397.31"), Currency: "USD"},
 		},
-		TaxRate:        decimal.NewNullDecimal(dec("44.3")),
-		GainsTaxRate:   decimal.NewNullDecimal(dec("26.4")),
-		PotentialBasis: portfolio.Gross,
-		CurrentBasis:   portfolio.Gross,
+		TaxRate:      decimal.NewNullDecimal(dec("44.3")),
+		GainsTaxRate: decimal.NewNullDecimal(dec("26.4")),
 	}
 }
 
@@ -125,8 +125,7 @@ func (m *MockStore) returns(p Portfolio) {
 	m.returnsAccount(p)
 	m.returnsRate(portfolio.TaxRateKey, p.TaxRate)
 	m.returnsRate(portfolio.GainsTaxRateKey, p.GainsTaxRate)
-	m.On("GetConfig", portfolio.PotentialBasisKey).Return(string(p.PotentialBasis), nil)
-	m.On("GetConfig", portfolio.CurrentBasisKey).Return(string(p.CurrentBasis), nil)
+	m.On("GetConfig", portfolio.ShowNetSummaryKey).Return(strconv.FormatBool(p.ShowNet), nil)
 }
 
 // returnsRate sets store up to answer with rate for the key of a tax rate, written as folio config

@@ -104,12 +104,11 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
   (`folio config gains-tax-rate`). Each lot is taxed on its own gain, as the Holdings view shows it:
   a lot that lost is not taxed and takes nothing off the gain of another, and a lot without a cost
   has no gain that is known. The three values stay the bank's, before tax, unless the user asks
-  for one after tax: `folio config potential net` for the potential value after the tax on the
-  vests, and `folio config current net` for the current value after the tax on the gains. The
-  TUI's header marks a value that is after tax `(net)`, and the total is the two values it shows,
-  so that the values on screen add up. The rates are kept in the `settings` table, which holds
-  what applies to the whole account, one value by name, so that it is in the database like
-  everything else.
+  for them after tax (`folio config show-net-summary true`). Then the TUI's header shows the
+  potential value after the tax on the vests and the current value after the tax on the gains,
+  each marked `(net)`, and the total is the two added up, so that the values on screen add up.
+  The rates are kept in the `settings` table, which holds what applies to the whole account, one
+  value by name, so that it is in the database like everything else.
 - **Everything is in USD for now**, the currency the stock trades in. Showing another currency is
   in `TODO.md`.
 - **The demo is the one verb with a database of its own.** Every other verb shares the database of

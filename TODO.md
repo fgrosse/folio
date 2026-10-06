@@ -51,7 +51,7 @@ Roughly in the order worth doing.
 - **Show values in another currency**, such as EUR, toggled with a key in the TUI and a flag on `folio status`. It needs an
   exchange rate, fetched and cached like a quote.
 - **Tax estimates**: the header shows the potential and the current value after tax, with
-  `folio config potential net` and `folio config current net`. Still to come: the same in
+  `folio config show-net-summary true`. Still to come: the same in
   `folio status`. Costs are in USD, and a tax return outside the US wants the gain in its own
   currency at the rate of each day, so an exact tax on a gain needs the exchange rate of a past
   day.

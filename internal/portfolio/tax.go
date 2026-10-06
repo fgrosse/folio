@@ -15,29 +15,12 @@ const TaxRateKey = "tax-rate"
 // set under, in percent and as ParseTaxRate reads it.
 const GainsTaxRateKey = "gains-tax-rate"
 
-// PotentialBasisKey is the key of the configuration that says which potential value the TUI shows
-// in its header, as ParseBasis reads it. It is gross when it is not set.
-const PotentialBasisKey = "potential"
-
-// CurrentBasisKey is the key of the configuration that says which current value the TUI shows in
-// its header, as ParseBasis reads it. It is gross when it is not set.
-const CurrentBasisKey = "current"
-
-const (
-	// Gross is a value before tax, as the bank states it.
-	Gross Basis = "gross"
-
-	// Net is a value after tax, at the rate the account has for it.
-	Net Basis = "net"
-)
+// ShowNetSummaryKey is the key of the configuration that says whether the TUI shows the values in
+// its header after tax, as ParseSwitch reads it. They are before tax when it is not set.
+const ShowNetSummaryKey = "show-net-summary"
 
 // hundred is all of something, in percent.
 var hundred = decimal.NewFromInt(100)
-
-// A Basis is whether a value of an account is shown as the bank states it, before tax, or as what
-// is left of it once the tax on it is taken off. The bank's number is the one to compare with its
-// web site, and the one after tax is closer to what the shares will bring.
-type Basis string
 
 // ParseTaxRate parses a rate that something is taxed at, written as a percentage such as "44.3%" or
 // "44.3", and returns it in percent. A vest is taxed as income, at a rate that depends on the rest
@@ -75,12 +58,14 @@ func GainsTax(gain, rate decimal.Decimal) decimal.Decimal {
 	return gain.Mul(rate).Div(hundred).Round(2)
 }
 
-// ParseBasis parses which of a value to show, written as "gross" or "net".
-func ParseBasis(value string) (Basis, error) {
-	switch basis := Basis(strings.ToLower(strings.TrimSpace(value))); basis {
-	case Gross, Net:
-		return basis, nil
+// ParseSwitch parses a setting that is on or off, written as "true" or "false".
+func ParseSwitch(value string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
 	default:
-		return "", fmt.Errorf("%q is neither gross nor net", value)
+		return false, fmt.Errorf("%q is neither true nor false", value)
 	}
 }

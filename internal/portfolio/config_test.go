@@ -18,8 +18,7 @@ func TestConfigKeys(t *testing.T) {
 	}{
 		TaxRateKey:        {},
 		GainsTaxRateKey:   {},
-		PotentialBasisKey: {choices: []string{"gross", "net"}, defaultValue: "gross"},
-		CurrentBasisKey:   {choices: []string{"gross", "net"}, defaultValue: "gross"},
+		ShowNetSummaryKey: {choices: []string{"false", "true"}, defaultValue: "false"},
 	}
 
 	require.Len(t, ConfigKeys, len(tests), "every key should have a case")

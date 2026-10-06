@@ -43,31 +43,31 @@ func notedHeader(left, note string, p Portfolio, err error, width int, style Sty
 }
 
 // shownValues are the values of an account as the header shows them, and whether the current and
-// the potential one are before or after tax.
+// the potential one are after tax.
 type shownValues struct {
-	account   portfolio.Account
-	current   portfolio.Basis
-	potential portfolio.Basis
+	account      portfolio.Account
+	currentNet   bool
+	potentialNet bool
 }
 
-// shownAccount returns the values of p that the header shows. Each of the two the total is made of
-// is after tax only if the account asks for that and has a rate to take off, and the bank's number
-// otherwise, so that the header never calls a value net that is not. The two have a tax each: a
-// vest is taxed as income, and what is held on the gain it made since.
+// shownAccount returns the values of p that the header shows. They are the bank's numbers unless
+// the account asks for them after tax. Then each of the two the total is made of is after tax if
+// the account has a rate to take off it, and still the bank's number otherwise, so that the header
+// never calls a value net that is not. The two have a tax each: a vest is taxed as income, and what
+// is held on the gain it made since.
 func shownAccount(p Portfolio) shownValues {
-	values := shownValues{
-		account:   portfolio.NewAccount(p.Lots, p.Grants, p.Quotes),
-		current:   portfolio.Gross,
-		potential: portfolio.Gross,
+	values := shownValues{account: portfolio.NewAccount(p.Lots, p.Grants, p.Quotes)}
+	if !p.ShowNet {
+		return values
 	}
 
-	if p.CurrentBasis == portfolio.Net && p.GainsTaxRate.Valid {
+	if p.GainsTaxRate.Valid {
 		values.account = values.account.AfterGainsTax(p.GainsTaxRate.Decimal)
-		values.current = portfolio.Net
+		values.currentNet = true
 	}
-	if p.PotentialBasis == portfolio.Net && p.TaxRate.Valid {
+	if p.TaxRate.Valid {
 		values.account = values.account.AfterTax(p.TaxRate.Decimal)
-		values.potential = portfolio.Net
+		values.potentialNet = true
 	}
 
 	return values
@@ -82,14 +82,17 @@ const headerGap = 2
 // it is net: it is the bank's unless the account asks otherwise, and the line has the prices to fit
 // in as well.
 func accountParts(values shownValues) string {
-	current := "Current"
-	if values.current == portfolio.Net {
+	current, potential := "Current", "Potential (gross)"
+	if values.currentNet {
 		current += " (net)"
 	}
+	if values.potentialNet {
+		potential = "Potential (net)"
+	}
 
-	return fmt.Sprintf("%s %s · Potential (%s) %s",
+	return fmt.Sprintf("%s %s · %s %s",
 		current, portfolio.FormatUSD(values.account.Current),
-		values.potential, portfolio.FormatUSD(values.account.Potential))
+		potential, portfolio.FormatUSD(values.account.Potential))
 }
 
 // accountHeader renders the two lines above the table of a view. The right half is the same in

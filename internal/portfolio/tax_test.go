@@ -47,31 +47,31 @@ func TestAfterTax(t *testing.T) {
 	assert.Equal(t, "0", AfterTax(shares("3962.50"), shares("100")).String())
 }
 
-// TestParseBasis covers how the user says which of a value the header shows: the
-// bank's before tax, or what is left of it after tax, by name and however it is capitalized.
-func TestParseBasis(t *testing.T) {
-	tests := map[string]struct {
+// TestParseSwitch covers how a setting that is on or off is typed: as true or false, however it is
+// capitalized, and nothing else.
+func TestParseSwitch(t *testing.T) {
+	cases := map[string]struct {
 		value    string
-		expected Basis
+		expected bool
 		error    string
 	}{
-		"gross":      {value: "gross", expected: Gross},
-		"net":        {value: "net", expected: Net},
-		"capitals":   {value: " Net ", expected: Net},
-		"nothing":    {value: "", error: `"" is neither gross nor net`},
-		"other word": {value: "after-tax", error: `"after-tax" is neither gross nor net`},
+		"true":       {value: "true", expected: true},
+		"false":      {value: "false", expected: false},
+		"capitals":   {value: " True ", expected: true},
+		"nothing":    {value: "", error: `"" is neither true nor false`},
+		"other word": {value: "net", error: `"net" is neither true nor false`},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
-			basis, err := ParseBasis(tt.value)
+			on, err := ParseSwitch(tt.value)
 			if tt.error != "" {
 				assert.EqualError(t, err, tt.error)
 				return
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, basis)
+			assert.Equal(t, tt.expected, on)
 		})
 	}
 }

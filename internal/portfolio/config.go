@@ -2,6 +2,7 @@ package portfolio
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -16,26 +17,25 @@ var ConfigKeys = []ConfigKey{
 		Parse: parseStoredTaxRate,
 	},
 	{
-		Name: PotentialBasisKey,
-		Description: "Which potential value the header shows: gross, as the bank states it, " +
-			"or net, what is left of it after tax at the tax rate.",
-		Choices: []string{string(Gross), string(Net)},
-		Default: string(Gross),
-		Parse:   parseStoredBasis,
-	},
-	{
 		Name: GainsTaxRateKey,
 		Description: "The rate that the gain of a sale is taxed at, as a percentage: what " +
 			"selling the shares you hold would cost of what they gained since you got them.",
 		Parse: parseStoredTaxRate,
 	},
 	{
-		Name: CurrentBasisKey,
-		Description: "Which current value the header shows: gross, as the bank states it, " +
-			"or net, what is left of it after tax on the gains at the gains tax rate.",
-		Choices: []string{string(Gross), string(Net)},
-		Default: string(Gross),
-		Parse:   parseStoredBasis,
+		Name: ShowNetSummaryKey,
+		Description: "Whether the header shows the values after tax: the potential value after " +
+			"tax at the tax rate, and the current value after tax on the gains at the gains tax rate.",
+		Choices: []string{"false", "true"},
+		Default: "false",
+		Parse: func(value string) (string, error) {
+			on, err := ParseSwitch(value)
+			if err != nil {
+				return "", err
+			}
+
+			return strconv.FormatBool(on), nil
+		},
 	},
 }
 
@@ -47,12 +47,6 @@ func parseStoredTaxRate(value string) (string, error) {
 	}
 
 	return rate.String() + "%", nil
-}
-
-// parseStoredBasis checks a basis and returns it as the store keeps it, in small letters.
-func parseStoredBasis(value string) (string, error) {
-	basis, err := ParseBasis(value)
-	return string(basis), err
 }
 
 // A ConfigKey is a value of the configuration of an account, by the name that folio config knows
