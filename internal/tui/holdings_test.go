@@ -55,8 +55,7 @@ func TestHoldingsModel_LoadsPortfolio(t *testing.T) {
 
 	rows := m.table.Rows()
 	require.Len(t, rows, 2)
-	assert.Equal(t, table.Row{"2026-01-15", "PANW", "Payout", "         6", "   $380.12", "   $396.25", "   +4.2%", "     $2,377.50"}, rows[0],
-		"all but the tax, for want of room")
+	assert.Equal(t, table.Row{"2026-01-15", "PANW", "Payout", "         6", "   $380.12", "   $396.25", "   +4.2%", "     $2,377.50"}, rows[0])
 	assert.Equal(t, table.Row{"2026-02-15", "PANW", "", "       2.5", "         -", "   $396.25", "       -", "       $990.63"}, rows[1])
 	store.AssertExpectations(t)
 }
@@ -396,26 +395,16 @@ func TestHoldingsModel_HidesColumnsInANarrowWindow(t *testing.T) {
 	assert.Equal(t, 1, m.table.Cursor())
 }
 
-// TestHoldingsModel_ShowsTheTaxOnALot covers the column that says what selling a lot would cost in
-// tax on its gain, left of the value, which stays the last column. It is the last one the table
-// makes room for, after the gain, so it takes a wide window, and it is only there for an account that has a rate to tax a gain at: a column of dashes
-// would take the room of the grant for nothing.
-func TestHoldingsModel_ShowsTheTaxOnALot(t *testing.T) {
+// TestHoldingsModel_HasNoColumnForTheTax covers where the tax on the gain of a lot is not: in the
+// table, however wide the window and whatever the rate of the account. It is a detail of a lot,
+// which its flyout has, and the room goes to the grant.
+func TestHoldingsModel_HasNoColumnForTheTax(t *testing.T) {
 	m, _ := newTestingHoldings(t)
-	assert.NotContains(t, ansi.Strip(m.View().Content), "Tax", "a window of 100 columns has no room for it")
+	require.True(t, m.portfolio.GainsTaxRate.Valid)
 
 	m.Update(tea.WindowSizeMsg{Width: 108, Height: 20})
 
 	frame := ansi.Strip(m.View().Content)
-	assert.Contains(t, frame, "│ Acquired    Symbol    From      Shares        Cost       Price      Gain             Tax           Value │")
-	assert.Contains(t, frame, "│ 2026-01-15  PANW      Pay…           6     $380.12     $396.25     +4.2%          $25.55       $2,377.50 │")
-	assert.Contains(t, frame, "│ 2026-02-15  PANW                   2.5           -     $396.25         -               -         $990.63 │")
-
-	p := testPortfolio()
-	p.GainsTaxRate = decimal.NullDecimal{}
-	m.Update(PortfolioLoadedMsg{portfolio: p})
-
-	frame = ansi.Strip(m.View().Content)
 	assert.NotContains(t, frame, "Tax")
 	assert.Contains(t, frame, "│ 2026-01-15  PANW      Payout                         6     $380.12     $396.25     +4.2%       $2,377.50 │")
 }
@@ -583,25 +572,21 @@ func TestPositions(t *testing.T) {
 
 // TestLotRow covers how one lot reads as a row of the Holdings table: the day it was acquired, its
 // symbol and the grant it was released from, and then the numbers - how many shares, what one cost
-// and is worth now, how far that is from the cost, with its sign, the tax that selling them would
-// cost at the rate of the account, and last what all of them are worth - right-aligned so that
+// and is worth now, how far that is from the cost, with its sign, and last what all of them are worth - right-aligned so that
 // their digits line up down the column. The table has no alignment of its own, so the values are padded
 // out to the width of their column.
 func TestLotRow(t *testing.T) {
 	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
-	rate := decimal.NewNullDecimal(dec("26.4"))
 
 	cases := map[string]struct {
 		lot      portfolio.Lot
 		quote    portfolio.Quote
-		rate     decimal.NullDecimal
 		expected table.Row
 	}{
 		"a lot released from a grant": {
 			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("6"), Acquired: day("2026-01-15"), Cost: dec("380.12"), Grant: "Payout"},
 			quote:    panw,
-			rate:     rate,
-			expected: table.Row{"2026-01-15", "PANW", "Payout", "         6", "   $380.12", "   $396.25", "   +4.2%", "        $25.55", "     $2,377.50"},
+			expected: table.Row{"2026-01-15", "PANW", "Payout", "         6", "   $380.12", "   $396.25", "   +4.2%", "     $2,377.50"},
 		},
 		// A lot entered by hand came from no grant, and says nothing about where it is from. One
 		// without a cost shows a dash for it, rather than shares that cost nothing, and for what
@@ -609,40 +594,30 @@ func TestLotRow(t *testing.T) {
 		"a fraction of a share, entered by hand without a cost": {
 			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("2.125"), Acquired: day("2026-02-15")},
 			quote:    panw,
-			rate:     rate,
-			expected: table.Row{"2026-02-15", "PANW", "", "     2.125", "         -", "   $396.25", "       -", "             -", "       $842.03"},
+			expected: table.Row{"2026-02-15", "PANW", "", "     2.125", "         -", "   $396.25", "       -", "       $842.03"},
 		},
 		"a value in the millions": {
 			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("12000"), Acquired: day("2020-06-01"), Cost: dec("75.5")},
 			quote:    panw,
-			rate:     rate,
-			expected: table.Row{"2020-06-01", "PANW", "", "     12000", "    $75.50", "   $396.25", " +424.8%", " $1,016,136.00", " $4,755,000.00"},
+			expected: table.Row{"2020-06-01", "PANW", "", "     12000", "    $75.50", "   $396.25", " +424.8%", " $4,755,000.00"},
 		},
-		// A sale at a loss is not taxed, which is no tax rather than none that is known.
 		"a lot that lost": {
 			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("3"), Acquired: day("2025-12-01"), Cost: dec("452.86")},
 			quote:    panw,
-			rate:     rate,
-			expected: table.Row{"2025-12-01", "PANW", "", "         3", "   $452.86", "   $396.25", "  -12.5%", "         $0.00", "     $1,188.75"},
+			expected: table.Row{"2025-12-01", "PANW", "", "         3", "   $452.86", "   $396.25", "  -12.5%", "     $1,188.75"},
 		},
 		// Without a quote there is nothing to value the lot at, which reads as a dash rather than
 		// as shares that are worth nothing.
 		"a lot without a quote": {
 			lot:      portfolio.Lot{Symbol: "SAP.DE", Shares: dec("5"), Acquired: day("2026-01-15"), Cost: dec("120")},
 			quote:    portfolio.Quote{},
-			rate:     rate,
-			expected: table.Row{"2026-01-15", "SAP.DE", "", "         5", "   $120.00", "         -", "       -", "             -", "             -"},
-		},
-		"an account without a gains tax rate": {
-			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("6"), Acquired: day("2026-01-15"), Cost: dec("380.12")},
-			quote:    panw,
-			expected: table.Row{"2026-01-15", "PANW", "", "         6", "   $380.12", "   $396.25", "   +4.2%", "             -", "     $2,377.50"},
+			expected: table.Row{"2026-01-15", "SAP.DE", "", "         5", "   $120.00", "         -", "       -", "             -"},
 		},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, c.expected, lotRow(c.lot, c.quote, c.rate))
+			assert.Equal(t, c.expected, lotRow(c.lot, c.quote))
 		})
 	}
 }
@@ -670,9 +645,11 @@ func TestHoldingsModel_ShowsDetails(t *testing.T) {
 
 // TestHoldingsModel_RenderDetails is the frame with the flyout open: it takes the right of the
 // table's box, from the top of it to the bottom, and leaves the left of every row in sight, which
-// says whose details these are.
+// says whose details these are. The window is a row taller than that of the other frames, which is
+// what the flyout takes to show its last row, the tax on the gain.
 func TestHoldingsModel_RenderDetails(t *testing.T) {
 	m, _ := newTestingHoldings(t)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 21})
 	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 	golden.RequireEqual(t, ansi.Strip(m.View().Content))
@@ -734,15 +711,17 @@ func TestHoldingsModel_DetailsHelp(t *testing.T) {
 // percentage has a row of its own, without a label, so that the dollars stand under the value they
 // are part of. What is not known reads as a dash, as it does in the row, and a gain is only known
 // with both a cost and a price. The value is in the style of a value and the gain in that of a gain
-// or a loss, and a dash is in none.
+// or a loss, and a dash is in none. In an account with a gains tax rate, the tax that selling the
+// lot would cost comes last: nothing for a loss, and a dash where the gain is not known.
 func TestLotDetails(t *testing.T) {
 	style := DefaultStyle()
 	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
 
-	tests := map[string]struct {
-		lot      portfolio.Lot
-		quote    portfolio.Quote
-		expected Flyout
+	cases := map[string]struct {
+		lot          portfolio.Lot
+		quote        portfolio.Quote
+		gainsTaxRate decimal.NullDecimal
+		expected     Flyout
 	}{
 		"a lot released from a grant, partly sold": {
 			lot: portfolio.Lot{
@@ -812,11 +791,85 @@ func TestLotDetails(t *testing.T) {
 				},
 			},
 		},
+		"a lot that gained, in an account with a gains tax rate": {
+			lot: portfolio.Lot{
+				Symbol: "PANW", Shares: dec("6"), Sold: dec("2"), Acquired: day("2026-01-15"),
+				Cost: dec("380.12"), Grant: "Payout",
+			},
+			quote:        panw,
+			gainsTaxRate: decimal.NewNullDecimal(dec("26.4")),
+			expected: Flyout{
+				Title: "PANW of 2026-01-15",
+				Sections: []FlyoutSection{
+					{Title: "Shares", Rows: []FlyoutRow{
+						{Label: "From", Value: "Payout"},
+						{Label: "Acquired", Value: "6"},
+						{Label: "Sold", Value: "2"},
+						{Label: "Left", Value: "4"},
+					}},
+					{Title: "Value", Rows: []FlyoutRow{
+						{Label: "Cost per share", Value: "$380.12"},
+						{Label: "Price per share", Value: "$396.25"},
+						{Label: "Value of what is left", Value: "$1,585.00", ValueStyle: style.Value},
+						{Label: "Gain", Value: "$64.52", ValueStyle: style.Gain},
+						{Value: "▲ 4.2%", ValueStyle: style.Gain},
+						{Label: "Tax on the gain", Value: "$17.03"},
+					}},
+				},
+			},
+		},
+		"a lot that lost, in an account with a gains tax rate": {
+			lot:          portfolio.Lot{Symbol: "PANW", Shares: dec("17"), Acquired: day("2025-10-01"), Cost: dec("691.5")},
+			quote:        panw,
+			gainsTaxRate: decimal.NewNullDecimal(dec("26.4")),
+			expected: Flyout{
+				Title: "PANW of 2025-10-01",
+				Sections: []FlyoutSection{
+					{Title: "Shares", Rows: []FlyoutRow{
+						{Label: "From", Value: "-"},
+						{Label: "Acquired", Value: "17"},
+						{Label: "Sold", Value: "0"},
+						{Label: "Left", Value: "17"},
+					}},
+					{Title: "Value", Rows: []FlyoutRow{
+						{Label: "Cost per share", Value: "$691.50"},
+						{Label: "Price per share", Value: "$396.25"},
+						{Label: "Value of what is left", Value: "$6,736.25", ValueStyle: style.Value},
+						{Label: "Gain", Value: "-$5,019.25", ValueStyle: style.Loss},
+						{Value: "▼ 42.7%", ValueStyle: style.Loss},
+						{Label: "Tax on the gain", Value: "$0.00"},
+					}},
+				},
+			},
+		},
+		"a lot without a cost or a quote, in an account with a gains tax rate": {
+			lot:          portfolio.Lot{Symbol: "SAP.DE", Shares: dec("2.5"), Acquired: day("2026-02-15")},
+			quote:        portfolio.Quote{},
+			gainsTaxRate: decimal.NewNullDecimal(dec("26.4")),
+			expected: Flyout{
+				Title: "SAP.DE of 2026-02-15",
+				Sections: []FlyoutSection{
+					{Title: "Shares", Rows: []FlyoutRow{
+						{Label: "From", Value: "-"},
+						{Label: "Acquired", Value: "2.5"},
+						{Label: "Sold", Value: "0"},
+						{Label: "Left", Value: "2.5"},
+					}},
+					{Title: "Value", Rows: []FlyoutRow{
+						{Label: "Cost per share", Value: "-"},
+						{Label: "Price per share", Value: "-"},
+						{Label: "Value of what is left", Value: "-"},
+						{Label: "Gain", Value: "-"},
+						{Label: "Tax on the gain", Value: "-"},
+					}},
+				},
+			},
+		},
 	}
 
-	for name, tt := range tests {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, lotDetails(tt.lot, tt.quote, style))
+			assert.Equal(t, c.expected, lotDetails(c.lot, c.quote, c.gainsTaxRate, style))
 		})
 	}
 }

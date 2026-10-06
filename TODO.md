@@ -60,9 +60,10 @@ Roughly in the order worth doing.
   losses of the sales that were recorded this year. The same goes for an allowance, such as the
   Sparer-Pauschbetrag in Germany.
 - **The gain of the account in the header**, next to the values, now that each lot shows its own.
-- **More columns for wider windows.** The Holdings table leaves out the gain and the tax where it
-  has no room, and stops growing at 120 columns. The gain in dollars and the value after tax could
-  be columns of a window wider than that.
+- **More columns for wider windows.** The Holdings table leaves out the gain where it has no room,
+  and stops growing at 120 columns. The gain in dollars could be a column of a window wider than
+  that. The tax on it had one and lost it to the details of a lot, so a column has to earn its
+  place.
 - **The account value over time**, as a chart or a table by month.
 - **A status bar widget**, such as a module for Waybar, that shows the account value from
   `folio status --json`.
