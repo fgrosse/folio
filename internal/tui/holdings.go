@@ -552,7 +552,7 @@ func (m *HoldingsModel) flyoutLayer(height int) *lipgloss.Layer {
 	}
 
 	lot := m.lots[i]
-	return lotDetails(lot, m.portfolio.Quotes[lot.Symbol], m.style).Layer(flyoutWidth, height, m.style)
+	return lotDetails(lot, m.portfolio.Quotes[lot.Symbol], m.portfolio.GainsTaxRate, m.style).Layer(flyoutWidth, height, m.style)
 }
 
 // dialogLayer renders whichever dialog is open, or returns nil if none is.
@@ -647,8 +647,11 @@ func positions(lots []portfolio.Lot) string {
 // with and how many of them were sold, where the row only has those that are left, and what those
 // have gained since. What is not known is a dash, as it is in the row, and the gain is known only
 // if both the cost and the price are. The value is in the gold of style, as the part of the total
-// that it is, and the gain in its green or, if it is a loss, its red.
-func lotDetails(lot portfolio.Lot, quote portfolio.Quote, style Style) Flyout {
+// that it is, and the gain in its green or, if it is a loss, its red. Under the gain is the tax that
+// selling the shares at that price would cost at gainsTaxRate, the number the row has in its Tax
+// column, which a narrow terminal leaves out. An account without that rate, where gainsTaxRate is
+// not valid, has no such row here either.
+func lotDetails(lot portfolio.Lot, quote portfolio.Quote, gainsTaxRate decimal.NullDecimal, style Style) Flyout {
 	from := noValue
 	if lot.Grant != "" {
 		from = lot.Grant
@@ -691,6 +694,10 @@ func lotDetails(lot portfolio.Lot, quote portfolio.Quote, style Style) Flyout {
 		value = append(value, FlyoutRow{Label: "Gain", Value: noValue})
 	}
 
+	if gainsTaxRate.Valid {
+		value = append(value, FlyoutRow{Label: "Tax on the gain", Value: lotTax(lot, quote, gainsTaxRate.Decimal)})
+	}
+
 	return Flyout{
 		Title: lot.Symbol + " of " + lot.Acquired.Format(time.DateOnly),
 		Sections: []FlyoutSection{
@@ -721,6 +728,18 @@ func lotGain(lot portfolio.Lot, price decimal.Decimal) (dollars, percent string)
 	return portfolio.FormatUSD(gain), arrow + " " + growth.Abs().StringFixed(1) + "%"
 }
 
+// lotTax renders the tax that selling the shares that are left of lot at quote would cost, at rate
+// in percent, such as "$17.03". It is a dash if the gain is not known, for want of a cost or of a
+// quote, which is then the zero Quote. A lot that lost is not taxed, which reads as "$0.00".
+func lotTax(lot portfolio.Lot, quote portfolio.Quote, rate decimal.Decimal) string {
+	gained, ok := lot.Gain(quote.Price)
+	if !ok || quote.Symbol == "" {
+		return noValue
+	}
+
+	return portfolio.FormatUSD(portfolio.GainsTax(gained, rate))
+}
+
 // lotRow renders a lot as a row of the Holdings table with all its columns: the grant it was
 // released from, if any, the shares that are left of it, what one of them cost, if that is known,
 // and what they are worth at quote, which is the zero Quote if there is none of the lot's stock.
@@ -740,8 +759,8 @@ func lotRow(lot portfolio.Lot, quote portfolio.Quote, gainsTaxRate decimal.NullD
 		if growth, ok := lot.GrowthPercent(quote.Price); ok {
 			gain = formatGrowth(growth)
 		}
-		if gained, ok := lot.Gain(quote.Price); ok && gainsTaxRate.Valid {
-			tax = portfolio.FormatUSD(portfolio.GainsTax(gained, gainsTaxRate.Decimal))
+		if gainsTaxRate.Valid {
+			tax = lotTax(lot, quote, gainsTaxRate.Decimal)
 		}
 	}
 
