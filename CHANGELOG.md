@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `folio config gains-tax-rate` sets the rate the gain of a sale is taxed at, and the Holdings view shows the tax that selling each lot would cost
 - `folio config show-net-summary true` shows the potential and the current value after tax in the header of the TUI, each marked net
 - The Holdings view leaves out the gain and the tax in a terminal too narrow for them
-- `enter` in the Holdings view shows the details of the selected lot next to the table, with what it has gained since it was acquired
+- `enter` in the Holdings view shows the details of the selected lot next to the table, with what it has gained since it was acquired and the tax that selling it would cost
 
 ## [v1.0.0] - 2026-10-02
 - Initial release

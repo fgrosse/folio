@@ -157,7 +157,8 @@ gained since. The Holdings view shows that gain for each lot, as how far the pri
 lot cost, such as `+4.2%`. With `folio config gains-tax-rate`, such as 26.4%, it also shows the tax
 that selling the lot today would cost. A lot that lost is not taxed, and its loss is not set
 against the gain of another lot. The two columns need room: the gain shows in a terminal of 92
-columns or more, and the tax in one of 108.
+columns or more, and the tax in one of 108. `enter` shows both for the selected lot in a panel next
+to the table, however narrow the terminal is.
 
 The three values are the bank's, before tax, unless you set `folio config show-net-summary true`.
 Then the header of the TUI shows the potential value after the tax on the vests and the current
