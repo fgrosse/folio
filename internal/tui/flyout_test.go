@@ -45,3 +45,30 @@ func TestFlyout_Layer(t *testing.T) {
 	assert.Equal(t, 30, layer.Width())
 	assert.Equal(t, 12, layer.Height())
 }
+
+// TestFlyout_LayerCutsOff covers a flyout that has more to say than it has room for, such as a lot
+// with a long list of sales in a small window: it stays the size it was asked for, with its frame
+// whole, and what does not fit is left out.
+func TestFlyout_LayerCutsOff(t *testing.T) {
+	f := Flyout{
+		Title: "PANW of 2026-01-15",
+		Sections: []FlyoutSection{
+			{Title: "Lot", Rows: []FlyoutRow{
+				{Label: "Acquired", Value: "2026-01-15"},
+				{Label: "Shares", Value: "6"},
+			}},
+		},
+	}
+
+	layer := f.Layer(30, 6, DefaultStyle())
+
+	expected := strings.Join([]string{
+		"╭────────────────────────────╮",
+		"│ PANW of 2026-01-15         │",
+		"│                            │",
+		"│ Lot                        │",
+		"│ Acquired        2026-01-15 │",
+		"╰────────────────────────────╯",
+	}, "\n")
+	assert.Equal(t, expected, ansi.Strip(layer.GetContent()))
+}

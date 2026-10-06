@@ -32,7 +32,8 @@ type FlyoutRow struct {
 
 // Layer renders the flyout as a compositor layer of exactly width by height cells, border included,
 // for the parent to position over its own view. The size is the parent's to say, since it is the
-// parent that knows what the flyout has to line up with.
+// parent that knows what the flyout has to line up with. What does not fit into the height is left
+// out.
 func (f Flyout) Layer(width, height int, style Style) *lipgloss.Layer {
 	box := style.Dialog.Width(width).Height(height)
 	inner := width - box.GetHorizontalFrameSize()
@@ -44,6 +45,12 @@ func (f Flyout) Layer(width, height int, style Style) *lipgloss.Layer {
 			gap := max(inner-lipgloss.Width(row.Label)-lipgloss.Width(row.Value), 1)
 			lines = append(lines, row.Label+strings.Repeat(" ", gap)+row.Value)
 		}
+	}
+
+	// The box grows with what is in it, so what does not fit is left out here, where that costs
+	// the last lines rather than the bottom of the frame.
+	if room := max(height-box.GetVerticalFrameSize(), 0); len(lines) > room {
+		lines = lines[:room]
 	}
 
 	return lipgloss.NewLayer(box.Render(strings.Join(lines, "\n")))
