@@ -606,6 +606,22 @@ func TestHoldingsModel_RenderDetails(t *testing.T) {
 	golden.RequireEqual(t, ansi.Strip(m.View().Content))
 }
 
+// TestHoldingsModel_DetailsWithNothingSelected covers enter in an account without lots: there are no
+// details to show, so nothing opens, and the help does not offer to close what is not there.
+func TestHoldingsModel_DetailsWithNothingSelected(t *testing.T) {
+	store := new(MockStore)
+	store.returns(Portfolio{})
+	m := NewHoldingsModel(store, quotes{}, DefaultStyle())
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
+	m.Update(runCmd(t, loadPortfolioCmd(store)))
+
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	frame := ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "enter details")
+	assert.NotContains(t, frame, "esc close")
+}
+
 // TestHoldingsModel_ClosesDetails covers getting rid of the flyout: with the key that opened it, and
 // with esc, which closes whatever else is in front of the table as well.
 func TestHoldingsModel_ClosesDetails(t *testing.T) {

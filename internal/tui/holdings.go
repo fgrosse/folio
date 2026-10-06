@@ -252,7 +252,9 @@ func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 	case key.Matches(msg, m.keys.Edit):
 		return m.editSelected()
 	case key.Matches(msg, m.keys.Details):
-		m.details = !m.details
+		// Without a lot to select there are no details to open, as there is nothing to edit.
+		i := m.table.Cursor()
+		m.details = !m.details && i >= 0 && i < len(m.lots)
 		return m, nil
 	case key.Matches(msg, m.keys.Close):
 		m.details = false
