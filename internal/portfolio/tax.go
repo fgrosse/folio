@@ -55,6 +55,17 @@ func AfterTax(value, rate decimal.Decimal) decimal.Decimal {
 	return value.Mul(hundred.Sub(rate)).Div(hundred).Round(2)
 }
 
+// GainsTax returns the tax that is due on gain, what a sale brought over what the shares cost, at
+// rate in percent and to the cent. A loss is not taxed. Neither does it earn anything back here:
+// what a loss is good for depends on the other sales of the year, which this does not know.
+func GainsTax(gain, rate decimal.Decimal) decimal.Decimal {
+	if !gain.IsPositive() {
+		return decimal.Zero
+	}
+
+	return gain.Mul(rate).Div(hundred).Round(2)
+}
+
 // ParseBasis parses which of a value to show, written as "gross" or "net".
 func ParseBasis(value string) (Basis, error) {
 	switch basis := Basis(strings.ToLower(strings.TrimSpace(value))); basis {

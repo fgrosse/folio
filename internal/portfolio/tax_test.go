@@ -75,3 +75,12 @@ func TestParseBasis(t *testing.T) {
 		})
 	}
 }
+
+// TestGainsTax covers the tax that is due on the gain of a sale, at a rate in percent and to the
+// cent. A loss is not taxed, and neither is a sale at what the shares cost.
+func TestGainsTax(t *testing.T) {
+	assert.Equal(t, "25.55", GainsTax(shares("96.78"), shares("26.4")).String())
+	assert.Equal(t, "0", GainsTax(shares("96.78"), shares("0")).String())
+	assert.Equal(t, "0", GainsTax(shares("-169.83"), shares("26.4")).String())
+	assert.Equal(t, "0", GainsTax(shares("0"), shares("26.4")).String())
+}
