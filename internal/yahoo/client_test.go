@@ -70,11 +70,11 @@ func TestClient_QuoteErrors(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(tt.status)
-				_, _ = w.Write([]byte(tt.body))
+				w.WriteHeader(c.status)
+				_, _ = w.Write([]byte(c.body))
 			}))
 			defer server.Close()
 
@@ -82,7 +82,7 @@ func TestClient_QuoteErrors(t *testing.T) {
 			client.baseURL = server.URL
 
 			_, err := client.Quote(t.Context(), "NOPE")
-			assert.EqualError(t, err, tt.error)
+			assert.EqualError(t, err, c.error)
 		})
 	}
 }

@@ -133,9 +133,9 @@ func TestQuoteStatus(t *testing.T) {
 		"no stock at all":          {symbols: nil, expected: ""},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, quoteStatus(tt.symbols, quotes))
+			assert.Equal(t, c.expected, quoteStatus(c.symbols, quotes))
 		})
 	}
 }

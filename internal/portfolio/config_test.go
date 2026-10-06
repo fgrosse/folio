@@ -23,14 +23,14 @@ func TestConfigKeys(t *testing.T) {
 
 	require.Len(t, ConfigKeys, len(cases), "every key should have a case")
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			key, err := ConfigKeyNamed(name)
 			require.NoError(t, err)
 
 			assert.NotEmpty(t, key.Description)
-			assert.Equal(t, tt.choices, key.Choices)
-			assert.Equal(t, tt.defaultValue, key.Default)
+			assert.Equal(t, c.choices, key.Choices)
+			assert.Equal(t, c.defaultValue, key.Default)
 
 			for _, choice := range key.Choices {
 				stored, err := key.Parse(choice)

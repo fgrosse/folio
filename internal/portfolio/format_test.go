@@ -25,9 +25,9 @@ func TestFormatUSD(t *testing.T) {
 		"an amount that is negative": {amount: "-1234.5", expected: "-$1,234.50"},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, FormatUSD(shares(tt.amount)))
+			assert.Equal(t, c.expected, FormatUSD(shares(c.amount)))
 		})
 	}
 }

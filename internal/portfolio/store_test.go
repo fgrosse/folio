@@ -94,11 +94,11 @@ func TestStore_SaveLotRefusesInvalidLots(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			s := NewTestingStore()
 
-			assert.EqualError(t, s.SaveLot(tt.lot), tt.error)
+			assert.EqualError(t, s.SaveLot(c.lot), c.error)
 
 			lots, err := s.Lots()
 			require.NoError(t, err)
@@ -524,9 +524,9 @@ func TestStore_SaveSaleRefusals(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.EqualError(t, s.SaveSale(tt.sale), tt.error)
+			assert.EqualError(t, s.SaveSale(c.sale), c.error)
 
 			sales, err := s.Sales()
 			require.NoError(t, err)

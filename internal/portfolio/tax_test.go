@@ -26,16 +26,16 @@ func TestParseTaxRate(t *testing.T) {
 		"more than all":            {spec: "120%", error: "a tax rate is between 0% and 100%, not 120%"},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			rate, err := ParseTaxRate(tt.spec)
-			if tt.error != "" {
-				assert.EqualError(t, err, tt.error)
+			rate, err := ParseTaxRate(c.spec)
+			if c.error != "" {
+				assert.EqualError(t, err, c.error)
 				return
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.rate, rate.String())
+			assert.Equal(t, c.rate, rate.String())
 		})
 	}
 }

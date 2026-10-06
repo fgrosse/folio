@@ -479,14 +479,14 @@ func TestHoldingsModel_SaleFormRefuses(t *testing.T) {
 		"before the lot was acquired": {shares: "4", price: "410.2", date: "2026-01-14", error: "the lot was only acquired on 2026-01-15"},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			m, _ := newTestingHoldings(t)
 
-			msg, err := newSale(m.lots[0], day("2026-10-02"))([]string{tt.shares, tt.price, tt.date, ""})
+			msg, err := newSale(m.lots[0], day("2026-10-02"))([]string{c.shares, c.price, c.date, ""})
 
 			assert.Nil(t, msg)
-			assert.EqualError(t, err, tt.error)
+			assert.EqualError(t, err, c.error)
 		})
 	}
 
@@ -574,9 +574,9 @@ func TestPositions(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, positions(tt.lots))
+			assert.Equal(t, c.expected, positions(c.lots))
 		})
 	}
 }
@@ -640,9 +640,9 @@ func TestLotRow(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, lotRow(tt.lot, tt.quote, tt.rate))
+			assert.Equal(t, c.expected, lotRow(c.lot, c.quote, c.rate))
 		})
 	}
 }

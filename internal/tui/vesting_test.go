@@ -235,16 +235,16 @@ func TestVestingModel_ReleaseDialogRefuses(t *testing.T) {
 		"too much":          {typed: "6 @380.12 net", error: `a release is written as "<shares> [@<cost>]"`},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			m := newTestingRelease(t)
-			m.input.SetValue(tt.typed)
+			m.input.SetValue(c.typed)
 
 			_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 
 			assert.Nil(t, cmd)
 			assert.True(t, m.CapturesKeys(), "the dialog should stay open")
-			assert.Contains(t, ansi.Strip(m.View().Content), tt.error)
+			assert.Contains(t, ansi.Strip(m.View().Content), c.error)
 		})
 	}
 }
@@ -310,9 +310,9 @@ func TestVestRow(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, vestRow(tt.vest, tt.quote, tt.rate, today))
+			assert.Equal(t, c.expected, vestRow(c.vest, c.quote, c.rate, today))
 		})
 	}
 }
@@ -352,9 +352,9 @@ func TestVestingSummary(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, vestingSummary(tt.vests, today))
+			assert.Equal(t, c.expected, vestingSummary(c.vests, today))
 		})
 	}
 }
@@ -382,9 +382,9 @@ func TestDueIn(t *testing.T) {
 		"years are rounded down":   {date: "2030-08-20", expected: "in 3 years"},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, dueIn(day(tt.date), today))
+			assert.Equal(t, c.expected, dueIn(day(c.date), today))
 		})
 	}
 }

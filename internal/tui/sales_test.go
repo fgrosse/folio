@@ -221,9 +221,9 @@ func TestSaleRow(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, saleRow(tt.sale))
+			assert.Equal(t, c.expected, saleRow(c.sale))
 		})
 	}
 }
@@ -262,9 +262,9 @@ func TestRealizedSummary(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, realizedSummary(tt.sales))
+			assert.Equal(t, c.expected, realizedSummary(c.sales))
 		})
 	}
 }

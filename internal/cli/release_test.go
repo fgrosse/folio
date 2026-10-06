@@ -76,15 +76,15 @@ func TestReleaseCmd_WhichVest(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			cmd, dbPath := NewTestingCmd(t, tt.args...)
+			cmd, dbPath := NewTestingCmd(t, c.args...)
 			seed(t, dbPath)
 			saveGrant(t, dbPath, bonus)
 
 			err := cmd.Execute()
-			if tt.error != "" {
-				assert.EqualError(t, err, tt.error)
+			if c.error != "" {
+				assert.EqualError(t, err, c.error)
 				assert.Len(t, lots(t, dbPath), 2, "nothing should be released")
 				return
 			}
@@ -92,7 +92,7 @@ func TestReleaseCmd_WhichVest(t *testing.T) {
 			require.NoError(t, err)
 			all := lots(t, dbPath)
 			require.Len(t, all, 3)
-			assert.Equal(t, tt.lot, all[2].Grant)
+			assert.Equal(t, c.lot, all[2].Grant)
 		})
 	}
 }

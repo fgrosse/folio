@@ -235,9 +235,9 @@ func TestGrantRow(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, grantRow(tt.grant, tt.quote))
+			assert.Equal(t, c.expected, grantRow(c.grant, c.quote))
 		})
 	}
 }

@@ -131,25 +131,25 @@ func TestConfigCmd_Outputs(t *testing.T) {
 		"unknown": {output: "xml", error: `"xml" is no output format: use yaml or json`},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			set, dbPath := NewTestingCmd(t, "config", "tax-rate", "44.3%")
 			require.NoError(t, set.Execute())
 
 			cmd := New()
-			cmd.SetArgs([]string{"--db", dbPath, "config", "--output", tt.output})
+			cmd.SetArgs([]string{"--db", dbPath, "config", "--output", c.output})
 			var out bytes.Buffer
 			cmd.SetOut(&out)
 
 			err := cmd.Execute()
-			if tt.error != "" {
-				assert.EqualError(t, err, tt.error)
+			if c.error != "" {
+				assert.EqualError(t, err, c.error)
 				assert.Empty(t, out.String())
 				return
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, out.String())
+			assert.Equal(t, c.expected, out.String())
 		})
 	}
 }

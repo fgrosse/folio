@@ -34,11 +34,11 @@ func TestNewLot(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			lot, err := NewLot(tt.spec)
+			lot, err := NewLot(c.spec)
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, lot)
+			assert.Equal(t, c.expected, lot)
 		})
 	}
 }
@@ -92,10 +92,10 @@ func TestNewLot_Errors(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, err := NewLot(tt.spec)
-			assert.EqualError(t, err, tt.error)
+			_, err := NewLot(c.spec)
+			assert.EqualError(t, err, c.error)
 		})
 	}
 }
@@ -137,11 +137,11 @@ func TestNewLot_Cost(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			lot, err := NewLot(tt.spec)
+			lot, err := NewLot(c.spec)
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, lot)
+			assert.Equal(t, c.expected, lot)
 		})
 	}
 }
@@ -164,16 +164,16 @@ func TestLot_String(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, tt.lot.String())
+			assert.Equal(t, c.expected, c.lot.String())
 
-			parsed, err := NewLot(tt.lot.String())
+			parsed, err := NewLot(c.lot.String())
 			require.NoError(t, err)
-			assert.Equal(t, tt.lot.Symbol, parsed.Symbol)
-			assert.Equal(t, tt.lot.Acquired, parsed.Acquired)
-			assert.True(t, tt.lot.Shares.Equal(parsed.Shares))
-			assert.True(t, tt.lot.Cost.Equal(parsed.Cost))
+			assert.Equal(t, c.lot.Symbol, parsed.Symbol)
+			assert.Equal(t, c.lot.Acquired, parsed.Acquired)
+			assert.True(t, c.lot.Shares.Equal(parsed.Shares))
+			assert.True(t, c.lot.Cost.Equal(parsed.Cost))
 		})
 	}
 }
@@ -201,17 +201,17 @@ func TestParseRelease(t *testing.T) {
 		"a cost that is nothing": {spec: "250 @0", error: `"@0" is not a cost such as @380.12`},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			released, cost, err := ParseRelease(tt.spec)
-			if tt.error != "" {
-				assert.EqualError(t, err, tt.error)
+			released, cost, err := ParseRelease(c.spec)
+			if c.error != "" {
+				assert.EqualError(t, err, c.error)
 				return
 			}
 
 			require.NoError(t, err)
-			assert.True(t, shares(tt.shares).Equal(released), "shares: %s", released)
-			assert.True(t, shares(tt.cost).Equal(cost), "cost: %s", cost)
+			assert.True(t, shares(c.shares).Equal(released), "shares: %s", released)
+			assert.True(t, shares(c.cost).Equal(cost), "cost: %s", cost)
 		})
 	}
 }

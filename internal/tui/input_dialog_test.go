@@ -72,14 +72,14 @@ func TestInputDialog_Cancel(t *testing.T) {
 		"ctrl+c":                  {typed: "12 PANW", key: tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}, expected: tea.QuitMsg{}},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			d := newTestingDialog()
-			typeInto(d, tt.typed)
+			typeInto(d, c.typed)
 
-			cmd := d.HandleKeyPress(tt.key)
+			cmd := d.HandleKeyPress(c.key)
 			require.NotNil(t, cmd)
-			assert.Equal(t, tt.expected, cmd())
+			assert.Equal(t, c.expected, cmd())
 		})
 	}
 }

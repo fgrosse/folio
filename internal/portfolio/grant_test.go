@@ -132,11 +132,11 @@ func TestNewGrant(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			grant, err := NewGrant(tt.spec)
+			grant, err := NewGrant(c.spec)
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, grant)
+			assert.Equal(t, c.expected, grant)
 		})
 	}
 }
@@ -208,10 +208,10 @@ func TestNewGrant_Errors(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, err := NewGrant(tt.spec)
-			assert.EqualError(t, err, tt.error)
+			_, err := NewGrant(c.spec)
+			assert.EqualError(t, err, c.error)
 		})
 	}
 }
@@ -267,10 +267,10 @@ func TestParseVests_Errors(t *testing.T) {
 		},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			_, err := ParseVests(tt.text)
-			assert.EqualError(t, err, tt.error)
+			_, err := ParseVests(c.text)
+			assert.EqualError(t, err, c.error)
 		})
 	}
 }

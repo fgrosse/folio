@@ -71,14 +71,14 @@ func TestConfigDialog_Select(t *testing.T) {
 		"k is up":                   {keys: []tea.KeyPressMsg{keyPressed("k")}, expected: "> show-net-summary"},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			d := NewConfigDialog(testConfigKeys(t), nil, dialogWidth, DefaultStyle())
-			for _, key := range tt.keys {
+			for _, key := range c.keys {
 				assert.Nil(t, d.HandleKeyPress(key), "moving the selection sends nothing")
 			}
 
-			assert.Contains(t, dialogText(d), tt.expected)
+			assert.Contains(t, dialogText(d), c.expected)
 		})
 	}
 
@@ -110,13 +110,13 @@ func TestConfigDialog_Choose(t *testing.T) {
 		"space picks the next":      {key: space, expected: "true"},
 	}
 
-	for name, tt := range cases {
+	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			d := NewConfigDialog(testConfigKeys(t), tt.values, dialogWidth, DefaultStyle())
+			d := NewConfigDialog(testConfigKeys(t), c.values, dialogWidth, DefaultStyle())
 			d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyDown})
 
-			cmd := d.HandleKeyPress(tt.key)
-			assert.Equal(t, SetConfigMsg{key: "show-net-summary", value: tt.expected}, runCmd(t, cmd))
+			cmd := d.HandleKeyPress(c.key)
+			assert.Equal(t, SetConfigMsg{key: "show-net-summary", value: c.expected}, runCmd(t, cmd))
 		})
 	}
 
