@@ -120,7 +120,7 @@ worked out from. `1`-`4` or `tab` switch views, `q` quits.
 
 | View | Shows | Keys |
 |---|---|---|
-| Holdings | Every lot that has shares left, and what they are worth | `a` add a lot, `e` edit, `s` sell shares of it, `d` delete |
+| Holdings | Every lot that has shares left, and what they are worth | `a` add a lot, `e` edit, `s` sell shares of it, `d` delete, `enter` show its details |
 | Vesting | Every vest that has not been released, in the order of their days, and what it is worth before and after tax | `r` release a vest that is due |
 | Grants | Every grant, with the shares still to come | `a` add a grant, `d` delete |
 | Sales | Every sale, with what it brought in and gained | `d` delete |

@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `folio config potential net` shows the potential value after tax in the header of the TUI, marked gross or net
 - `c` opens the configuration in the TUI, to set and unset its values without leaving it
 - `folio config --unset` takes a value of the configuration back
+- `enter` in the Holdings view shows the details of the selected lot next to the table, with what it has gained since it was acquired
 
 ## [v1.0.0] - 2026-10-02
 - Initial release
