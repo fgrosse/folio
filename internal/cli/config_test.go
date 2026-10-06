@@ -121,7 +121,7 @@ func TestConfigCmd_OutputWithKey(t *testing.T) {
 // without the flag, and json. Any other is refused with the ones there are, rather than printed as
 // one of them.
 func TestConfigCmd_Outputs(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		output   string
 		expected string
 		error    string
@@ -131,7 +131,7 @@ func TestConfigCmd_Outputs(t *testing.T) {
 		"unknown": {output: "xml", error: `"xml" is no output format: use yaml or json`},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			set, dbPath := NewTestingCmd(t, "config", "tax-rate", "44.3%")
 			require.NoError(t, set.Execute())

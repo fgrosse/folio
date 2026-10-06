@@ -58,7 +58,7 @@ func TestConfigDialog_Rows(t *testing.T) {
 func TestConfigDialog_Select(t *testing.T) {
 	up, down := tea.KeyPressMsg{Code: tea.KeyUp}, tea.KeyPressMsg{Code: tea.KeyDown}
 
-	tests := map[string]struct {
+	cases := map[string]struct {
 		keys     []tea.KeyPressMsg
 		expected string
 	}{
@@ -71,7 +71,7 @@ func TestConfigDialog_Select(t *testing.T) {
 		"k is up":                   {keys: []tea.KeyPressMsg{keyPressed("k")}, expected: "> show-net-summary"},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			d := NewConfigDialog(testConfigKeys(t), nil, dialogWidth, DefaultStyle())
 			for _, key := range tt.keys {
@@ -96,7 +96,7 @@ func TestConfigDialog_Choose(t *testing.T) {
 	left, right := tea.KeyPressMsg{Code: tea.KeyLeft}, tea.KeyPressMsg{Code: tea.KeyRight}
 	enter, space := tea.KeyPressMsg{Code: tea.KeyEnter}, tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
 
-	tests := map[string]struct {
+	cases := map[string]struct {
 		values   map[string]string
 		key      tea.KeyPressMsg
 		expected string
@@ -110,7 +110,7 @@ func TestConfigDialog_Choose(t *testing.T) {
 		"space picks the next":      {key: space, expected: "true"},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			d := NewConfigDialog(testConfigKeys(t), tt.values, dialogWidth, DefaultStyle())
 			d.HandleKeyPress(tea.KeyPressMsg{Code: tea.KeyDown})

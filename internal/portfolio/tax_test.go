@@ -10,7 +10,7 @@ import (
 // TestParseTaxRate covers how the rate that vests are taxed at is typed: as a percentage, with or
 // without its sign, and from none up to all of a vest.
 func TestParseTaxRate(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		spec  string
 		rate  string
 		error string
@@ -26,7 +26,7 @@ func TestParseTaxRate(t *testing.T) {
 		"more than all":            {spec: "120%", error: "a tax rate is between 0% and 100%, not 120%"},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			rate, err := ParseTaxRate(tt.spec)
 			if tt.error != "" {

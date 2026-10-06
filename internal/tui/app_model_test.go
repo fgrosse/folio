@@ -436,7 +436,7 @@ func TestAppModel_ConfigErrors(t *testing.T) {
 	store.On("GetConfig", portfolio.TaxRateKey).Return("44.3%", nil)
 	store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
 
-	tests := map[string]struct {
+	cases := map[string]struct {
 		msg      tea.Msg
 		expected string
 	}{
@@ -444,7 +444,7 @@ func TestAppModel_ConfigErrors(t *testing.T) {
 		"unset": {msg: UnsetConfigMsg{key: "tax-rate"}, expected: "unset tax-rate: disk full"},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			m := openConfig(t, store, map[string]string{"tax-rate": "44.3%"}, &stubView{title: "Holdings"})
 

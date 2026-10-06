@@ -92,7 +92,7 @@ func TestGraded_WholeShares(t *testing.T) {
 // every month, quarter or year, that many times, and with "<percent>/<percent>/..." in place of the
 // count for a grant that vests a different share of its shares in each year.
 func TestNewGrant(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		spec     string
 		expected Grant
 	}{
@@ -132,7 +132,7 @@ func TestNewGrant(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			grant, err := NewGrant(tt.spec)
 			require.NoError(t, err)
@@ -146,7 +146,7 @@ func TestNewGrant(t *testing.T) {
 func TestNewGrant_Errors(t *testing.T) {
 	const syntax = `a grant is written as "<name>: <shares> <symbol> <interval> x<count> from <YYYY-MM-DD>"`
 
-	tests := map[string]struct {
+	cases := map[string]struct {
 		spec  string
 		error string
 	}{
@@ -208,7 +208,7 @@ func TestNewGrant_Errors(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			_, err := NewGrant(tt.spec)
 			assert.EqualError(t, err, tt.error)
@@ -241,7 +241,7 @@ func TestParseVests(t *testing.T) {
 // TestParseVests_Errors covers the lines ParseVests refuses, each named by its number, since a
 // schedule of a few years is a long list to find a typo in.
 func TestParseVests_Errors(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		text  string
 		error string
 	}{
@@ -267,7 +267,7 @@ func TestParseVests_Errors(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			_, err := ParseVests(tt.text)
 			assert.EqualError(t, err, tt.error)

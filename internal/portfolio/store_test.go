@@ -72,7 +72,7 @@ func TestStore_LotsAreListedByDay(t *testing.T) {
 // TestStore_SaveLotRefusesInvalidLots covers what a lot has to have to be worth anything: a symbol
 // to look its price up by, shares to multiply it with, and the day they arrived.
 func TestStore_SaveLotRefusesInvalidLots(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		lot   Lot
 		error string
 	}{
@@ -94,7 +94,7 @@ func TestStore_SaveLotRefusesInvalidLots(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			s := NewTestingStore()
 
@@ -494,7 +494,7 @@ func TestStore_SaveSaleRefusals(t *testing.T) {
 	s := newSalesStore(t)
 	require.NoError(t, s.SaveSale(Sale{LotID: 1, Date: day("2026-09-15"), Shares: shares("50"), Price: shares("410.2")}))
 
-	tests := map[string]struct {
+	cases := map[string]struct {
 		sale  Sale
 		error string
 	}{
@@ -524,7 +524,7 @@ func TestStore_SaveSaleRefusals(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			assert.EqualError(t, s.SaveSale(tt.sale), tt.error)
 

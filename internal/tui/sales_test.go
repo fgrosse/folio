@@ -194,7 +194,7 @@ func TestViews_SelectTheFirstRow(t *testing.T) {
 // that brought in, and how much of it is gain over what the shares cost. A gain says which way it
 // goes with a sign, and a sale of a lot without a cost has none to state.
 func TestSaleRow(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		sale     portfolio.Sale
 		expected table.Row
 	}{
@@ -221,7 +221,7 @@ func TestSaleRow(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, saleRow(tt.sale))
 		})
@@ -236,7 +236,7 @@ func TestRealizedSummary(t *testing.T) {
 	loss := portfolio.Sale{Shares: dec("10"), Price: dec("150"), Cost: dec("162.5")}
 	uncosted := portfolio.Sale{Shares: dec("2.5"), Price: dec("330")}
 
-	tests := map[string]struct {
+	cases := map[string]struct {
 		sales    []portfolio.Sale
 		expected string
 	}{
@@ -262,7 +262,7 @@ func TestRealizedSummary(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, realizedSummary(tt.sales))
 		})

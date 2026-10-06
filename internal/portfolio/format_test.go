@@ -10,7 +10,7 @@ import (
 // always to the cent, with the thousands set apart, since an account value is a number of five or
 // six digits that is otherwise hard to take in at a glance.
 func TestFormatUSD(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		amount   string
 		expected string
 	}{
@@ -25,7 +25,7 @@ func TestFormatUSD(t *testing.T) {
 		"an amount that is negative": {amount: "-1234.5", expected: "-$1,234.50"},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, FormatUSD(shares(tt.amount)))
 		})

@@ -12,7 +12,7 @@ import (
 // applies while it is not set, if there is one. A value to pick and the default have to be ones the
 // key itself takes, written as it stores them.
 func TestConfigKeys(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		choices      []string
 		defaultValue string
 	}{
@@ -21,9 +21,9 @@ func TestConfigKeys(t *testing.T) {
 		ShowNetSummaryKey: {choices: []string{"false", "true"}, defaultValue: "false"},
 	}
 
-	require.Len(t, ConfigKeys, len(tests), "every key should have a case")
+	require.Len(t, ConfigKeys, len(cases), "every key should have a case")
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			key, err := ConfigKeyNamed(name)
 			require.NoError(t, err)

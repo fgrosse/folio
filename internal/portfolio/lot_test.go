@@ -12,7 +12,7 @@ import (
 // however it was typed. The day is optional, and a lot without one leaves it to the caller, who
 // knows what today is.
 func TestNewLot(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		spec     string
 		expected Lot
 	}{
@@ -34,7 +34,7 @@ func TestNewLot(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			lot, err := NewLot(tt.spec)
 			require.NoError(t, err)
@@ -46,7 +46,7 @@ func TestNewLot(t *testing.T) {
 // TestNewLot_Errors covers the specs NewLot refuses, each with an error that says what to type
 // instead: it is shown under the field of the dialog the spec was typed into.
 func TestNewLot_Errors(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		spec  string
 		error string
 	}{
@@ -92,7 +92,7 @@ func TestNewLot_Errors(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			_, err := NewLot(tt.spec)
 			assert.EqualError(t, err, tt.error)
@@ -105,7 +105,7 @@ func TestNewLot_Errors(t *testing.T) {
 // what a gain is measured from, and with it what tax is due on. The cost is optional and may come
 // before or after the day.
 func TestNewLot_Cost(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		spec     string
 		expected Lot
 	}{
@@ -137,7 +137,7 @@ func TestNewLot_Cost(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			lot, err := NewLot(tt.spec)
 			require.NoError(t, err)
@@ -150,7 +150,7 @@ func TestNewLot_Cost(t *testing.T) {
 // starts out with: exactly the syntax NewLot reads, so that a lot survives the round trip, and
 // without a cost if the lot has none.
 func TestLot_String(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		lot      Lot
 		expected string
 	}{
@@ -164,7 +164,7 @@ func TestLot_String(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, tt.lot.String())
 
@@ -182,7 +182,7 @@ func TestLot_String(t *testing.T) {
 // that arrived and what one was worth that day, with or without space around the "@". A release
 // without a cost has none.
 func TestParseRelease(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		spec   string
 		shares string
 		cost   string
@@ -201,7 +201,7 @@ func TestParseRelease(t *testing.T) {
 		"a cost that is nothing": {spec: "250 @0", error: `"@0" is not a cost such as @380.12`},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			released, cost, err := ParseRelease(tt.spec)
 			if tt.error != "" {

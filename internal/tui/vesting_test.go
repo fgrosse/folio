@@ -223,7 +223,7 @@ func TestVestingModel_ReleaseWithoutSpace(t *testing.T) {
 // something that is no number, no shares at all, and more shares than vested. It stays open and says
 // why under its field, rather than leaving it to the store to refuse once the dialog is gone.
 func TestVestingModel_ReleaseDialogRefuses(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		typed string
 		error string
 	}{
@@ -235,7 +235,7 @@ func TestVestingModel_ReleaseDialogRefuses(t *testing.T) {
 		"too much":          {typed: "6 @380.12 net", error: `a release is written as "<shares> [@<cost>]"`},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			m := newTestingRelease(t)
 			m.input.SetValue(tt.typed)
@@ -278,7 +278,7 @@ func TestVestRow(t *testing.T) {
 	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
 	rate := decimal.NewNullDecimal(dec("44.3"))
 
-	tests := map[string]struct {
+	cases := map[string]struct {
 		vest     grantVest
 		quote    portfolio.Quote
 		rate     decimal.NullDecimal
@@ -310,7 +310,7 @@ func TestVestRow(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, vestRow(tt.vest, tt.quote, tt.rate, today))
 		})
@@ -326,7 +326,7 @@ func TestVestingSummary(t *testing.T) {
 		return grantVest{grant: "Payout", symbol: "PANW", vest: portfolio.Vest{Date: day(date), Shares: dec("10")}}
 	}
 
-	tests := map[string]struct {
+	cases := map[string]struct {
 		vests    []grantVest
 		expected string
 	}{
@@ -352,7 +352,7 @@ func TestVestingSummary(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, vestingSummary(tt.vests, today))
 		})
@@ -366,7 +366,7 @@ func TestVestingSummary(t *testing.T) {
 func TestDueIn(t *testing.T) {
 	today := day("2026-10-02")
 
-	tests := map[string]struct {
+	cases := map[string]struct {
 		date     string
 		expected string
 	}{
@@ -382,7 +382,7 @@ func TestDueIn(t *testing.T) {
 		"years are rounded down":   {date: "2030-08-20", expected: "in 3 years"},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, dueIn(day(tt.date), today))
 		})

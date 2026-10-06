@@ -197,7 +197,7 @@ func TestGrantsModel_RenderDeleteDialog(t *testing.T) {
 func TestGrantRow(t *testing.T) {
 	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
 
-	tests := map[string]struct {
+	cases := map[string]struct {
 		grant    portfolio.Grant
 		quote    portfolio.Quote
 		expected table.Row
@@ -235,7 +235,7 @@ func TestGrantRow(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, grantRow(tt.grant, tt.quote))
 		})

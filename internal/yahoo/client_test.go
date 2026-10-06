@@ -48,7 +48,7 @@ func TestClient_Quote(t *testing.T) {
 // TestClient_QuoteErrors covers the ways Yahoo says no: a symbol it does not know, which comes with
 // a description worth passing on, and a request it turns away, such as when there were too many.
 func TestClient_QuoteErrors(t *testing.T) {
-	tests := map[string]struct {
+	cases := map[string]struct {
 		status int
 		body   string
 		error  string
@@ -70,7 +70,7 @@ func TestClient_QuoteErrors(t *testing.T) {
 		},
 	}
 
-	for name, tt := range tests {
+	for name, tt := range cases {
 		t.Run(name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(tt.status)
