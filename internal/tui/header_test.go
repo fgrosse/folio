@@ -20,16 +20,18 @@ import (
 func TestAccountHeader(t *testing.T) {
 	account := portfolio.Account{Current: dec("3368.13"), Potential: dec("7925")}
 
-	header := accountHeader("8.5 PANW", "PANW $396.25", account, portfolio.Gross, 66, DefaultStyle())
+	values := shownValues{account: account, current: portfolio.Gross, potential: portfolio.Gross}
+
+	header := accountHeader("8.5 PANW", "PANW $396.25", values, 74, DefaultStyle())
 
 	expected := "" +
-		"  8.5 PANW                                         Total: $11,293.13\n" +
-		"  PANW $396.25       Current $3,368.13 · Potential (gross) $7,925.00"
+		"  8.5 PANW                                                 Total: $11,293.13\n" +
+		"  PANW $396.25       Current (gross) $3,368.13 · Potential (gross) $7,925.00"
 	assert.Equal(t, expected, ansi.Strip(header))
 
 	// Both lines end in the column the table's last cell does: the indent and the width given.
 	for line := range strings.SplitSeq(expected, "\n") {
-		assert.Equal(t, 68, lipgloss.Width(line))
+		assert.Equal(t, 76, lipgloss.Width(line))
 	}
 }
 
@@ -48,18 +50,18 @@ func TestPortfolioHeader_PotentialBasis(t *testing.T) {
 		"gross": {
 			basis: portfolio.Gross,
 			total: "Total: $11,293.13",
-			parts: "Current $3,368.13 · Potential (gross) $7,925.00",
+			parts: "Current (gross) $3,368.13 · Potential (gross) $7,925.00",
 		},
 		"net": {
 			basis: portfolio.Net,
 			total: "Total: $7,782.36",
-			parts: "Current $3,368.13 · Potential (net) $4,414.23",
+			parts: "Current (gross) $3,368.13 · Potential (net) $4,414.23",
 		},
 		"net without a tax rate": {
 			basis:     portfolio.Net,
 			noTaxRate: true,
 			total:     "Total: $11,293.13",
-			parts:     "Current $3,368.13 · Potential (gross) $7,925.00",
+			parts:     "Current (gross) $3,368.13 · Potential (gross) $7,925.00",
 		},
 	}
 
@@ -69,6 +71,58 @@ func TestPortfolioHeader_PotentialBasis(t *testing.T) {
 			p.PotentialBasis = tt.basis
 			if tt.noTaxRate {
 				p.TaxRate = decimal.NullDecimal{}
+			}
+
+			lines := strings.Split(ansi.Strip(portfolioHeader("8.5 PANW", p, nil, 80, DefaultStyle())), "\n")
+
+			require.Len(t, lines, 2)
+			assert.True(t, strings.HasSuffix(lines[0], tt.total), "%q should end in %q", lines[0], tt.total)
+			assert.True(t, strings.HasSuffix(lines[1], tt.parts), "%q should end in %q", lines[1], tt.parts)
+		})
+	}
+}
+
+// TestPortfolioHeader_CurrentBasis covers the current value the header shows, which is the bank's
+// unless the account asks for it after tax: then it is what the shares that are held would bring
+// if they were sold today, less the tax on the gain of each lot, and says so. The total counts the
+// value that is shown, next to a potential value that has a basis of its own. Without a gains tax
+// rate there is nothing to take off, and the header says it shows the bank's number.
+func TestPortfolioHeader_CurrentBasis(t *testing.T) {
+	tests := map[string]struct {
+		current   portfolio.Basis
+		potential portfolio.Basis
+		noRate    bool
+		total     string
+		parts     string
+	}{
+		"net": {
+			current:   portfolio.Net,
+			potential: portfolio.Gross,
+			total:     "Total: $11,267.58",
+			parts:     "Current (net) $3,342.58 · Potential (gross) $7,925.00",
+		},
+		"both net": {
+			current:   portfolio.Net,
+			potential: portfolio.Net,
+			total:     "Total: $7,756.81",
+			parts:     "Current (net) $3,342.58 · Potential (net) $4,414.23",
+		},
+		"net without a gains tax rate": {
+			current:   portfolio.Net,
+			potential: portfolio.Gross,
+			noRate:    true,
+			total:     "Total: $11,293.13",
+			parts:     "Current (gross) $3,368.13 · Potential (gross) $7,925.00",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := testPortfolio()
+			p.CurrentBasis = tt.current
+			p.PotentialBasis = tt.potential
+			if tt.noRate {
+				p.GainsTaxRate = decimal.NullDecimal{}
 			}
 
 			lines := strings.Split(ansi.Strip(portfolioHeader("8.5 PANW", p, nil, 80, DefaultStyle())), "\n")
