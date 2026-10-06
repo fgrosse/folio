@@ -7,6 +7,7 @@
 │ 2026-02-15  PANW  │ > tax-rate        44.3%                                  │ -         $990.63 │
 │                   │   potential       ‹ gross ›                              │                   │
 │                   │   gains-tax-rate  26.4%                                  │                   │
+│                   │   current         ‹ gross ›                              │                   │
 │                   │                                                          │                   │
 │                   │ The rate that the shares still to vest are taxed at, as  │                   │
 │                   │ a percentage: your estimate of the rate at the top of    │                   │
@@ -14,7 +15,6 @@
 │                   │                                                          │                   │
 │                   │ ↑/k up • ↓/j down • enter edit • esc close               │                   │
 │                   ╰──────────────────────────────────────────────────────────╯                   │
-│                                                                                                  │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘
 ↑/k up • ↓/j down • q quit
 a add • e edit • s sell • d delete

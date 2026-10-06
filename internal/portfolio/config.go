@@ -21,16 +21,21 @@ var ConfigKeys = []ConfigKey{
 			"or net, what is left of it after tax at the tax rate.",
 		Choices: []string{string(Gross), string(Net)},
 		Default: string(Gross),
-		Parse: func(value string) (string, error) {
-			basis, err := ParseBasis(value)
-			return string(basis), err
-		},
+		Parse:   parseStoredBasis,
 	},
 	{
 		Name: GainsTaxRateKey,
 		Description: "The rate that the gain of a sale is taxed at, as a percentage: what " +
 			"selling the shares you hold would cost of what they gained since you got them.",
 		Parse: parseStoredTaxRate,
+	},
+	{
+		Name: CurrentBasisKey,
+		Description: "Which current value the header shows: gross, as the bank states it, " +
+			"or net, what is left of it after tax on the gains at the gains tax rate.",
+		Choices: []string{string(Gross), string(Net)},
+		Default: string(Gross),
+		Parse:   parseStoredBasis,
 	},
 }
 
@@ -42,6 +47,12 @@ func parseStoredTaxRate(value string) (string, error) {
 	}
 
 	return rate.String() + "%", nil
+}
+
+// parseStoredBasis checks a basis and returns it as the store keeps it, in small letters.
+func parseStoredBasis(value string) (string, error) {
+	basis, err := ParseBasis(value)
+	return string(basis), err
 }
 
 // A ConfigKey is a value of the configuration of an account, by the name that folio config knows

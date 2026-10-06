@@ -19,6 +19,10 @@ const GainsTaxRateKey = "gains-tax-rate"
 // in its header, as ParseBasis reads it. It is gross when it is not set.
 const PotentialBasisKey = "potential"
 
+// CurrentBasisKey is the key of the configuration that says which current value the TUI shows in
+// its header, as ParseBasis reads it. It is gross when it is not set.
+const CurrentBasisKey = "current"
+
 const (
 	// Gross is a value before tax, as the bank states it.
 	Gross Basis = "gross"

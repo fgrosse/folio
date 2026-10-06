@@ -45,6 +45,13 @@ The keys are:
       selling the shares you hold would cost of what they gained since you got
       them. With it, the Holdings view shows the tax that selling each lot at
       the price of today would cost. A lot that lost is not taxed.
+
+  current
+      Which current value the TUI shows in its header: gross, the value of the
+      shares you hold as the bank states it, or net, what is left of it after
+      tax on the gains at the gains tax rate, as if you sold them all today.
+      With net, the total counts the current value after tax. It is gross if
+      it is not set, and gross too without a gains tax rate to take off.
 `,
 		Example: `
   # Have vests taxed at 44.3%
@@ -58,6 +65,9 @@ The keys are:
 
   # Have the gain of a sale taxed at 26.4%
   folio config gains-tax-rate 26.4%
+
+  # Show the current value after tax on the gains in the TUI
+  folio config current net
 
   # Have vests taxed at no rate again
   folio config --unset tax-rate
