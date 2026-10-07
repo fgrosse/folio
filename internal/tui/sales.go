@@ -50,7 +50,13 @@ type SalesModel struct {
 	showPrice bool           // the window has room for the column of the price as well
 	portfolio Portfolio      // the account as it was last loaded
 	err       error          // why the last load failed or had no fresh quotes, nil unless it did
-	confirm   *ConfirmDialog // the dialog asking whether to delete a sale, nil unless it is open
+	confirm   *ConfirmDialog // the dialog asking whether to delete or clear sales, nil unless it is open
+	confirms  string         // what a yes to that dialog does, in a word for the help
+}
+
+// ClearSalesMsg reports that the user confirmed marking the sales with the given IDs as cleared.
+type ClearSalesMsg struct {
+	ids []int
 }
 
 // DeleteSaleMsg reports that the user confirmed deleting the sale with the given ID.
@@ -167,6 +173,9 @@ func (m *SalesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case DeleteSaleMsg:
 		m.confirm = nil
 		return m, m.deleteSaleCmd(msg.id)
+	case ClearSalesMsg:
+		m.confirm = nil
+		return m, m.clearSalesCmd(msg.ids, true)
 	case ConfirmCanceledMsg:
 		m.confirm = nil
 		return m, nil
@@ -176,7 +185,8 @@ func (m *SalesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // handleKeyPress quits on the quit keys, asks whether to delete the selected sale on the delete key,
-// clears it or takes that back on the clear key, and hands every other key to the table, which moves the selection. While the question is open,
+// clears it or takes that back on the clear key, asks whether to clear the sales of its year on
+// the key for that, and hands every other key to the table, which moves the selection. While the question is open,
 // every key is its own.
 func (m *SalesModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.confirm != nil {
@@ -190,6 +200,8 @@ func (m *SalesModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.askToDelete()
 	case key.Matches(msg, m.keys.Clear):
 		return m.toggleCleared()
+	case key.Matches(msg, m.keys.ClearYear):
+		return m.askToClearYear()
 	}
 
 	var cmd tea.Cmd
@@ -217,6 +229,42 @@ func (m *SalesModel) askToDelete() (tea.Model, tea.Cmd) {
 
 	question := fmt.Sprintf("Delete the sale of %s %s on %s?", sale.Shares, sale.Symbol, sale.Date.Format(time.DateOnly))
 	m.confirm = NewConfirmDialog("Delete sale", question, DeleteSaleMsg{id: sale.ID}, m.style)
+	m.confirms = "delete"
+
+	return m, nil
+}
+
+// askToClearYear opens a dialog asking whether to clear every sale of the year of the selected one
+// that is not cleared yet, which sends a ClearSalesMsg if the answer is yes. A tax return settles
+// the sales of one year, so that is what is cleared in one go, and the later sales stay owed. The
+// question says what tax goes with them if the account has a rate to work it out with. In a year
+// with nothing left to clear there is nothing to ask.
+func (m *SalesModel) askToClearYear() (tea.Model, tea.Cmd) {
+	selected, ok := m.selected()
+	if !ok {
+		return m, nil
+	}
+
+	year := selected.Date.Year()
+	var open []portfolio.Sale
+	var ids []int
+	for _, sale := range m.portfolio.Sales {
+		if sale.Date.Year() == year && !sale.Cleared {
+			open = append(open, sale)
+			ids = append(ids, sale.ID)
+		}
+	}
+	if len(open) == 0 {
+		return m, nil
+	}
+
+	question := fmt.Sprintf("Mark %s of %d as cleared", count(len(open), "sale"), year)
+	if rate := m.portfolio.GainsTaxRate; rate.Valid {
+		question += ", with " + portfolio.FormatUSD(portfolio.TaxOwed(open, rate.Decimal)) + " of tax"
+	}
+
+	m.confirm = NewConfirmDialog("Clear tax year", question+"?", ClearSalesMsg{ids: ids}, m.style)
+	m.confirms = "clear"
 
 	return m, nil
 }
@@ -309,7 +357,7 @@ func (m *SalesModel) helpView() string {
 
 	if m.confirm != nil {
 		return help.ShortHelpView([]key.Binding{
-			key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "delete")),
+			key.NewBinding(key.WithKeys("y"), key.WithHelp("y", m.confirms)),
 			key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "cancel")),
 		}) + "\n"
 	}
@@ -321,7 +369,7 @@ func (m *SalesModel) helpView() string {
 	}
 
 	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n" +
-		help.ShortHelpView([]key.Binding{m.keys.Delete, toggle})
+		help.ShortHelpView([]key.Binding{m.keys.Delete, toggle, m.keys.ClearYear})
 }
 
 // realizedSummary sums up sales as the money they brought in, the gain in it and the tax that is

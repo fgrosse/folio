@@ -204,6 +204,58 @@ func TestSalesModel_ClearSale(t *testing.T) {
 	assert.Nil(t, cmd)
 }
 
+// TestSalesModel_ClearYear covers what follows a tax return, which settles the sales of a year at
+// once: C asks whether to clear every sale of the year of the selected one that is not cleared yet,
+// saying how many they are and what tax goes with them, and a y has the store clear them together.
+// The sales of other years are left alone. A no clears nothing, and in a year with nothing left to
+// clear there is nothing to ask.
+func TestSalesModel_ClearYear(t *testing.T) {
+	p := soldPortfolio()
+	p.Sales = append(p.Sales,
+		portfolio.Sale{
+			ID: 3, LotID: 1, Date: day("2026-12-01"), Shares: dec("1"), Price: dec("420"),
+			Symbol: "PANW", Cost: dec("380.12"), Grant: "Payout", Cleared: true,
+		},
+		portfolio.Sale{
+			ID: 4, LotID: 1, Date: day("2027-01-10"), Shares: dec("1"), Price: dec("430"),
+			Symbol: "PANW", Cost: dec("380.12"), Grant: "Payout", Cleared: true,
+		},
+	)
+	store := new(MockStore)
+	store.returns(p)
+	m := NewSalesModel(store, DefaultStyle())
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
+	m.Update(runCmd(t, m.Init()))
+	assert.Contains(t, ansi.Strip(m.View().Content), "c clear tax • C clear year")
+
+	m.Update(keyPressed("C"))
+	require.True(t, m.CapturesKeys(), "the question should take the keyboard")
+	frame := ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "Mark 2 sales of 2026 as cleared, with $19.23 of tax?")
+	assert.Contains(t, frame, "y clear • n cancel")
+
+	_, cmd := m.Update(keyPressed("n"))
+	_, cmd = m.Update(runCmd(t, cmd))
+	assert.Nil(t, cmd)
+	assert.False(t, m.CapturesKeys(), "a no should close the question")
+
+	m.Update(keyPressed("C"))
+	_, cmd = m.Update(keyPressed("y"))
+	msg := runCmd(t, cmd)
+	require.Equal(t, ClearSalesMsg{ids: []int{1, 2}}, msg)
+
+	store.On("ClearSales", []int{1, 2}, true).Return(nil)
+	_, cmd = m.Update(msg)
+	assert.False(t, m.CapturesKeys(), "the question should be closed")
+	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
+	store.AssertExpectations(t)
+
+	m.table.SetCursor(3) // the sale of 2027, which is cleared
+	_, cmd = m.Update(keyPressed("C"))
+	assert.Nil(t, cmd)
+	assert.False(t, m.CapturesKeys(), "there should be no question to answer")
+}
+
 // TestSalesModel_DeleteWithNothingSelected covers d before anything was sold, where there is nothing
 // to ask about.
 func TestSalesModel_DeleteWithNothingSelected(t *testing.T) {
