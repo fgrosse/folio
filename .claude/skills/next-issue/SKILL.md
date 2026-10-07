@@ -14,7 +14,7 @@ If an issue number was given, that is the issue. Otherwise it is the first line 
 
 ```sh
 gh issue list --state open --limit 1 \
-  --search 'label:size/S,size/M,size/L -label:needs-discussion no:assignee -linked:pr sort:created-asc'
+  --search 'label:"size:S","size:M","size:L" -label:needs-discussion no:assignee -linked:pr sort:created-asc'
 ```
 
 That is the oldest open issue that has a size, whose design is settled, and that nobody has taken.

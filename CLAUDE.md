@@ -191,9 +191,9 @@ issue is work that is still to do, and closing it is what marks it done: a pull 
 - **An issue says what is missing and why it matters**, in a few sentences, then what to build,
   and the code it touches if that is known. It gets one size label, and `needs-discussion` on top
   as long as its design is open, which keeps it from being picked up:
-  - `size/S`: one or two red-green cycles, in one package or one view.
-  - `size/M`: several cycles across the domain and a front end, maybe a migration.
-  - `size/L`: a new concept, with new data, a new source or a design that is still open.
+  - `size:S`: one or two red-green cycles, in one package or one view.
+  - `size:M`: several cycles across the domain and a front end, maybe a migration.
+  - `size:L`: a new concept, with new data, a new source or a design that is still open.
 - **The next issue to work on** is the oldest open one with a size label and without
   `needs-discussion`. The `next-issue` skill picks it, builds it in a worktree and opens the pull
   request.
