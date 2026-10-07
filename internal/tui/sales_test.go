@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"charm.land/bubbles/v2/table"
@@ -59,8 +60,8 @@ func TestSalesModel_LoadsPortfolio(t *testing.T) {
 	p := soldPortfolio()
 	rows := m.table.Rows()
 	require.Len(t, rows, 2)
-	assert.Equal(t, saleRow(p.Sales[0], p.GainsTaxRate), rows[0])
-	assert.Equal(t, saleRow(p.Sales[1], p.GainsTaxRate), rows[1])
+	assert.Equal(t, table.Row(shownSale(m, saleRow(p.Sales[0], p.GainsTaxRate))), rows[0])
+	assert.Equal(t, table.Row(shownSale(m, saleRow(p.Sales[1], p.GainsTaxRate))), rows[1])
 	store.AssertExpectations(t)
 }
 
@@ -78,6 +79,48 @@ func TestSalesModel_Keys(t *testing.T) {
 	require.Equal(t, 0, m.table.Cursor())
 	m.Update(keyPressed("j"))
 	assert.Equal(t, 1, m.table.Cursor(), "j should move the selection down a row")
+}
+
+// TestSalesModel_Columns covers which columns the Sales table has at which width. What a sale
+// brought in, the tax on it and its gain are in every window. The price of a share, which the
+// proceeds and the shares imply, is only in one wide enough to leave the grant its room as well,
+// and the narrowest window does without the grant too. A row has a cell for every column.
+func TestSalesModel_Columns(t *testing.T) {
+	cases := map[string]struct {
+		width    int
+		expected []string
+	}{
+		"the narrowest window": {
+			width:    82,
+			expected: []string{"Sold on", "Symbol", "Shares", "Proceeds", "Tax", "Gain"},
+		},
+		"room for the grant": {
+			width:    100,
+			expected: []string{"Sold on", "Symbol", "From", "Shares", "Proceeds", "Tax", "Gain"},
+		},
+		"room for the price": {
+			width:    110,
+			expected: []string{"Sold on", "Symbol", "From", "Shares", "Price", "Proceeds", "Tax", "Gain"},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			m, _ := newTestingSales(t)
+			m.Update(tea.WindowSizeMsg{Width: c.width, Height: 20})
+
+			var titles []string
+			width := 0
+			for _, column := range m.table.Columns() {
+				titles = append(titles, strings.TrimSpace(column.Title))
+				width += column.Width + cellPadding
+			}
+
+			assert.Equal(t, c.expected, titles)
+			assert.Equal(t, tableWidth(c.width), width, "the columns should fill the table")
+			assert.Len(t, m.table.Rows()[0], len(c.expected))
+		})
+	}
 }
 
 // TestSalesModel_Render is the frame the Sales view puts on screen, in the shape of the other

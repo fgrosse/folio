@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -19,10 +20,19 @@ const (
 	// front of it.
 	taxColumnWidth = 12
 
-	// salesColumnsWidth is what every column of the Sales table other than the grant occupies,
-	// padding included.
-	salesColumnsWidth = dayColumnWidth + symbolColumnWidth + sharesColumnWidth + priceColumnWidth + 2*valueColumnWidth +
-		taxColumnWidth + 7*cellPadding
+	// salesColumnsWidth is what the columns of the Sales table that are always there occupy, with
+	// their padding. They are all of the narrowest window: the grant and the price of a share are
+	// only in a window with room for them, which is what SalesModel.layout decides.
+	salesColumnsWidth = dayColumnWidth + symbolColumnWidth + sharesColumnWidth + 2*valueColumnWidth + taxColumnWidth +
+		6*cellPadding
+
+	// saleGrantMinWidth is the least room the column of the grant is worth having with.
+	saleGrantMinWidth = 8
+
+	// saleGrantColumn and salePriceColumn are where the grant and the price stand among all the
+	// columns, for leaving them out.
+	saleGrantColumn = 2
+	salePriceColumn = 4
 
 	// clearedMark stands in front of the tax on a sale that is cleared.
 	clearedMark = "✓"
@@ -36,6 +46,8 @@ type SalesModel struct {
 	keys      keyMap
 	table     table.Model
 	width     int            // width of the table, which the header line is spread across
+	showGrant bool           // the window has room for the column of the grant
+	showPrice bool           // the window has room for the column of the price as well
 	portfolio Portfolio      // the account as it was last loaded
 	err       error          // why the last load failed or had no fresh quotes, nil unless it did
 	confirm   *ConfirmDialog // the dialog asking whether to delete a sale, nil unless it is open
@@ -60,20 +72,59 @@ func NewSalesModel(store Store, style Style) *SalesModel {
 	return m
 }
 
+// layout decides which columns the table has room for at its width and sets it up with those, and
+// with the rows to match. The tax on a sale is always among them, since what is owed is what the
+// view keeps track of. The grant comes first of the two that are not: no other column says where
+// the shares were from, while the price of one is the proceeds over the shares.
+func (m *SalesModel) layout() {
+	room := m.width - salesColumnsWidth - cellPadding
+	m.showGrant = room >= saleGrantMinWidth
+	m.showPrice = room-priceColumnWidth-cellPadding >= saleGrantMinWidth
+
+	// The table renders every row with the columns it has, so the rows go before the columns
+	// change in number and come back after.
+	cursor := m.table.Cursor()
+	m.table.SetRows(nil)
+	m.table.SetColumns(m.columns())
+	m.updateRows()
+	m.table.SetCursor(cursor)
+}
+
+// shownSale returns those of cells, which are one for every column of the table, whose columns the
+// window has room for. It is what keeps the columns and the cells of a row the same in number.
+func shownSale[T any](m *SalesModel, cells []T) []T {
+	cells = slices.Clone(cells)
+
+	// The price is the later of the two, so that leaving it out does not move the grant.
+	if !m.showPrice {
+		cells = slices.Delete(cells, salePriceColumn, salePriceColumn+1)
+	}
+	if !m.showGrant {
+		cells = slices.Delete(cells, saleGrantColumn, saleGrantColumn+1)
+	}
+
+	return cells
+}
+
 // columns returns the table's columns, the column of the grant taking whatever the width leaves.
 // The titles of the number columns are padded like the numbers under them, so that they end where
 // the numbers do.
 func (m *SalesModel) columns() []table.Column {
-	return []table.Column{
+	grantWidth := m.width - salesColumnsWidth - cellPadding
+	if m.showPrice {
+		grantWidth -= priceColumnWidth + cellPadding
+	}
+
+	return shownSale(m, []table.Column{
 		{Title: "Sold on", Width: dayColumnWidth},
 		{Title: "Symbol", Width: symbolColumnWidth},
-		{Title: "From", Width: max(m.width-salesColumnsWidth-cellPadding, 0)},
+		{Title: "From", Width: grantWidth},
 		{Title: fmt.Sprintf("%*s", sharesColumnWidth, "Shares"), Width: sharesColumnWidth},
 		{Title: fmt.Sprintf("%*s", priceColumnWidth, "Price"), Width: priceColumnWidth},
 		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Proceeds"), Width: valueColumnWidth},
 		{Title: fmt.Sprintf("%*s", taxColumnWidth, "Tax"), Width: taxColumnWidth},
 		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Gain"), Width: valueColumnWidth},
-	}
+	})
 }
 
 // Title implements ViewModel by naming the view in the app's tab bar.
@@ -100,7 +151,7 @@ func (m *SalesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKeyPress(msg)
 	case tea.WindowSizeMsg:
 		m.width = tableWidth(msg.Width)
-		m.table.SetColumns(m.columns())
+		m.layout()
 		m.table.SetWidth(m.width)
 		m.table.SetHeight(msg.Height - chromeHeight)
 		return m, nil
@@ -185,7 +236,7 @@ func (m *SalesModel) deleteSaleCmd(id int) tea.Cmd {
 func (m *SalesModel) updateRows() {
 	rows := make([]table.Row, len(m.portfolio.Sales))
 	for i, sale := range m.portfolio.Sales {
-		rows[i] = saleRow(sale, m.portfolio.GainsTaxRate)
+		rows[i] = shownSale(m, saleRow(sale, m.portfolio.GainsTaxRate))
 	}
 
 	setRows(&m.table, rows)
