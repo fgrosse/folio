@@ -28,7 +28,7 @@ func defaultKeyMap() keyMap {
 		Delete:    key.NewBinding(key.WithKeys("d", "delete"), key.WithHelp("d", "delete")),
 		Release:   key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "release")),
 		Details:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "details")),
-		Clear:     key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "clear tax")),
+		Clear:     key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "clear tax")),
 		ClearYear: key.NewBinding(key.WithKeys("C"), key.WithHelp("C", "clear year")),
 		Close:     key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
 		Quit:      key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
