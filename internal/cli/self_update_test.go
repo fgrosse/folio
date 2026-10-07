@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"testing"
 
@@ -132,6 +133,48 @@ Updated folio to v1.0.0
 `
 			assert.Equal(t, expected[1:], out.String())
 			assert.Equal(t, "folio v1.0.0", readFile(t, installed))
+		})
+	}
+}
+
+// TestSelfUpdateCmd_NotARelease covers the builds that no release made, which are not to be
+// replaced with one: a folio that "go install" built is updated by "go install", and one built from
+// a checkout by building it again. The update leaves both alone and says how they are updated.
+func TestSelfUpdateCmd_NotARelease(t *testing.T) {
+	cases := map[string]struct {
+		args  []string
+		info  *debug.BuildInfo
+		error string
+	}{
+		"installed with go install": {
+			info:  &debug.BuildInfo{Main: debug.Module{Version: "v1.1.0"}},
+			error: "this folio was installed with \"go install\", so update it that way: go install github.com/fgrosse/folio/cmd/folio@latest",
+		},
+		"installed with go install, to a version": {
+			args:  []string{"1.2.0"},
+			info:  &debug.BuildInfo{Main: debug.Module{Version: "v1.1.0"}},
+			error: "this folio was installed with \"go install\", so update it that way: go install github.com/fgrosse/folio/cmd/folio@v1.2.0",
+		},
+		"built from a checkout": {
+			info:  &debug.BuildInfo{Main: debug.Module{Version: "(devel)"}},
+			error: "this folio was built from its source and not released, so update the source and build it again",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			cmd, _ := NewTestingCmd(t, append([]string{"self-update", "-y"}, c.args...)...)
+			installed := NewTestingInstall(t, cmd, "1.1.0")
+			cmd.BuildVersion = "" // which only the build of a release sets
+			cmd.buildInfo = func() (*debug.BuildInfo, bool) { return c.info, true }
+			cmd.releases = fakeReleases{
+				latest:   "v1.2.0",
+				releases: map[string][]byte{"v1.2.0": []byte("folio v1.2.0")},
+			}
+
+			require.EqualError(t, cmd.Execute(), c.error)
+
+			assert.Equal(t, "folio v1.1.0", readFile(t, installed))
 		})
 	}
 }

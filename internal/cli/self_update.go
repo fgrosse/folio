@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,9 @@ import (
 
 	"github.com/fgrosse/folio/internal/update"
 )
+
+// installPath is the package that "go install" builds folio from.
+const installPath = "github.com/fgrosse/folio/cmd/folio"
 
 // SelfUpdateCmd returns the "folio self-update" command.
 func (cmd *Folio) SelfUpdateCmd() *cobra.Command {
@@ -50,6 +54,12 @@ func (cmd *Folio) SelfUpdateCmd() *cobra.Command {
 // latest release if version is empty. Unless yes says that the user agreed already, it asks them
 // on stdout first and reads the answer from in.
 func (cmd *Folio) selfUpdate(ctx context.Context, version string, yes bool, in io.Reader) error {
+	// Only the build of a release is handed a version. Any other build has a way of its own to
+	// be updated, and whatever installed it would not know of a binary that was put in its place.
+	if cmd.BuildVersion == "" {
+		return cmd.updateInstead(version)
+	}
+
 	target, err := cmd.targetVersion(ctx, version)
 	if err != nil {
 		return err
@@ -95,7 +105,28 @@ func (cmd *Folio) targetVersion(ctx context.Context, version string) (string, er
 		return cmd.releases.Latest(ctx)
 	}
 
-	return "v" + strings.TrimPrefix(version, "v"), nil
+	return tagOf(version), nil
+}
+
+// tagOf is the tag that the release of version has.
+func tagOf(version string) string {
+	return "v" + strings.TrimPrefix(version, "v")
+}
+
+// updateInstead is the error that says how to update a folio that is no build of a release, to
+// version or to the latest one if version is empty. A build that knows the version of its module
+// was made by "go install". One that does not was built from a checkout.
+func (cmd *Folio) updateInstead(version string) error {
+	if cmd.version() == "devel" {
+		return errors.New("this folio was built from its source and not released, so update the source and build it again")
+	}
+
+	target := "latest"
+	if version != "" {
+		target = tagOf(version)
+	}
+
+	return fmt.Errorf("this folio was installed with \"go install\", so update it that way: go install %s@%s", installPath, target)
 }
 
 // confirm asks a question on stdout and reports whether the line that in answers with is a yes.
