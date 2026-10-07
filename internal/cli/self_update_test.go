@@ -138,26 +138,36 @@ Updated folio to v1.0.0
 }
 
 // TestSelfUpdateCmd_NotARelease covers the builds that no release made, which are not to be
-// replaced with one: a folio that "go install" built is updated by "go install", and one built from
-// a checkout by building it again. The update leaves both alone and says how they are updated.
+// replaced with one: whatever built such a folio is what updates it. The update leaves it alone
+// and says how the usual one of them, "go install", does it. It does not say which one it was:
+// the Go toolchain gives a build from a checkout a version too, so folio cannot tell.
 func TestSelfUpdateCmd_NotARelease(t *testing.T) {
 	cases := map[string]struct {
-		args  []string
-		info  *debug.BuildInfo
-		error string
+		args    []string
+		info    *debug.BuildInfo
+		version string // what the build says it is
+		install string // what the update says to install
 	}{
 		"installed with go install": {
-			info:  &debug.BuildInfo{Main: debug.Module{Version: "v1.1.0"}},
-			error: "this folio was installed with \"go install\", so update it that way: go install github.com/fgrosse/folio/cmd/folio@latest",
+			info:    &debug.BuildInfo{Main: debug.Module{Version: "v1.1.0"}},
+			version: "v1.1.0",
+			install: "github.com/fgrosse/folio/cmd/folio@latest",
 		},
-		"installed with go install, to a version": {
-			args:  []string{"1.2.0"},
-			info:  &debug.BuildInfo{Main: debug.Module{Version: "v1.1.0"}},
-			error: "this folio was installed with \"go install\", so update it that way: go install github.com/fgrosse/folio/cmd/folio@v1.2.0",
+		"to a version": {
+			args:    []string{"1.2.0"},
+			info:    &debug.BuildInfo{Main: debug.Module{Version: "v1.1.0"}},
+			version: "v1.1.0",
+			install: "github.com/fgrosse/folio/cmd/folio@v1.2.0",
 		},
 		"built from a checkout": {
-			info:  &debug.BuildInfo{Main: debug.Module{Version: "(devel)"}},
-			error: "this folio was built from its source and not released, so update the source and build it again",
+			info:    &debug.BuildInfo{Main: debug.Module{Version: "v1.1.1-0.20261007195200-c1d9b81a2f3e+dirty"}},
+			version: "v1.1.1-0.20261007195200-c1d9b81a2f3e+dirty",
+			install: "github.com/fgrosse/folio/cmd/folio@latest",
+		},
+		"built without a version": {
+			info:    &debug.BuildInfo{Main: debug.Module{Version: "(devel)"}},
+			version: "devel",
+			install: "github.com/fgrosse/folio/cmd/folio@latest",
 		},
 	}
 
@@ -172,7 +182,9 @@ func TestSelfUpdateCmd_NotARelease(t *testing.T) {
 				releases: map[string][]byte{"v1.2.0": []byte("folio v1.2.0")},
 			}
 
-			require.EqualError(t, cmd.Execute(), c.error)
+			expected := "this folio (" + c.version + ") is not the build of a release, " +
+				"so update it the way it was installed, such as: go install " + c.install
+			require.EqualError(t, cmd.Execute(), expected)
 
 			assert.Equal(t, "folio v1.1.0", readFile(t, installed))
 		})

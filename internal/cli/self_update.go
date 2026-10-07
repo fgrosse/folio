@@ -3,7 +3,6 @@ package cli
 import (
 	"bufio"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -39,7 +38,7 @@ The binary is replaced in one step, so an update that is interrupted leaves the
 folio that was there. Your account is not part of this: the database is not opened.
 
 This is for a folio that came from a release. One that "go install" built, or that
-was built from a checkout, is left alone, and folio says how to update it instead.
+was built from a checkout, is left alone and is updated the way it was installed.
 `,
 		Example: `
   # Update to the latest release
@@ -148,19 +147,19 @@ func tagOf(version string) string {
 }
 
 // updateInstead is the error that says how to update a folio that is no build of a release, to
-// version or to the latest one if version is empty. A build that knows the version of its module
-// was made by "go install". One that does not was built from a checkout.
+// version or to the latest one if version is empty. It names "go install" as an example and not
+// as what happened: the Go toolchain records a version for a build from a checkout as well as for
+// one that "go install" made, so the two cannot be told apart.
 func (cmd *Folio) updateInstead(version string) error {
-	if cmd.version() == "devel" {
-		return errors.New("this folio was built from its source and not released, so update the source and build it again")
-	}
-
 	target := "latest"
 	if version != "" {
 		target = tagOf(version)
 	}
 
-	return fmt.Errorf("this folio was installed with \"go install\", so update it that way: go install %s@%s", installPath, target)
+	return fmt.Errorf(
+		"this folio (%s) is not the build of a release, so update it the way it was installed, such as: go install %s@%s",
+		cmd.version(), installPath, target,
+	)
 }
 
 // confirm asks a question on stdout and reports whether the line that in answers with is a yes.
