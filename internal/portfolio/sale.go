@@ -26,6 +26,10 @@ type Sale struct {
 	// Note is whatever there is to remember about the sale, in as many lines as it takes.
 	Note string
 
+	// Cleared is whether the tax on the gain of the sale is settled with the tax office, which it
+	// is once the tax return of its year is done. Until then that tax is owed.
+	Cleared bool
+
 	// Symbol, Cost and Grant are those of the lot the shares were sold from: its stock, what one
 	// share of it cost, which is zero if that is not known, and the name of the grant it was
 	// released from, if any. The store fills them in when it lists sales, and ignores them when it
@@ -75,6 +79,24 @@ func (s Sale) Tax(rate decimal.Decimal) (tax decimal.Decimal, known bool) {
 	}
 
 	return GainsTax(gain, rate), true
+}
+
+// TaxOwed adds up the tax at rate, in percent, on those of sales that are not cleared: what the tax
+// office is still to get for them. A sale whose cost is not known adds nothing, since its tax is
+// not known either.
+func TaxOwed(sales []Sale, rate decimal.Decimal) decimal.Decimal {
+	var owed decimal.Decimal
+	for _, sale := range sales {
+		if sale.Cleared {
+			continue
+		}
+
+		// A tax that is not known is zero, which adds nothing.
+		tax, _ := sale.Tax(rate)
+		owed = owed.Add(tax)
+	}
+
+	return owed
 }
 
 // Realized is what sales have turned shares into: money, as opposed to the value of what is still
