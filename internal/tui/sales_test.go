@@ -306,42 +306,66 @@ func TestSaleRow(t *testing.T) {
 }
 
 // TestRealizedSummary covers the line the Sales view puts above its table, which is what tracking
-// sales is for: how much money the sales have brought in, and how much of that is gain. It says so
-// if the gain leaves out sales whose cost is not known, and if nothing was sold yet.
+// sales is for: how much money the sales have brought in, how much of that is gain, and how much tax
+// is still owed on it, which is the tax on the sales that are not cleared. It says so if the gain
+// leaves out sales whose cost is not known, and if nothing was sold yet. An account without a rate
+// to tax a gain at is not told what it owes, and neither is one whose every gain is unknown.
 func TestRealizedSummary(t *testing.T) {
 	gain := portfolio.Sale{Shares: dec("50"), Price: dec("410.2"), Cost: dec("162.5")}
+	cleared := portfolio.Sale{Shares: dec("2"), Price: dec("401.5"), Cost: dec("380.12"), Cleared: true}
 	loss := portfolio.Sale{Shares: dec("10"), Price: dec("150"), Cost: dec("162.5")}
 	uncosted := portfolio.Sale{Shares: dec("2.5"), Price: dec("330")}
+	rate := decimal.NewNullDecimal(dec("26.4"))
 
 	cases := map[string]struct {
 		sales    []portfolio.Sale
+		rate     decimal.NullDecimal
 		expected string
 	}{
 		"nothing sold": {
 			sales:    nil,
+			rate:     rate,
 			expected: "Nothing sold yet",
 		},
 		"a gain": {
 			sales:    []portfolio.Sale{gain},
-			expected: "Realized $20,510.00 · gain +$12,385.00",
+			rate:     rate,
+			expected: "Realized $20,510.00 · gain +$12,385.00 · tax owed $3,269.64",
+		},
+		"a gain that is cleared": {
+			sales:    []portfolio.Sale{gain, cleared},
+			rate:     rate,
+			expected: "Realized $21,313.00 · gain +$12,427.76 · tax owed $3,269.64",
+		},
+		"all cleared": {
+			sales:    []portfolio.Sale{cleared},
+			rate:     rate,
+			expected: "Realized $803.00 · gain +$42.76 · tax owed $0.00",
 		},
 		"a loss overall": {
 			sales:    []portfolio.Sale{loss},
-			expected: "Realized $1,500.00 · gain -$125.00",
+			rate:     rate,
+			expected: "Realized $1,500.00 · gain -$125.00 · tax owed $0.00",
 		},
 		"a sale without a cost": {
 			sales:    []portfolio.Sale{gain, uncosted},
-			expected: "Realized $21,335.00 · gain +$12,385.00 without 1 sale of unknown cost",
+			rate:     rate,
+			expected: "Realized $21,335.00 · gain +$12,385.00 without 1 sale of unknown cost · tax owed $3,269.64",
 		},
 		"only sales without a cost": {
 			sales:    []portfolio.Sale{uncosted, uncosted},
+			rate:     rate,
 			expected: "Realized $1,650.00 · gain unknown",
+		},
+		"no rate to tax a gain at": {
+			sales:    []portfolio.Sale{gain},
+			expected: "Realized $20,510.00 · gain +$12,385.00",
 		},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, c.expected, realizedSummary(c.sales))
+			assert.Equal(t, c.expected, realizedSummary(c.sales, c.rate))
 		})
 	}
 }

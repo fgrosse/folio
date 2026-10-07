@@ -261,8 +261,8 @@ func (m *SalesModel) View() tea.View {
 	return tea.NewView(trimTrailingSpace(c.Render()) + "\n")
 }
 
-// headerView renders the two lines above the table: what the sales have realized on the left, and
-// the account values on the right. Under the summary is the note of the selected sale, which the
+// headerView renders the two lines above the table: what the sales have realized and what tax is
+// still owed on it on the left, and the account values on the right. Under the summary is the note of the selected sale, which the
 // table has no column for, all of its lines on that one, or the prices if the sale has no note.
 func (m *SalesModel) headerView() string {
 	var note string
@@ -270,7 +270,7 @@ func (m *SalesModel) headerView() string {
 		note = strings.Join(strings.Fields(strings.ReplaceAll(sale.Note, "\n", " · ")), " ")
 	}
 
-	return notedHeader(realizedSummary(m.portfolio.Sales), note, m.portfolio, m.err, m.width-cellPadding, m.style)
+	return notedHeader(realizedSummary(m.portfolio.Sales, m.portfolio.GainsTaxRate), note, m.portfolio, m.err, m.width-cellPadding, m.style)
 }
 
 // helpView renders the keys worth knowing in two lines, as every view does: getting around on the
@@ -291,10 +291,13 @@ func (m *SalesModel) helpView() string {
 		help.ShortHelpView([]key.Binding{m.keys.Delete})
 }
 
-// realizedSummary sums up sales as the money they brought in and the gain in it, such as "Realized
-// $20,510.00 · gain +$12,385.00". It is what the Sales view says above its table. The gain is that
-// of the sales whose cost is known, and the summary says how many it leaves out.
-func realizedSummary(sales []portfolio.Sale) string {
+// realizedSummary sums up sales as the money they brought in, the gain in it and the tax that is
+// still owed on it at rate, such as "Realized $20,510.00 · gain +$12,385.00 · tax owed $3,269.64".
+// It is what the Sales view says above its table. The gain is that of the sales whose cost is
+// known, and the summary says how many it leaves out. What is owed is the tax on the sales that are
+// not cleared, and is left unsaid where there is nothing to work it out from: no rate, which is not
+// valid then, or no gain that is known.
+func realizedSummary(sales []portfolio.Sale, rate decimal.NullDecimal) string {
 	if len(sales) == 0 {
 		return "Nothing sold yet"
 	}
@@ -306,10 +309,16 @@ func realizedSummary(sales []portfolio.Sale) string {
 	case realized.Uncosted == len(sales):
 		return summary + "unknown"
 	case realized.Uncosted > 0:
-		return summary + formatGain(realized.Gain) + " without " + count(realized.Uncosted, "sale") + " of unknown cost"
+		summary += formatGain(realized.Gain) + " without " + count(realized.Uncosted, "sale") + " of unknown cost"
 	default:
-		return summary + formatGain(realized.Gain)
+		summary += formatGain(realized.Gain)
 	}
+
+	if rate.Valid {
+		summary += " · tax owed " + portfolio.FormatUSD(portfolio.TaxOwed(sales, rate.Decimal))
+	}
+
+	return summary
 }
 
 // saleRow renders a sale as a row of the Sales table: its day, the stock and the grant of the lot it
