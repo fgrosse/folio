@@ -22,6 +22,10 @@ Roughly in the order worth doing.
   arrives may be in another currency. There is no verb to record a sale from the command line. A sale that spans
   several lots is entered once per lot, and folio could spread it over the lots oldest first, the
   way the tax office counts.
+- **Tax owed, beyond the Sales view.** `folio status` does not say what tax is owed on the sales,
+  in its plain output or its JSON. The summary above the Sales table runs into the total in a
+  window of 100 columns once it also names sales of unknown cost. The owed tax could be broken down
+  by year, and the demo account could come with a sale that is cleared.
 - **Record the whole of a release.** A release confirmation states more than folio keeps: the
   shares that were sold to cover tax, which folio can work out, and the price they sold at, which
   it cannot. That sale is a taxable event of its own, with a gain or loss against the value of the
@@ -57,7 +61,8 @@ Roughly in the order worth doing.
   day.
 - **Set losses against gains.** The tax on what is held counts every lot on its own, so a lot that
   lost takes nothing off the tax on another. Sold in one year, the loss would, and so would the
-  losses of the sales that were recorded this year. The same goes for an allowance, such as the
+  losses of the sales that were recorded this year. The tax that the Sales view says is owed counts
+  every sale on its own in the same way, and is too high in a year with a loss. The same goes for an allowance, such as the
   Sparer-Pauschbetrag in Germany.
 - **The gain of the account in the header**, next to the values, now that each lot shows its own.
 - **More columns for wider windows.** The Holdings table leaves out the gain where it has no room,

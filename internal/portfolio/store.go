@@ -248,19 +248,20 @@ func (s *SQLiteStore) DeleteLot(id int) error {
 // were saved, each with the stock, the cost and the grant of the lot it was sold from.
 func (s *SQLiteStore) Sales() ([]Sale, error) {
 	var rows []struct {
-		ID     int                 `db:"id"`
-		LotID  int                 `db:"lot_id"`
-		Date   time.Time           `db:"sold_on"`
-		Shares decimal.Decimal     `db:"shares"`
-		Price  decimal.Decimal     `db:"price"`
-		Note   string              `db:"note"`
-		Symbol string              `db:"symbol"`
-		Cost   decimal.NullDecimal `db:"cost"`
-		Grant  string              `db:"grant_name"`
+		ID      int                 `db:"id"`
+		LotID   int                 `db:"lot_id"`
+		Date    time.Time           `db:"sold_on"`
+		Shares  decimal.Decimal     `db:"shares"`
+		Price   decimal.Decimal     `db:"price"`
+		Note    string              `db:"note"`
+		Cleared bool                `db:"cleared"`
+		Symbol  string              `db:"symbol"`
+		Cost    decimal.NullDecimal `db:"cost"`
+		Grant   string              `db:"grant_name"`
 	}
 
 	err := s.db.Select(&rows, `
-		SELECT sales.id, sales.lot_id, sales.sold_on, sales.shares, sales.price, sales.note,
+		SELECT sales.id, sales.lot_id, sales.sold_on, sales.shares, sales.price, sales.note, sales.cleared,
 			lots.symbol, lots.cost, coalesce(grants.name, '') AS grant_name
 		FROM sales
 			JOIN lots ON lots.id = sales.lot_id
@@ -274,15 +275,16 @@ func (s *SQLiteStore) Sales() ([]Sale, error) {
 	sales := make([]Sale, len(rows))
 	for i, r := range rows {
 		sales[i] = Sale{
-			ID:     r.ID,
-			LotID:  r.LotID,
-			Date:   r.Date,
-			Shares: r.Shares,
-			Price:  r.Price,
-			Note:   r.Note,
-			Symbol: r.Symbol,
-			Cost:   r.Cost.Decimal,
-			Grant:  r.Grant,
+			ID:      r.ID,
+			LotID:   r.LotID,
+			Date:    r.Date,
+			Shares:  r.Shares,
+			Price:   r.Price,
+			Note:    r.Note,
+			Cleared: r.Cleared,
+			Symbol:  r.Symbol,
+			Cost:    r.Cost.Decimal,
+			Grant:   r.Grant,
 		}
 	}
 
@@ -336,6 +338,34 @@ func (s *SQLiteStore) SaveSale(sale Sale) error {
 	)
 	if err != nil {
 		return err
+	}
+
+	return tx.Commit()
+}
+
+// ClearSales marks the sales with the given IDs as cleared, or as not cleared: whether the tax on
+// them is settled with the tax office. Every one of them has to exist, or none is changed, so that
+// the sales of a year are cleared together or not at all.
+func (s *SQLiteStore) ClearSales(ids []int, cleared bool) error {
+	tx, err := s.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }() // does nothing once the transaction is committed
+
+	for _, id := range ids {
+		result, err := tx.Exec(`UPDATE sales SET cleared = ? WHERE id = ?`, cleared, id)
+		if err != nil {
+			return err
+		}
+
+		n, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return fmt.Errorf("no sale with ID %d", id)
+		}
 	}
 
 	return tx.Commit()
