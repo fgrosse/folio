@@ -116,5 +116,9 @@ func (c *Client) asset(ctx context.Context, version, name string) ([]byte, error
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("answered with %s", resp.Status)
+	}
+
 	return io.ReadAll(resp.Body)
 }

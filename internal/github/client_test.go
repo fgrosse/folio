@@ -48,6 +48,21 @@ func TestClient_Asset(t *testing.T) {
 	assert.Equal(t, "ac8ac231  folio-v1.2.0-linux-amd64.tar.gz\n", string(asset))
 }
 
+// TestClient_AssetErrors covers a file that GitHub does not have, which is what asking for a
+// version that was never released comes to. The page that GitHub answers with is not the file.
+func TestClient_AssetErrors(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	defer server.Close()
+
+	client := New()
+	client.downloadURL = server.URL
+
+	asset, err := client.Asset(t.Context(), "v9.9.9", "checksums.txt")
+
+	require.EqualError(t, err, "no checksums.txt of release v9.9.9: answered with 404 Not Found")
+	assert.Nil(t, asset)
+}
+
 // TestClient_LatestErrors covers the ways GitHub says no: with a message worth passing on, such as
 // when one address asked too often, and with a response that is no release at all.
 func TestClient_LatestErrors(t *testing.T) {
