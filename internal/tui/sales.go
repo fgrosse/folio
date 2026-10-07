@@ -176,7 +176,7 @@ func (m *SalesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // handleKeyPress quits on the quit keys, asks whether to delete the selected sale on the delete key,
-// and hands every other key to the table, which moves the selection. While the question is open,
+// clears it or takes that back on the clear key, and hands every other key to the table, which moves the selection. While the question is open,
 // every key is its own.
 func (m *SalesModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.confirm != nil {
@@ -188,6 +188,8 @@ func (m *SalesModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case key.Matches(msg, m.keys.Delete):
 		return m.askToDelete()
+	case key.Matches(msg, m.keys.Clear):
+		return m.toggleCleared()
 	}
 
 	var cmd tea.Cmd
@@ -217,6 +219,31 @@ func (m *SalesModel) askToDelete() (tea.Model, tea.Cmd) {
 	m.confirm = NewConfirmDialog("Delete sale", question, DeleteSaleMsg{id: sale.ID}, m.style)
 
 	return m, nil
+}
+
+// toggleCleared marks the selected sale as cleared, or as not cleared if it is: the tax on it is
+// settled with the tax office, or still owed. It does not ask first, since the same key takes it
+// back.
+func (m *SalesModel) toggleCleared() (tea.Model, tea.Cmd) {
+	sale, ok := m.selected()
+	if !ok {
+		return m, nil
+	}
+
+	return m, m.clearSalesCmd([]int{sale.ID}, !sale.Cleared)
+}
+
+// clearSalesCmd returns a command that marks the sales with the given IDs as cleared, or as not
+// cleared, and loads the portfolio again, in which their tax is no longer owed, or is again.
+func (m *SalesModel) clearSalesCmd(ids []int, cleared bool) tea.Cmd {
+	store := m.store
+	return func() tea.Msg {
+		if err := store.ClearSales(ids, cleared); err != nil {
+			return PortfolioLoadedMsg{err: err}
+		}
+
+		return loadPortfolioCmd(store)()
+	}
 }
 
 // deleteSaleCmd returns a command that deletes the sale with the given ID and loads the portfolio
@@ -287,8 +314,14 @@ func (m *SalesModel) helpView() string {
 		}) + "\n"
 	}
 
+	// The key that clears a sale takes that back on one that is cleared, and says so.
+	toggle := m.keys.Clear
+	if sale, ok := m.selected(); ok && sale.Cleared {
+		toggle.SetHelp(toggle.Help().Key, "unclear tax")
+	}
+
 	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n" +
-		help.ShortHelpView([]key.Binding{m.keys.Delete})
+		help.ShortHelpView([]key.Binding{m.keys.Delete, toggle})
 }
 
 // realizedSummary sums up sales as the money they brought in, the gain in it and the tax that is

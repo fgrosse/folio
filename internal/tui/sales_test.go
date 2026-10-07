@@ -173,6 +173,37 @@ func TestSalesModel_DeleteSale(t *testing.T) {
 	store.AssertExpectations(t)
 }
 
+// TestSalesModel_ClearSale covers settling the tax on one sale: c has the store mark the selected
+// sale as cleared, without a question since another c takes it back, and the view loads the
+// portfolio again. On a sale that is cleared the same key marks it as not cleared, and the help
+// says which of the two it is going to do. Before anything was sold it does nothing.
+func TestSalesModel_ClearSale(t *testing.T) {
+	p := soldPortfolio()
+	p.Sales[1].Cleared = true
+	store := new(MockStore)
+	store.returns(p)
+	m := NewSalesModel(store, DefaultStyle())
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
+	m.Update(runCmd(t, m.Init()))
+	assert.Contains(t, ansi.Strip(m.View().Content), "d delete • c clear tax")
+
+	store.On("ClearSales", []int{1}, true).Return(nil).Once()
+	_, cmd := m.Update(keyPressed("c"))
+	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
+
+	m.Update(keyPressed("j")) // the second sale, which is cleared
+	assert.Contains(t, ansi.Strip(m.View().Content), "d delete • c unclear tax")
+
+	store.On("ClearSales", []int{2}, false).Return(nil).Once()
+	_, cmd = m.Update(keyPressed("c"))
+	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
+	store.AssertExpectations(t)
+
+	empty := NewSalesModel(new(MockStore), DefaultStyle())
+	_, cmd = empty.Update(keyPressed("c"))
+	assert.Nil(t, cmd)
+}
+
 // TestSalesModel_DeleteWithNothingSelected covers d before anything was sold, where there is nothing
 // to ask about.
 func TestSalesModel_DeleteWithNothingSelected(t *testing.T) {
