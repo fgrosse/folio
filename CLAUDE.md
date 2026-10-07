@@ -112,7 +112,7 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
   `settings` table, which holds what applies to the whole account, one value by name, so that it is
   in the database like everything else.
 - **Everything is in USD for now**, the currency the stock trades in. Showing another currency is
-  in `TODO.md`.
+  issue #32.
 - **The demo is the one verb with a database of its own.** Every other verb shares the database of
   the real account, which the root command opens and creates before the verb runs. `folio demo`
   overrides those hooks, makes up an account in a temporary database, opens the TUI on it and
@@ -176,7 +176,26 @@ path without `internal/`, and a body that says what was done and why.
 
 ## What's next
 
-Plans live in `TODO.md`, not here. Check it at the start of a session and keep it current: delete
-an item once it is done, and add an idea as soon as it comes up rather than leaving it in chat
-history. It holds only work that is still to do. A decision goes into this file instead, and a
-gotcha goes into a comment at the code it affects.
+Plans live in the issues of the GitHub repository, `fgrosse/folio`, not in a file here. An open
+issue is work that is still to do, and closing it is what marks it done: a pull request says
+`Fixes #<number>` so that merging it does.
+
+- **An idea that comes up is offered, not filed.** When work on one thing turns up another, such as
+  a gap, a follow-up or something left out on purpose, say so and offer to create an issue for it.
+  Create it only once the user agrees. Neither keep a list in a file nor leave it in chat history.
+- **Keep the issues few.** Search the open and the closed ones first (`gh issue list --state all
+  --search`), and add a comment to the one that covers the idea already rather than opening a
+  second. One issue is one improvement that can be built and merged by itself. Do not open one for
+  what the pull request at hand can settle, for a wish without a need behind it, or for a question:
+  ask that.
+- **An issue says what is missing and why it matters**, in a few sentences, then what to build,
+  and the code it touches if that is known. It gets one size label, and `needs-discussion` on top
+  as long as its design is open, which keeps it from being picked up:
+  - `size:S`: one or two red-green cycles, in one package or one view.
+  - `size:M`: several cycles across the domain and a front end, maybe a migration.
+  - `size:L`: a new concept, with new data, a new source or a design that is still open.
+- **The next issue to work on** is the oldest open one with a size label and without
+  `needs-discussion`. The `next-issue` skill picks it, builds it in a worktree and opens the pull
+  request.
+
+A decision goes into this file, and a gotcha goes into a comment at the code it affects.

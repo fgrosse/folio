@@ -240,8 +240,8 @@ mise run git:hooks    # run the tests and the linter before every push
 vhs demo.tape         # record the demo of this file again, which needs ffmpeg
 ```
 
-See `CLAUDE.md` for how the project is built and why it is the way it is, and `TODO.md` for what is
-planned.
+See `CLAUDE.md` for how the project is built and why it is the way it is, and the
+[issues](https://github.com/fgrosse/folio/issues) for what is planned.
 
 ## Contributing
 
