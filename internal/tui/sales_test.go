@@ -94,6 +94,10 @@ func TestSalesModel_Columns(t *testing.T) {
 			width:    82,
 			expected: []string{"Sold on", "Symbol", "Shares", "Proceeds", "Tax", "Gain"},
 		},
+		"not quite room for the grant": {
+			width:    88,
+			expected: []string{"Sold on", "Symbol", "Shares", "Proceeds", "Tax", "Gain"},
+		},
 		"room for the grant": {
 			width:    100,
 			expected: []string{"Sold on", "Symbol", "From", "Shares", "Proceeds", "Tax", "Gain"},

@@ -112,18 +112,25 @@ func shownSale[T any](m *SalesModel, cells []T) []T {
 	return cells
 }
 
-// columns returns the table's columns, the column of the grant taking whatever the width leaves.
-// The titles of the number columns are padded like the numbers under them, so that they end where
-// the numbers do.
+// columns returns the table's columns, the column of the grant taking whatever the width leaves,
+// if it is there. The titles of the number columns are padded like the numbers under them, so that
+// they end where the numbers do.
 func (m *SalesModel) columns() []table.Column {
 	grantWidth := m.width - salesColumnsWidth - cellPadding
 	if m.showPrice {
 		grantWidth -= priceColumnWidth + cellPadding
 	}
 
+	// Without the grant, the symbol takes the little that the width leaves, so that the last
+	// column still ends where the table does.
+	symbolWidth := symbolColumnWidth
+	if !m.showGrant {
+		symbolWidth = m.width - salesColumnsWidth + symbolColumnWidth
+	}
+
 	return shownSale(m, []table.Column{
 		{Title: "Sold on", Width: dayColumnWidth},
-		{Title: "Symbol", Width: symbolColumnWidth},
+		{Title: "Symbol", Width: symbolWidth},
 		{Title: "From", Width: grantWidth},
 		{Title: fmt.Sprintf("%*s", sharesColumnWidth, "Shares"), Width: sharesColumnWidth},
 		{Title: fmt.Sprintf("%*s", priceColumnWidth, "Price"), Width: priceColumnWidth},
