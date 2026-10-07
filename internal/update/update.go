@@ -7,9 +7,12 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // A Source is where the releases of folio are published. It is an interface for the reason
@@ -32,6 +35,9 @@ type Platform struct {
 // binaryName is what the folio binary is called inside the archive of a release.
 const binaryName = "folio"
 
+// checksumsName is the file of a release that lists the SHA-256 of each of its archives.
+const checksumsName = "checksums.txt"
+
 // Binary fetches the folio binary that the release of version has for a platform.
 func Binary(ctx context.Context, source Source, version string, platform Platform) ([]byte, error) {
 	// The name is the one that the archives section of .goreleaser.yaml gives an archive. It
@@ -44,12 +50,46 @@ func Binary(ctx context.Context, source Source, version string, platform Platfor
 		return nil, fmt.Errorf("download release: %w", err)
 	}
 
+	checksums, err := source.Asset(ctx, version, checksumsName)
+	if err != nil {
+		return nil, fmt.Errorf("download checksums: %w", err)
+	}
+
+	if err := verify(name, archive, checksums); err != nil {
+		return nil, fmt.Errorf("verify %s: %w", name, err)
+	}
+
 	binary, err := extract(archive)
 	if err != nil {
 		return nil, fmt.Errorf("unpack %s: %w", name, err)
 	}
 
 	return binary, nil
+}
+
+// verify checks that an archive is the one that was released under its name: that its SHA-256 is
+// the one that the checksums of the release state for it. They come from the same place as the
+// archive, so this catches a download that went wrong or was cut short, and a file that was put in
+// the place of an archive later on. It is no defense against a release that was forged as a whole.
+func verify(name string, archive, checksums []byte) error {
+	sum := sha256.Sum256(archive)
+	actual := hex.EncodeToString(sum[:])
+
+	// A line of the file is what sha256sum prints: the checksum and the name of its file.
+	for line := range strings.Lines(string(checksums)) {
+		fields := strings.Fields(line)
+		if len(fields) != 2 || fields[1] != name {
+			continue
+		}
+
+		if fields[0] != actual {
+			return fmt.Errorf("its checksum is %s, and the release states %s", actual, fields[0])
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf("%s has no checksum of it", checksumsName)
 }
 
 // extract returns the folio binary out of the gzipped tarball that is the archive of a release.
