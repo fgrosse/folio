@@ -104,6 +104,38 @@ func TestSelfUpdateCmd_UpToDate(t *testing.T) {
 	assert.Equal(t, "folio v1.2.0", readFile(t, installed))
 }
 
+// TestSelfUpdateCmd_Version covers moving folio to a release that is named, which need not be the
+// latest and may be older than the one installed: the way back from a release that broke something.
+// The version is the tag of the release, and is taken without its "v" as well.
+func TestSelfUpdateCmd_Version(t *testing.T) {
+	for _, version := range []string{"v1.0.0", "1.0.0"} {
+		t.Run(version, func(t *testing.T) {
+			cmd, _ := NewTestingCmd(t, "self-update", "-y", version)
+			installed := NewTestingInstall(t, cmd, "1.1.0")
+			cmd.releases = fakeReleases{
+				latest: "v1.2.0",
+				releases: map[string][]byte{
+					"v1.0.0": []byte("folio v1.0.0"),
+					"v1.2.0": []byte("folio v1.2.0"),
+				},
+			}
+
+			var out bytes.Buffer
+			cmd.SetOut(&out)
+
+			require.NoError(t, cmd.Execute())
+
+			expected := `
+Current version: v1.1.0
+New version:     v1.0.0
+Updated folio to v1.0.0
+`
+			assert.Equal(t, expected[1:], out.String())
+			assert.Equal(t, "folio v1.0.0", readFile(t, installed))
+		})
+	}
+}
+
 // NewTestingInstall makes cmd the folio of a release of version that is installed as a file in a
 // temporary directory, on Linux, and returns the path of that file. Its content is no program but
 // says which version it is, as "folio v1.1.0", for a test to see whether it was replaced.
