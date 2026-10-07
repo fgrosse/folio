@@ -14,10 +14,19 @@ import (
 	"github.com/fgrosse/folio/internal/portfolio"
 )
 
-// salesColumnsWidth is what every column of the Sales table other than the grant occupies, padding
-// included.
-const salesColumnsWidth = dayColumnWidth + symbolColumnWidth + sharesColumnWidth + priceColumnWidth + 2*valueColumnWidth +
-	6*cellPadding
+const (
+	// taxColumnWidth fits the tax on a sale up to $99,999.99 with the mark of a cleared sale in
+	// front of it.
+	taxColumnWidth = 12
+
+	// salesColumnsWidth is what every column of the Sales table other than the grant occupies,
+	// padding included.
+	salesColumnsWidth = dayColumnWidth + symbolColumnWidth + sharesColumnWidth + priceColumnWidth + 2*valueColumnWidth +
+		taxColumnWidth + 7*cellPadding
+
+	// clearedMark stands in front of the tax on a sale that is cleared.
+	clearedMark = "✓"
+)
 
 // A SalesModel is the Sales view: every sale, with what it brought in and gained. Together they are
 // the part of the account that has been turned into money.
@@ -58,10 +67,11 @@ func (m *SalesModel) columns() []table.Column {
 	return []table.Column{
 		{Title: "Sold on", Width: dayColumnWidth},
 		{Title: "Symbol", Width: symbolColumnWidth},
-		{Title: "From", Width: m.width - salesColumnsWidth - cellPadding},
+		{Title: "From", Width: max(m.width-salesColumnsWidth-cellPadding, 0)},
 		{Title: fmt.Sprintf("%*s", sharesColumnWidth, "Shares"), Width: sharesColumnWidth},
 		{Title: fmt.Sprintf("%*s", priceColumnWidth, "Price"), Width: priceColumnWidth},
 		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Proceeds"), Width: valueColumnWidth},
+		{Title: fmt.Sprintf("%*s", taxColumnWidth, "Tax"), Width: taxColumnWidth},
 		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Gain"), Width: valueColumnWidth},
 	}
 }
@@ -175,7 +185,7 @@ func (m *SalesModel) deleteSaleCmd(id int) tea.Cmd {
 func (m *SalesModel) updateRows() {
 	rows := make([]table.Row, len(m.portfolio.Sales))
 	for i, sale := range m.portfolio.Sales {
-		rows[i] = saleRow(sale)
+		rows[i] = saleRow(sale, m.portfolio.GainsTaxRate)
 	}
 
 	setRows(&m.table, rows)
@@ -252,9 +262,9 @@ func realizedSummary(sales []portfolio.Sale) string {
 }
 
 // saleRow renders a sale as a row of the Sales table: its day, the stock and the grant of the lot it
-// was sold from, the shares and the price of one, and what the sale brought in and gained. The
-// numbers are right-aligned and padded out like those of the other tables.
-func saleRow(sale portfolio.Sale) table.Row {
+// was sold from, the shares and the price of one, what the sale brought in, the tax on its gain at
+// rate, and the gain. The numbers are right-aligned and padded out like those of the other tables.
+func saleRow(sale portfolio.Sale, rate decimal.NullDecimal) table.Row {
 	gain := noValue
 	if amount, known := sale.Gain(); known {
 		gain = formatGain(amount)
@@ -267,8 +277,25 @@ func saleRow(sale portfolio.Sale) table.Row {
 		fmt.Sprintf("%*s", sharesColumnWidth, sale.Shares),
 		fmt.Sprintf("%*s", priceColumnWidth, portfolio.FormatUSD(sale.Price)),
 		fmt.Sprintf("%*s", valueColumnWidth, portfolio.FormatUSD(sale.Proceeds())),
+		fmt.Sprintf("%*s", taxColumnWidth, saleTax(sale, rate)),
 		fmt.Sprintf("%*s", valueColumnWidth, gain),
 	}
+}
+
+// saleTax renders the tax on the gain of sale at rate, which is in percent and not valid if the
+// account has none. A sale that is cleared has its tax checked off, whether or not folio can say
+// how much it was: that it is settled is the user's to say.
+func saleTax(sale portfolio.Sale, rate decimal.NullDecimal) string {
+	tax := noValue
+	if amount, known := sale.Tax(rate.Decimal); known && rate.Valid {
+		tax = portfolio.FormatUSD(amount)
+	}
+
+	if sale.Cleared {
+		return clearedMark + " " + tax
+	}
+
+	return tax
 }
 
 // formatGain renders a gain in dollars with its sign in front, a plus as well as a minus, so that

@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/exp/golden"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -58,8 +59,8 @@ func TestSalesModel_LoadsPortfolio(t *testing.T) {
 	p := soldPortfolio()
 	rows := m.table.Rows()
 	require.Len(t, rows, 2)
-	assert.Equal(t, saleRow(p.Sales[0]), rows[0])
-	assert.Equal(t, saleRow(p.Sales[1]), rows[1])
+	assert.Equal(t, saleRow(p.Sales[0], p.GainsTaxRate), rows[0])
+	assert.Equal(t, saleRow(p.Sales[1], p.GainsTaxRate), rows[1])
 	store.AssertExpectations(t)
 }
 
@@ -191,11 +192,16 @@ func TestViews_SelectTheFirstRow(t *testing.T) {
 
 // TestSaleRow covers how one sale reads as a row of the Sales table: its day, the stock and the
 // grant its lot was from, and the numbers right-aligned - how many shares, what one sold for, what
-// that brought in, and how much of it is gain over what the shares cost. A gain says which way it
-// goes with a sign, and a sale of a lot without a cost has none to state.
+// that brought in, the tax on the gain in it, and that gain over what the shares cost. A gain says
+// which way it goes with a sign, and a sale of a lot without a cost has none to state, and no tax.
+// Neither has any sale of an account without a rate to tax a gain at. A loss is not taxed, and the
+// tax on a sale that is cleared is checked off.
 func TestSaleRow(t *testing.T) {
+	rate := decimal.NewNullDecimal(dec("26.4"))
+
 	cases := map[string]struct {
 		sale     portfolio.Sale
+		rate     decimal.NullDecimal
 		expected table.Row
 	}{
 		"sold at a gain": {
@@ -203,27 +209,55 @@ func TestSaleRow(t *testing.T) {
 				Date: day("2026-09-15"), Symbol: "PANW", Grant: "Payout",
 				Shares: dec("50"), Price: dec("410.2"), Cost: dec("162.5"),
 			},
-			expected: table.Row{"2026-09-15", "PANW", "Payout", "        50", "   $410.20", "    $20,510.00", "   +$12,385.00"},
+			rate: rate,
+			expected: table.Row{
+				"2026-09-15", "PANW", "Payout", "        50", "   $410.20", "    $20,510.00", "   $3,269.64", "   +$12,385.00",
+			},
+		},
+		"sold at a gain and cleared": {
+			sale: portfolio.Sale{
+				Date: day("2026-09-15"), Symbol: "PANW", Grant: "Payout",
+				Shares: dec("50"), Price: dec("410.2"), Cost: dec("162.5"), Cleared: true,
+			},
+			rate: rate,
+			expected: table.Row{
+				"2026-09-15", "PANW", "Payout", "        50", "   $410.20", "    $20,510.00", " ✓ $3,269.64", "   +$12,385.00",
+			},
 		},
 		"sold at a loss": {
 			sale: portfolio.Sale{
 				Date: day("2025-08-01"), Symbol: "PANW", Grant: "Payout",
 				Shares: dec("230"), Price: dec("131.1961"), Cost: dec("162.5"),
 			},
-			expected: table.Row{"2025-08-01", "PANW", "Payout", "       230", "   $131.20", "    $30,175.10", "    -$7,199.90"},
+			rate: rate,
+			expected: table.Row{
+				"2025-08-01", "PANW", "Payout", "       230", "   $131.20", "    $30,175.10", "       $0.00", "    -$7,199.90",
+			},
 		},
 		"a lot without a cost, entered by hand": {
 			sale: portfolio.Sale{
 				Date: day("2026-09-20"), Symbol: "AAPL",
 				Shares: dec("2.5"), Price: dec("330"),
 			},
-			expected: table.Row{"2026-09-20", "AAPL", "", "       2.5", "   $330.00", "       $825.00", "             -"},
+			rate: rate,
+			expected: table.Row{
+				"2026-09-20", "AAPL", "", "       2.5", "   $330.00", "       $825.00", "           -", "             -",
+			},
+		},
+		"no rate to tax a gain at": {
+			sale: portfolio.Sale{
+				Date: day("2026-09-15"), Symbol: "PANW", Grant: "Payout",
+				Shares: dec("50"), Price: dec("410.2"), Cost: dec("162.5"), Cleared: true,
+			},
+			expected: table.Row{
+				"2026-09-15", "PANW", "Payout", "        50", "   $410.20", "    $20,510.00", "         ✓ -", "   +$12,385.00",
+			},
 		},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, c.expected, saleRow(c.sale))
+			assert.Equal(t, c.expected, saleRow(c.sale, c.rate))
 		})
 	}
 }
