@@ -46,3 +46,22 @@ func TestNewRealized(t *testing.T) {
 
 	assert.Equal(t, "0", NewRealized(nil).Proceeds.String())
 }
+
+// TestSale_Tax covers what a sale costs in tax: the gains tax on its own gain, at the rate of the
+// account. A sale at a loss is not taxed, and a sale of a lot without a cost has no gain to tax, so
+// its tax is not known.
+func TestSale_Tax(t *testing.T) {
+	rate := shares("26.4")
+
+	// A gain of 50 * 247.7 = 12385.
+	tax, known := Sale{Shares: shares("50"), Price: shares("410.2"), Cost: shares("162.5")}.Tax(rate)
+	assert.True(t, known)
+	assert.Equal(t, "3269.64", tax.String())
+
+	tax, known = Sale{Shares: shares("10"), Price: shares("150"), Cost: shares("162.5")}.Tax(rate)
+	assert.True(t, known, "a loss is known not to be taxed")
+	assert.Equal(t, "0", tax.String())
+
+	_, known = Sale{Shares: shares("3"), Price: shares("390")}.Tax(rate)
+	assert.False(t, known)
+}

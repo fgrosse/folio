@@ -65,6 +65,18 @@ func (s Sale) Gain() (gain decimal.Decimal, known bool) {
 	return s.Shares.Mul(s.Price.Sub(s.Cost)), true
 }
 
+// Tax is the tax that is due on the gain of the sale at rate, in percent, to the cent. Like the gain
+// it is only known if the cost of the lot is. Every sale is taxed on its own gain, as every lot that
+// is held is: a sale at a loss is not taxed and takes nothing off the tax on another.
+func (s Sale) Tax(rate decimal.Decimal) (tax decimal.Decimal, known bool) {
+	gain, known := s.Gain()
+	if !known {
+		return decimal.Decimal{}, false
+	}
+
+	return GainsTax(gain, rate), true
+}
+
 // Realized is what sales have turned shares into: money, as opposed to the value of what is still
 // held.
 type Realized struct {
