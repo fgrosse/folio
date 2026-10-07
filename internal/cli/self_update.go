@@ -26,7 +26,31 @@ func (cmd *Folio) SelfUpdateCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "self-update [version]",
 		Short: "Update folio to the latest release",
-		Args:  cobra.MaximumNArgs(1),
+		Long: `
+Update folio to its latest release, or to the release of the version that is given:
+download the binary of that release for this platform from GitHub, check it against
+the checksums of the release, and put it in the place of the folio that runs.
+
+It shows the version that is installed and the one it found, and asks before it
+replaces anything, unless -y says yes already. A folio that is up to date is left
+as it is.
+
+The binary is replaced in one step, so an update that is interrupted leaves the
+folio that was there. Your account is not part of this: the database is not opened.
+
+This is for a folio that came from a release. One that "go install" built, or that
+was built from a checkout, is left alone, and folio says how to update it instead.
+`,
+		Example: `
+  # Update to the latest release
+  folio self-update
+
+  # The same, without the question
+  folio self-update -y
+
+  # Move to one release, which may be an older one
+  folio self-update v1.1.0`,
+		Args: cobra.MaximumNArgs(1),
 		// An update is about the binary, not about an account: like the version, it must not
 		// open the database that the root command opens for every other verb.
 		PersistentPreRunE:  func(*cobra.Command, []string) error { return nil },
@@ -84,7 +108,7 @@ func (cmd *Folio) selfUpdate(ctx context.Context, version string, yes bool, in i
 	cmd.Printf("New version:     %s\n", target)
 
 	if !yes && !cmd.confirm(in, "Update folio?") {
-		cmd.Println("Update cancelled")
+		cmd.Println("Update canceled")
 		return nil
 	}
 

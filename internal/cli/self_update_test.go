@@ -58,9 +58,9 @@ func TestSelfUpdateCmd_Confirm(t *testing.T) {
 	}{
 		"y":          {answer: "y\n", installed: "folio v1.2.0", outcome: "Updated folio to v1.2.0\n"},
 		"yes":        {answer: "Yes\n", installed: "folio v1.2.0", outcome: "Updated folio to v1.2.0\n"},
-		"no":         {answer: "n\n", installed: "folio v1.1.0", outcome: "Update cancelled\n"},
-		"just enter": {answer: "\n", installed: "folio v1.1.0", outcome: "Update cancelled\n"},
-		"no answer":  {answer: "", installed: "folio v1.1.0", outcome: "\nUpdate cancelled\n"},
+		"no":         {answer: "n\n", installed: "folio v1.1.0", outcome: "Update canceled\n"},
+		"just enter": {answer: "\n", installed: "folio v1.1.0", outcome: "Update canceled\n"},
+		"no answer":  {answer: "", installed: "folio v1.1.0", outcome: "\nUpdate canceled\n"},
 	}
 
 	for name, c := range cases {
@@ -204,7 +204,7 @@ func NewTestingInstall(t *testing.T, cmd *Folio, version string) string {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "folio")
-	require.NoError(t, os.WriteFile(path, []byte("folio v"+version), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte("folio v"+version), 0o755)) //nolint:gosec // a program is a file that others may run
 
 	cmd.BuildVersion = version
 	cmd.executable = func() (string, error) { return path, nil }

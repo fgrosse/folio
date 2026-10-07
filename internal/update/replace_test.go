@@ -15,7 +15,7 @@ import (
 func TestReplace(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "folio")
-	require.NoError(t, os.WriteFile(path, []byte("the old folio"), 0o750))
+	require.NoError(t, os.WriteFile(path, []byte("the old folio"), 0o750)) //nolint:gosec // the permissions are what the test is about
 
 	require.NoError(t, Replace(path, []byte("the new folio")))
 
