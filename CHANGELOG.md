@@ -5,7 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-_Nothing yet_
+- `folio self-update` updates a folio that was installed from a release to the latest one, or to a version that is given, after checking the download against the checksums of the release. `-y` skips the question it asks first. Not on Windows yet.
 
 ## [v1.1.0] - 2026-10-06
 This release is about tax. folio now estimates what the account is worth after it: what is left of

@@ -57,6 +57,8 @@ go install github.com/fgrosse/folio/cmd/folio@latest
 ```
 
 Or build nothing at all: the [releases page][releases] has binaries for Linux, macOS and Windows.
+A folio that came from there moves to the next release on its own, with `folio self-update`, on
+Linux and macOS.
 
 ### Look around with a demo account
 
@@ -193,6 +195,8 @@ folio config -o json                               # the whole configuration, as
 folio status
 folio status --json
 folio version                                      # which release this is
+folio self-update                                  # move to the latest release, after asking
+folio self-update -y v1.1.0                        # move to one release, without asking
 ```
 
 Every verb has a `--help` that says more.
@@ -219,6 +223,8 @@ ask for their prices.
   API: it may change or turn requests away without notice, and prices can be delayed.
 - Everything is in USD for now.
 - A grant and a sale cannot be edited yet, only deleted and entered again.
+- `folio self-update` does not update folio on Windows yet, where a release is still installed by
+  hand.
 - folio keeps records and adds them up; it is no tax or investment advice.
 
 ## Built With

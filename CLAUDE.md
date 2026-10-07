@@ -117,6 +117,11 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
   the real account, which the root command opens and creates before the verb runs. `folio demo`
   overrides those hooks, makes up an account in a temporary database, opens the TUI on it and
   removes it afterwards, so that trying folio leaves nothing behind and the real account alone.
+- **Only a release updates itself.** `folio self-update` replaces the binary that runs with the one
+  of a release, and only if it is the build of a release, which is the one that was handed a
+  version: whatever else installed folio, `go install` now and a package manager later, is how that
+  folio is updated. Where the releases are published is behind `update.Source`, as the prices are
+  behind `portfolio.Quoter`, and `internal/github` is the one there is.
 - **The TUI is started through a hook**, `Folio.openTUI`, which a test replaces: the real one needs
   a terminal, and the tests of a verb that opens it look at the store it was handed instead.
 
