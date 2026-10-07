@@ -179,6 +179,24 @@ func TestSelfUpdateCmd_NotARelease(t *testing.T) {
 	}
 }
 
+// TestSelfUpdateCmd_Windows covers the platform where the update does not work yet: Windows does
+// not let the file of a program that runs be replaced, and its releases are zip files. The update
+// says so before it asks or downloads anything, and points to where the releases are.
+func TestSelfUpdateCmd_Windows(t *testing.T) {
+	cmd, _ := NewTestingCmd(t, "self-update", "-y")
+	installed := NewTestingInstall(t, cmd, "1.1.0")
+	cmd.platform = update.Platform{OS: "windows", Arch: "amd64"}
+	cmd.releases = fakeReleases{latest: "v1.2.0"}
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	require.EqualError(t, cmd.Execute(), "folio cannot update itself on Windows yet, download the release from https://github.com/fgrosse/folio/releases")
+
+	assert.Empty(t, out.String())
+	assert.Equal(t, "folio v1.1.0", readFile(t, installed))
+}
+
 // NewTestingInstall makes cmd the folio of a release of version that is installed as a file in a
 // temporary directory, on Linux, and returns the path of that file. Its content is no program but
 // says which version it is, as "folio v1.1.0", for a test to see whether it was replaced.

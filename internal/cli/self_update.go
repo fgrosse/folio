@@ -18,6 +18,9 @@ import (
 // installPath is the package that "go install" builds folio from.
 const installPath = "github.com/fgrosse/folio/cmd/folio"
 
+// releasesURL is the page that lists the releases of folio, for whoever has to fetch one by hand.
+const releasesURL = "https://github.com/fgrosse/folio/releases"
+
 // SelfUpdateCmd returns the "folio self-update" command.
 func (cmd *Folio) SelfUpdateCmd() *cobra.Command {
 	c := &cobra.Command{
@@ -58,6 +61,13 @@ func (cmd *Folio) selfUpdate(ctx context.Context, version string, yes bool, in i
 	// be updated, and whatever installed it would not know of a binary that was put in its place.
 	if cmd.BuildVersion == "" {
 		return cmd.updateInstead(version)
+	}
+
+	// Windows does not let the file of a program that runs be renamed over, which is how the
+	// binary is replaced, and its release is a zip file rather than a tarball. Until folio does
+	// both, it says so here rather than fail halfway. TODO.md has it.
+	if cmd.platform.OS == "windows" {
+		return fmt.Errorf("folio cannot update itself on Windows yet, download the release from %s", releasesURL)
 	}
 
 	target, err := cmd.targetVersion(ctx, version)
