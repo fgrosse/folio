@@ -4,6 +4,7 @@ package github
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -61,11 +62,22 @@ func (c *Client) latest(ctx context.Context) (string, error) {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// The body is read before the status is looked at: GitHub says why it turned a request away
+	// in a message, which says more than the status does. A body that is no JSON leaves the status.
 	var release struct {
 		TagName string `json:"tag_name"`
+		Message string `json:"message"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+	err = json.NewDecoder(resp.Body).Decode(&release)
+	switch {
+	case err == nil && resp.StatusCode != http.StatusOK && release.Message != "":
+		return "", errors.New(release.Message)
+	case resp.StatusCode != http.StatusOK:
+		return "", fmt.Errorf("answered with %s", resp.Status)
+	case err != nil:
 		return "", fmt.Errorf("decode response: %w", err)
+	case release.TagName == "":
+		return "", errors.New("the response names none")
 	}
 
 	return release.TagName, nil

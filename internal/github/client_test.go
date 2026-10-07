@@ -29,3 +29,50 @@ func TestClient_Latest(t *testing.T) {
 
 	assert.Equal(t, "v1.2.0", version)
 }
+
+// TestClient_LatestErrors covers the ways GitHub says no: with a message worth passing on, such as
+// when one address asked too often, and with a response that is no release at all.
+func TestClient_LatestErrors(t *testing.T) {
+	cases := map[string]struct {
+		status int
+		body   string
+		error  string
+	}{
+		"rate limited": {
+			status: http.StatusForbidden,
+			body:   `{"message": "API rate limit exceeded for 203.0.113.7.", "documentation_url": "https://docs.github.com/rest"}`,
+			error:  "no latest release: API rate limit exceeded for 203.0.113.7.",
+		},
+		"an error that is no JSON": {
+			status: http.StatusBadGateway,
+			body:   "<html>Bad Gateway</html>",
+			error:  "no latest release: answered with 502 Bad Gateway",
+		},
+		"a response that is no JSON": {
+			status: http.StatusOK,
+			body:   "<html>Welcome</html>",
+			error:  "no latest release: decode response: invalid character '<' looking for beginning of value",
+		},
+		"a release without a tag": {
+			status: http.StatusOK,
+			body:   `{"id": 405151455}`,
+			error:  "no latest release: the response names none",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(c.status)
+				_, _ = w.Write([]byte(c.body))
+			}))
+			defer server.Close()
+
+			client := New()
+			client.apiURL = server.URL
+
+			_, err := client.Latest(t.Context())
+			require.EqualError(t, err, c.error)
+		})
+	}
+}
