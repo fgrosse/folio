@@ -111,6 +111,12 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
   rate to take off it is marked `(gross)` under a badge that says net. The rates are kept in the
   `settings` table, which holds what applies to the whole account, one value by name, so that it is
   in the database like everything else.
+- **A sale owes its tax until it is cleared.** The Sales view shows the tax on the gain of every
+  sale and states the sum of those that are not cleared as what is owed. Clearing is the user's to
+  say, with a mark on the sale, and it is said by the year: a tax return settles the sales of one
+  year, so `C` clears those together, and `space` one sale. The key is not `c`, which is the app's
+  for the configuration. The mark says nothing about what was paid, only that folio is to stop
+  counting it.
 - **Everything is in USD for now**, the currency the stock trades in. Showing another currency is
   in `TODO.md`.
 - **The demo is the one verb with a database of its own.** Every other verb shares the database of
