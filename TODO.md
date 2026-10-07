@@ -41,6 +41,11 @@ Roughly in the order worth doing.
 - **The help of a view while the configuration is open** still lists the keys of the view, which
   the dialog has taken. The lines could go empty, as they do under a dialog of the view's own.
 
+- **`folio self-update` on Windows.** It refuses there and points to the release page. Windows does
+  not let the file of a program that runs be renamed over, so the old binary has to be moved aside
+  first and removed on a later run, and the release of Windows is a zip file where `update.Binary`
+  reads a tarball.
+
 - **Slim the architecture decisions in `CLAUDE.md`.** The list gains an entry with nearly every
   feature and is read in full at the start of every session. Most entries describe one feature and
   say what the doc comment of its type says already. Decide what qualifies, such as a rule that
