@@ -30,6 +30,24 @@ func TestClient_Latest(t *testing.T) {
 	assert.Equal(t, "v1.2.0", version)
 }
 
+// TestClient_Asset covers downloading a file of a release, which GitHub serves under the tag of
+// the release and the name of the file, byte for byte.
+func TestClient_Asset(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/fgrosse/folio/releases/download/v1.2.0/checksums.txt", r.URL.Path)
+		_, _ = w.Write([]byte("ac8ac231  folio-v1.2.0-linux-amd64.tar.gz\n"))
+	}))
+	defer server.Close()
+
+	client := New()
+	client.downloadURL = server.URL
+
+	asset, err := client.Asset(t.Context(), "v1.2.0", "checksums.txt")
+	require.NoError(t, err)
+
+	assert.Equal(t, "ac8ac231  folio-v1.2.0-linux-amd64.tar.gz\n", string(asset))
+}
+
 // TestClient_LatestErrors covers the ways GitHub says no: with a message worth passing on, such as
 // when one address asked too often, and with a response that is no release at all.
 func TestClient_LatestErrors(t *testing.T) {
