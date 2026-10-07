@@ -33,6 +33,11 @@ func (cmd *Folio) SelfUpdateCmd() *cobra.Command {
 				return err
 			}
 
+			if target == cmd.version() {
+				cmd.Printf("folio %s is up to date\n", target)
+				return nil
+			}
+
 			cmd.Printf("Current version: %s\n", cmd.version())
 			cmd.Printf("New version:     %s\n", target)
 

@@ -87,6 +87,23 @@ Update folio? [y/N] `
 	}
 }
 
+// TestSelfUpdateCmd_UpToDate covers a folio that is the latest release already: the update says
+// so and is done, without a question to answer and without downloading what is installed.
+func TestSelfUpdateCmd_UpToDate(t *testing.T) {
+	cmd, _ := NewTestingCmd(t, "self-update")
+	installed := NewTestingInstall(t, cmd, "1.2.0")
+	// The release has no files, so that a download of it would fail.
+	cmd.releases = fakeReleases{latest: "v1.2.0"}
+
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	require.NoError(t, cmd.Execute())
+
+	assert.Equal(t, "folio v1.2.0 is up to date\n", out.String())
+	assert.Equal(t, "folio v1.2.0", readFile(t, installed))
+}
+
 // NewTestingInstall makes cmd the folio of a release of version that is installed as a file in a
 // temporary directory, on Linux, and returns the path of that file. Its content is no program but
 // says which version it is, as "folio v1.1.0", for a test to see whether it was replaced.
