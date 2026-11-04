@@ -91,6 +91,10 @@ func (m *MockStore) DeleteSale(id int) error {
 	return m.Called(id).Error(0)
 }
 
+func (m *MockStore) ClearSales(ids []int, cleared bool) error {
+	return m.Called(ids, cleared).Error(0)
+}
+
 // testPortfolio is the account most tests of the views look at: PANW stock in two lots of 8.5
 // shares in all, and a grant with one vest released into the first of them and two still to come,
 // which are taxed at 44.3%. The gain of a sale is taxed at 26.4%.

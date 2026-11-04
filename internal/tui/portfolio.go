@@ -29,6 +29,7 @@ type Store interface {
 	Sales() ([]portfolio.Sale, error)
 	SaveSale(sale portfolio.Sale) error
 	DeleteSale(id int) error
+	ClearSales(ids []int, cleared bool) error
 }
 
 // A Portfolio is everything the views show, as the store had it at one moment: the lots and grants

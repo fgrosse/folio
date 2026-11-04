@@ -126,7 +126,7 @@ worked out from. `1`-`4` or `tab` switch views, `q` quits.
 | Holdings | Every lot that has shares left, and what they are worth | `a` add a lot, `e` edit, `s` sell shares of it, `d` delete, `enter` show its details |
 | Vesting | Every vest that has not been released, in the order of their days, and what it is worth before and after tax | `r` release a vest that is due |
 | Grants | Every grant, with the shares still to come | `a` add a grant, `d` delete |
-| Sales | Every sale, with what it brought in and gained | `d` delete |
+| Sales | Every sale, with what it brought in and gained, and the tax on that gain | `space` mark the tax as cleared, or not, `C` clear every sale of that year, `d` delete |
 
 A lot, a grant and a release are typed as one line:
 
@@ -147,6 +147,12 @@ shares. A schedule that follows neither rule can be listed vest by vest, see `fo
 Selling opens a form with a field each for the shares, the price, the day and notes of several
 lines. `tab` moves between the fields, `enter` saves, and in the notes, where `enter` starts a new
 line, `ctrl+s` does. The note of a sale shows above the Sales table while the sale is selected.
+
+The Sales view keeps track of the tax you owe on what you sold. With a rate set by
+`folio config gains-tax-rate`, every sale shows the tax on its gain, and the line above the table
+adds up what is still owed. Once a tax return is done, `C` on any sale of its year marks them all
+as cleared: their tax is checked off with a `✓` and no longer counts as owed. `space` does the same
+for one sale, and takes it back.
 
 A vest is taxed as income when it vests, at a rate that depends on the rest of your income and where
 you live. folio does not work it out: it takes the rate you set with `folio config tax-rate` for

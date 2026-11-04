@@ -538,6 +538,38 @@ func TestStore_SaveSaleRefusals(t *testing.T) {
 	require.NoError(t, s.SaveSale(Sale{LotID: 1, Date: day("2026-09-20"), Shares: shares("200"), Price: shares("400")}))
 }
 
+// TestStore_ClearSales covers settling the tax on sales: several are marked as cleared at once, as
+// the sales of a year are when its tax return is done, and one can be marked as not cleared again. A
+// sale is recorded as not cleared. If one of the sales does not exist, none of them is changed.
+func TestStore_ClearSales(t *testing.T) {
+	s := newSalesStore(t)
+	require.NoError(t, s.SaveSale(Sale{LotID: 1, Date: day("2025-09-15"), Shares: shares("50"), Price: shares("410.2")}))
+	require.NoError(t, s.SaveSale(Sale{LotID: 1, Date: day("2025-11-20"), Shares: shares("10"), Price: shares("400")}))
+	require.NoError(t, s.SaveSale(Sale{LotID: 1, Date: day("2026-02-01"), Shares: shares("5"), Price: shares("420")}))
+
+	cleared := func() []bool {
+		sales, err := s.Sales()
+		require.NoError(t, err)
+
+		result := make([]bool, len(sales))
+		for i, sale := range sales {
+			result[i] = sale.Cleared
+		}
+
+		return result
+	}
+	assert.Equal(t, []bool{false, false, false}, cleared())
+
+	require.NoError(t, s.ClearSales([]int{1, 2}, true))
+	assert.Equal(t, []bool{true, true, false}, cleared())
+
+	require.NoError(t, s.ClearSales([]int{2}, false))
+	assert.Equal(t, []bool{true, false, false}, cleared())
+
+	assert.EqualError(t, s.ClearSales([]int{2, 3, 9}, true), "no sale with ID 9")
+	assert.Equal(t, []bool{true, false, false}, cleared())
+}
+
 // TestStore_DeleteSale covers taking a sale back: it is gone, and its shares are the lot's again. A
 // sale that does not exist cannot be deleted.
 func TestStore_DeleteSale(t *testing.T) {
