@@ -130,6 +130,7 @@ func (m *MockStore) returns(p Portfolio) {
 	m.returnsRate(portfolio.TaxRateKey, p.TaxRate)
 	m.returnsRate(portfolio.GainsTaxRateKey, p.GainsTaxRate)
 	m.On("GetConfig", portfolio.ShowNetSummaryKey).Return(strconv.FormatBool(p.ShowNet), nil)
+	m.On("GetConfig", portfolio.ColorGainsKey).Return("", portfolio.ErrNotSet).Maybe()
 }
 
 // returnsRate sets store up to answer with rate for the key of a tax rate, written as folio config
