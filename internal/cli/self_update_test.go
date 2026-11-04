@@ -61,6 +61,7 @@ func TestSelfUpdateCmd_Confirm(t *testing.T) {
 		"no":         {answer: "n\n", installed: "folio v1.1.0", outcome: "Update canceled\n"},
 		"just enter": {answer: "\n", installed: "folio v1.1.0", outcome: "Update canceled\n"},
 		"no answer":  {answer: "", installed: "folio v1.1.0", outcome: "\nUpdate canceled\n"},
+		"y at EOF":   {answer: "y", installed: "folio v1.2.0", outcome: "\nUpdated folio to v1.2.0\n"},
 	}
 
 	for name, c := range cases {

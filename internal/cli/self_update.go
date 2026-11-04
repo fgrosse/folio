@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -168,11 +169,15 @@ func (cmd *Folio) updateInstead(version string) error {
 func (cmd *Folio) confirm(in io.Reader, question string) bool {
 	cmd.Printf("%s [y/N] ", question)
 
+	// An answer that ends the input without a newline, as "printf y" pipes it, comes with io.EOF
+	// and is still an answer. No newline was read either way, so the line of the question is still
+	// open.
 	answer, err := bufio.NewReader(in).ReadString('\n')
 	if err != nil {
-		// Nothing was typed, so the line of the question is still open.
 		cmd.Println()
-		return false
+		if !errors.Is(err, io.EOF) {
+			return false
+		}
 	}
 
 	switch strings.ToLower(strings.TrimSpace(answer)) {
