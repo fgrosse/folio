@@ -32,10 +32,30 @@ jobs:
           restore-keys: |
             go-${{ runner.os }}-
 
+      # The coverage profile is uploaded for every run, also on main, where it
+      # is the baseline that the report on a pull request compares against.
       - name: Test
-        run: mise run test
+        run: mise run test -- -coverprofile=coverage.txt
         env:
           MISE_TASK_RUN_AUTO_INSTALL: "false"
+
+      - name: Archive code coverage results
+        uses: actions/upload-artifact@v7
+        with:
+          name: code-coverage
+          path: coverage.txt
+
+  code_coverage:
+    name: "Code coverage report"
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    needs: unit_tests
+    permissions:
+      contents: read
+      actions: read        # to download the coverage of this run and of the baseline on main
+      pull-requests: write # to comment on the pull request
+    steps:
+      - uses: fgrosse/go-coverage-report@c4bf7e78d1379325814b4dd42d80e526082e788b # v1.5.0
 
   lint:
     name: "Lint"
