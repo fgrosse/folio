@@ -52,6 +52,10 @@ type Portfolio struct {
 	// ShowNet is whether the header shows the potential and the current value after tax rather
 	// than as the bank states them.
 	ShowNet bool
+
+	// ColorGains is whether the gain of a lot is shown in green, red or gray, as it went up, down
+	// or nowhere that is known, rather than in the color of the text around it.
+	ColorGains bool
 }
 
 // PortfolioLoadedMsg reports the result of loading the portfolio from the Store. Every view
@@ -133,7 +137,12 @@ func loadPortfolio(store Store) (Portfolio, error) {
 		return Portfolio{}, err
 	}
 
-	showNet, err := loadSwitch(store, portfolio.ShowNetSummaryKey)
+	showNet, err := loadSwitch(store, portfolio.ShowNetSummaryKey, false)
+	if err != nil {
+		return Portfolio{}, err
+	}
+
+	colorGains, err := loadSwitch(store, portfolio.ColorGainsKey, true)
 	if err != nil {
 		return Portfolio{}, err
 	}
@@ -146,6 +155,7 @@ func loadPortfolio(store Store) (Portfolio, error) {
 		TaxRate:      taxRate,
 		GainsTaxRate: gainsTaxRate,
 		ShowNet:      showNet,
+		ColorGains:   colorGains,
 	}, nil
 }
 
@@ -168,13 +178,14 @@ func loadTaxRate(store Store, key string) (decimal.NullDecimal, error) {
 	return decimal.NewNullDecimal(rate), nil
 }
 
-// loadSwitch returns whether the setting under key is on. An account that has not said has it off,
-// which for the values of the header means the bank's numbers, before tax.
-func loadSwitch(store Store, key string) (bool, error) {
+// loadSwitch returns whether the setting under key is on, or unset if the account has not said: the
+// values of the header are the bank's, before tax, until the account asks for them after tax, but
+// the gains are in color until it asks for them not to be.
+func loadSwitch(store Store, key string, unset bool) (bool, error) {
 	value, err := store.GetConfig(key)
 	switch {
 	case errors.Is(err, portfolio.ErrNotSet):
-		return false, nil
+		return unset, nil
 	case err != nil:
 		return false, err
 	}

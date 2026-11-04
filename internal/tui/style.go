@@ -38,6 +38,10 @@ type Style struct {
 	Gain lipgloss.Style
 	Loss lipgloss.Style
 
+	// Flat is a gain of nothing, or one that is not known, which is neither up nor down and so as
+	// dim as the borders of the table.
+	Flat lipgloss.Style
+
 	// Badge says next to the total whether the account values are gross or net. Its place, its
 	// capitals and the brackets around it are what make it found, so it is as dim as the rest of the
 	// header and leaves the eye to the total.
@@ -89,6 +93,8 @@ func DefaultStyle() Style {
 			Foreground(lipgloss.Color("78")),
 		Loss: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("203")),
+		Flat: lipgloss.NewStyle().
+			Foreground(borderColor),
 		Badge: lipgloss.NewStyle().
 			Foreground(borderColor),
 		Hint: lipgloss.NewStyle().

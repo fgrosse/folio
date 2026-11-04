@@ -53,7 +53,7 @@ func TestHoldingsModel_LoadsPortfolio(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
 	m.Update(runCmd(t, loadPortfolioCmd(store)))
 
-	rows := m.table.Rows()
+	rows := plainRows(m.table.Rows())
 	require.Len(t, rows, 2)
 	assert.Equal(t, table.Row{"2026-01-15", "PANW", "Payout", "         6", "   $380.12", "   $396.25", "   +4.2%", "     $2,377.50"}, rows[0])
 	assert.Equal(t, table.Row{"2026-02-15", "PANW", "", "       2.5", "         -", "   $396.25", "       -", "       $990.63"}, rows[1])
@@ -364,10 +364,50 @@ func TestHoldingsModel_ShowsWhatIsLeft(t *testing.T) {
 	m, _ := newTestingHoldings(t)
 	m.Update(PortfolioLoadedMsg{portfolio: p})
 
-	rows := m.table.Rows()
+	rows := plainRows(m.table.Rows())
 	require.Len(t, rows, 1)
 	assert.Equal(t, table.Row{"2026-01-15", "PANW", "Payout", "         4", "   $380.12", "   $396.25", "   +4.2%", "     $1,585.00"}, rows[0])
 	assert.Contains(t, ansi.Strip(m.View().Content), "  4 PANW ")
+}
+
+// TestHoldingsModel_ColorsGains covers the switch of the account that says whether the column of
+// the gain is in color: with it on, the gain of the first lot is green and that of the second, which
+// has no cost, is gray, and with it off the cells are as plain as the rest of the row.
+func TestHoldingsModel_ColorsGains(t *testing.T) {
+	p := testPortfolio()
+	m, _ := newTestingHoldings(t)
+
+	p.ColorGains = true
+	m.Update(PortfolioLoadedMsg{portfolio: p})
+	rows := m.table.Rows()
+	require.Len(t, rows, 2)
+	assert.Equal(t, "\x1b[38;5;78m   +4.2%\x1b[39m", rows[0][gainColumn])
+	assert.Equal(t, "\x1b[38;5;240m       -\x1b[39m", rows[1][gainColumn])
+
+	p.ColorGains = false
+	m.Update(PortfolioLoadedMsg{portfolio: p})
+	rows = m.table.Rows()
+	assert.Equal(t, "   +4.2%", rows[0][gainColumn])
+	assert.Equal(t, "       -", rows[1][gainColumn])
+}
+
+// TestHoldingsModel_ColorsGainsInDetails covers the details of a lot under the same switch as the
+// table: the gain in the flyout is green with the colors on and as plain as its label with them
+// off, so that turning them off leaves no gain in color anywhere in the view.
+func TestHoldingsModel_ColorsGainsInDetails(t *testing.T) {
+	green := ansi.Style{}.ForegroundColor(DefaultStyle().Gain.GetForeground()).String()
+	p := testPortfolio()
+	m, _ := newTestingHoldings(t)
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	p.ColorGains = true
+	m.Update(PortfolioLoadedMsg{portfolio: p})
+	require.Contains(t, ansi.Strip(m.View().Content), "PANW of 2026-01-15")
+	assert.Contains(t, m.flyoutLayer(20).GetContent(), green)
+
+	p.ColorGains = false
+	m.Update(PortfolioLoadedMsg{portfolio: p})
+	assert.NotContains(t, m.View().Content, green)
 }
 
 // TestHoldingsModel_HidesColumnsInANarrowWindow covers a window that has no room for every column:
@@ -618,6 +658,52 @@ func TestLotRow(t *testing.T) {
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, c.expected, lotRow(c.lot, c.quote))
+		})
+	}
+}
+
+// TestColorGain covers the color of the cell of a lot's gain in the table: green for a gain, red
+// for a loss, and gray for a gain that rounds to nothing or that is not known, for want of a cost
+// or a quote. The color is set and taken back for the foreground alone, so that the selected row
+// keeps its background past the cell, which a full reset after it would cut short.
+func TestColorGain(t *testing.T) {
+	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
+
+	cases := map[string]struct {
+		lot      portfolio.Lot
+		quote    portfolio.Quote
+		expected string
+	}{
+		"a gain": {
+			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("6"), Cost: dec("380.12")},
+			quote:    panw,
+			expected: "\x1b[38;5;78mcell\x1b[39m",
+		},
+		"a loss": {
+			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("3"), Cost: dec("452.86")},
+			quote:    panw,
+			expected: "\x1b[38;5;203mcell\x1b[39m",
+		},
+		"next to nothing": {
+			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("3"), Cost: dec("396.26")},
+			quote:    panw,
+			expected: "\x1b[38;5;240mcell\x1b[39m",
+		},
+		"no cost": {
+			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("3")},
+			quote:    panw,
+			expected: "\x1b[38;5;240mcell\x1b[39m",
+		},
+		"no quote": {
+			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("3"), Cost: dec("380.12")},
+			quote:    portfolio.Quote{},
+			expected: "\x1b[38;5;240mcell\x1b[39m",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, c.expected, colorGain("cell", c.lot, c.quote, DefaultStyle()))
 		})
 	}
 }

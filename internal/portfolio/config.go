@@ -28,15 +28,31 @@ var ConfigKeys = []ConfigKey{
 			"tax at the tax rate, and the current value after tax on the gains at the gains tax rate.",
 		Choices: []string{"false", "true"},
 		Default: "false",
-		Parse: func(value string) (string, error) {
-			on, err := ParseSwitch(value)
-			if err != nil {
-				return "", err
-			}
-
-			return strconv.FormatBool(on), nil
-		},
+		Parse:   parseStoredSwitch,
 	},
+	{
+		Name: ColorGainsKey,
+		Description: "Whether the TUI colors what a lot gained: green for a gain, red for a loss, " +
+			"and gray for none or one that is not known.",
+		Choices: []string{"false", "true"},
+		Default: "true",
+		Parse:   parseStoredSwitch,
+	},
+}
+
+// ColorGainsKey is the key of the configuration that says whether the TUI colors the gain of a lot,
+// as ParseSwitch reads it. The colors are on while it is not set: they are what tells a gain from a
+// loss at a glance, and the key is there for a terminal or a reader they do not suit.
+const ColorGainsKey = "color-gains"
+
+// parseStoredSwitch checks a switch and returns it as the store keeps it, "true" or "false".
+func parseStoredSwitch(value string) (string, error) {
+	on, err := ParseSwitch(value)
+	if err != nil {
+		return "", err
+	}
+
+	return strconv.FormatBool(on), nil
 }
 
 // parseStoredTaxRate checks a tax rate and returns it as the store keeps it, with its percent sign.
