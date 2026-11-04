@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -14,10 +15,28 @@ import (
 	"github.com/fgrosse/folio/internal/portfolio"
 )
 
-// salesColumnsWidth is what every column of the Sales table other than the grant occupies, padding
-// included.
-const salesColumnsWidth = dayColumnWidth + symbolColumnWidth + sharesColumnWidth + priceColumnWidth + 2*valueColumnWidth +
-	6*cellPadding
+const (
+	// taxColumnWidth fits the tax on a sale up to $99,999.99 with the mark of a cleared sale in
+	// front of it.
+	taxColumnWidth = 12
+
+	// salesColumnsWidth is what the columns of the Sales table that are always there occupy, with
+	// their padding. They are all of the narrowest window: the grant and the price of a share are
+	// only in a window with room for them, which is what SalesModel.layout decides.
+	salesColumnsWidth = dayColumnWidth + symbolColumnWidth + sharesColumnWidth + 2*valueColumnWidth + taxColumnWidth +
+		6*cellPadding
+
+	// saleGrantMinWidth is the least room the column of the grant is worth having with.
+	saleGrantMinWidth = 8
+
+	// saleGrantColumn and salePriceColumn are where the grant and the price stand among all the
+	// columns, for leaving them out.
+	saleGrantColumn = 2
+	salePriceColumn = 4
+
+	// clearedMark stands in front of the tax on a sale that is cleared.
+	clearedMark = "✓"
+)
 
 // A SalesModel is the Sales view: every sale, with what it brought in and gained. Together they are
 // the part of the account that has been turned into money.
@@ -27,9 +46,17 @@ type SalesModel struct {
 	keys      keyMap
 	table     table.Model
 	width     int            // width of the table, which the header line is spread across
+	showGrant bool           // the window has room for the column of the grant
+	showPrice bool           // the window has room for the column of the price as well
 	portfolio Portfolio      // the account as it was last loaded
 	err       error          // why the last load failed or had no fresh quotes, nil unless it did
-	confirm   *ConfirmDialog // the dialog asking whether to delete a sale, nil unless it is open
+	confirm   *ConfirmDialog // the dialog asking whether to delete or clear sales, nil unless it is open
+	confirms  string         // what a yes to that dialog does, in a word for the help
+}
+
+// ClearSalesMsg reports that the user confirmed marking the sales with the given IDs as cleared.
+type ClearSalesMsg struct {
+	ids []int
 }
 
 // DeleteSaleMsg reports that the user confirmed deleting the sale with the given ID.
@@ -51,19 +78,66 @@ func NewSalesModel(store Store, style Style) *SalesModel {
 	return m
 }
 
-// columns returns the table's columns, the column of the grant taking whatever the width leaves.
-// The titles of the number columns are padded like the numbers under them, so that they end where
-// the numbers do.
+// layout decides which columns the table has room for at its width and sets it up with those, and
+// with the rows to match. The tax on a sale is always among them, since what is owed is what the
+// view keeps track of. The grant comes first of the two that are not: no other column says where
+// the shares were from, while the price of one is the proceeds over the shares.
+func (m *SalesModel) layout() {
+	room := m.width - salesColumnsWidth - cellPadding
+	m.showGrant = room >= saleGrantMinWidth
+	m.showPrice = room-priceColumnWidth-cellPadding >= saleGrantMinWidth
+
+	// The table renders every row with the columns it has, so the rows go before the columns
+	// change in number and come back after.
+	cursor := m.table.Cursor()
+	m.table.SetRows(nil)
+	m.table.SetColumns(m.columns())
+	m.updateRows()
+	m.table.SetCursor(cursor)
+}
+
+// shownSale returns those of cells, which are one for every column of the table, whose columns the
+// window has room for. It is what keeps the columns and the cells of a row the same in number.
+func shownSale[T any](m *SalesModel, cells []T) []T {
+	cells = slices.Clone(cells)
+
+	// The price is the later of the two, so that leaving it out does not move the grant.
+	if !m.showPrice {
+		cells = slices.Delete(cells, salePriceColumn, salePriceColumn+1)
+	}
+	if !m.showGrant {
+		cells = slices.Delete(cells, saleGrantColumn, saleGrantColumn+1)
+	}
+
+	return cells
+}
+
+// columns returns the table's columns, the column of the grant taking whatever the width leaves,
+// if it is there. The titles of the number columns are padded like the numbers under them, so that
+// they end where the numbers do.
 func (m *SalesModel) columns() []table.Column {
-	return []table.Column{
+	grantWidth := m.width - salesColumnsWidth - cellPadding
+	if m.showPrice {
+		grantWidth -= priceColumnWidth + cellPadding
+	}
+
+	// Without the grant, the symbol takes the little that the width leaves, so that the last
+	// column still ends where the table does.
+	symbolWidth := symbolColumnWidth
+	if !m.showGrant {
+		symbolWidth = m.width - salesColumnsWidth + symbolColumnWidth
+	}
+
+	return shownSale(m, []table.Column{
 		{Title: "Sold on", Width: dayColumnWidth},
-		{Title: "Symbol", Width: symbolColumnWidth},
-		{Title: "From", Width: m.width - salesColumnsWidth - cellPadding},
+		{Title: "Symbol", Width: symbolWidth},
+		{Title: "From", Width: grantWidth},
 		{Title: fmt.Sprintf("%*s", sharesColumnWidth, "Shares"), Width: sharesColumnWidth},
 		{Title: fmt.Sprintf("%*s", priceColumnWidth, "Price"), Width: priceColumnWidth},
 		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Proceeds"), Width: valueColumnWidth},
+		{Title: fmt.Sprintf("%*s", taxColumnWidth, "Tax"), Width: taxColumnWidth},
 		{Title: fmt.Sprintf("%*s", valueColumnWidth, "Gain"), Width: valueColumnWidth},
-	}
+	})
 }
 
 // Title implements ViewModel by naming the view in the app's tab bar.
@@ -90,7 +164,7 @@ func (m *SalesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKeyPress(msg)
 	case tea.WindowSizeMsg:
 		m.width = tableWidth(msg.Width)
-		m.table.SetColumns(m.columns())
+		m.layout()
 		m.table.SetWidth(m.width)
 		m.table.SetHeight(msg.Height - chromeHeight)
 		return m, nil
@@ -106,6 +180,9 @@ func (m *SalesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case DeleteSaleMsg:
 		m.confirm = nil
 		return m, m.deleteSaleCmd(msg.id)
+	case ClearSalesMsg:
+		m.confirm = nil
+		return m, m.clearSalesCmd(msg.ids, true)
 	case ConfirmCanceledMsg:
 		m.confirm = nil
 		return m, nil
@@ -115,7 +192,8 @@ func (m *SalesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // handleKeyPress quits on the quit keys, asks whether to delete the selected sale on the delete key,
-// and hands every other key to the table, which moves the selection. While the question is open,
+// clears it or takes that back on the clear key, asks whether to clear the sales of its year on
+// the key for that, and hands every other key to the table, which moves the selection. While the question is open,
 // every key is its own.
 func (m *SalesModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.confirm != nil {
@@ -127,6 +205,10 @@ func (m *SalesModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case key.Matches(msg, m.keys.Delete):
 		return m.askToDelete()
+	case key.Matches(msg, m.keys.Clear):
+		return m.toggleCleared()
+	case key.Matches(msg, m.keys.ClearYear):
+		return m.askToClearYear()
 	}
 
 	var cmd tea.Cmd
@@ -154,8 +236,69 @@ func (m *SalesModel) askToDelete() (tea.Model, tea.Cmd) {
 
 	question := fmt.Sprintf("Delete the sale of %s %s on %s?", sale.Shares, sale.Symbol, sale.Date.Format(time.DateOnly))
 	m.confirm = NewConfirmDialog("Delete sale", question, DeleteSaleMsg{id: sale.ID}, m.style)
+	m.confirms = "delete"
 
 	return m, nil
+}
+
+// askToClearYear opens a dialog asking whether to clear every sale of the year of the selected one
+// that is not cleared yet, which sends a ClearSalesMsg if the answer is yes. A tax return settles
+// the sales of one year, so that is what is cleared in one go, and the later sales stay owed. The
+// question says what tax goes with them if the account has a rate to work it out with. In a year
+// with nothing left to clear there is nothing to ask.
+func (m *SalesModel) askToClearYear() (tea.Model, tea.Cmd) {
+	selected, ok := m.selected()
+	if !ok {
+		return m, nil
+	}
+
+	year := selected.Date.Year()
+	var open []portfolio.Sale
+	var ids []int
+	for _, sale := range m.portfolio.Sales {
+		if sale.Date.Year() == year && !sale.Cleared {
+			open = append(open, sale)
+			ids = append(ids, sale.ID)
+		}
+	}
+	if len(open) == 0 {
+		return m, nil
+	}
+
+	question := fmt.Sprintf("Mark %s of %d as cleared", count(len(open), "sale"), year)
+	if rate := m.portfolio.GainsTaxRate; rate.Valid {
+		question += ", with " + portfolio.FormatUSD(portfolio.TaxOwed(open, rate.Decimal)) + " of tax"
+	}
+
+	m.confirm = NewConfirmDialog("Clear tax year", question+"?", ClearSalesMsg{ids: ids}, m.style)
+	m.confirms = "clear"
+
+	return m, nil
+}
+
+// toggleCleared marks the selected sale as cleared, or as not cleared if it is: the tax on it is
+// settled with the tax office, or still owed. It does not ask first, since the same key takes it
+// back.
+func (m *SalesModel) toggleCleared() (tea.Model, tea.Cmd) {
+	sale, ok := m.selected()
+	if !ok {
+		return m, nil
+	}
+
+	return m, m.clearSalesCmd([]int{sale.ID}, !sale.Cleared)
+}
+
+// clearSalesCmd returns a command that marks the sales with the given IDs as cleared, or as not
+// cleared, and loads the portfolio again, in which their tax is no longer owed, or is again.
+func (m *SalesModel) clearSalesCmd(ids []int, cleared bool) tea.Cmd {
+	store := m.store
+	return func() tea.Msg {
+		if err := store.ClearSales(ids, cleared); err != nil {
+			return PortfolioLoadedMsg{err: err}
+		}
+
+		return loadPortfolioCmd(store)()
+	}
 }
 
 // deleteSaleCmd returns a command that deletes the sale with the given ID and loads the portfolio
@@ -175,7 +318,7 @@ func (m *SalesModel) deleteSaleCmd(id int) tea.Cmd {
 func (m *SalesModel) updateRows() {
 	rows := make([]table.Row, len(m.portfolio.Sales))
 	for i, sale := range m.portfolio.Sales {
-		rows[i] = saleRow(sale)
+		rows[i] = shownSale(m, saleRow(sale, m.portfolio.GainsTaxRate))
 	}
 
 	setRows(&m.table, rows)
@@ -200,8 +343,8 @@ func (m *SalesModel) View() tea.View {
 	return tea.NewView(trimTrailingSpace(c.Render()) + "\n")
 }
 
-// headerView renders the two lines above the table: what the sales have realized on the left, and
-// the account values on the right. Under the summary is the note of the selected sale, which the
+// headerView renders the two lines above the table: what the sales have realized and what tax is
+// still owed on it on the left, and the account values on the right. Under the summary is the note of the selected sale, which the
 // table has no column for, all of its lines on that one, or the prices if the sale has no note.
 func (m *SalesModel) headerView() string {
 	var note string
@@ -209,7 +352,7 @@ func (m *SalesModel) headerView() string {
 		note = strings.Join(strings.Fields(strings.ReplaceAll(sale.Note, "\n", " · ")), " ")
 	}
 
-	return notedHeader(realizedSummary(m.portfolio.Sales), note, m.portfolio, m.err, m.width-cellPadding, m.style)
+	return notedHeader(realizedSummary(m.portfolio.Sales, m.portfolio.GainsTaxRate), note, m.portfolio, m.err, m.width-cellPadding, m.style)
 }
 
 // helpView renders the keys worth knowing in two lines, as every view does: getting around on the
@@ -221,19 +364,28 @@ func (m *SalesModel) helpView() string {
 
 	if m.confirm != nil {
 		return help.ShortHelpView([]key.Binding{
-			key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "delete")),
+			key.NewBinding(key.WithKeys("y"), key.WithHelp("y", m.confirms)),
 			key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "cancel")),
 		}) + "\n"
 	}
 
+	// The key that clears a sale takes that back on one that is cleared, and says so.
+	toggle := m.keys.Clear
+	if sale, ok := m.selected(); ok && sale.Cleared {
+		toggle.SetHelp(toggle.Help().Key, "unclear tax")
+	}
+
 	return help.ShortHelpView([]key.Binding{nav.LineUp, nav.LineDown, m.keys.Quit}) + "\n" +
-		help.ShortHelpView([]key.Binding{m.keys.Delete})
+		help.ShortHelpView([]key.Binding{m.keys.Delete, toggle, m.keys.ClearYear})
 }
 
-// realizedSummary sums up sales as the money they brought in and the gain in it, such as "Realized
-// $20,510.00 · gain +$12,385.00". It is what the Sales view says above its table. The gain is that
-// of the sales whose cost is known, and the summary says how many it leaves out.
-func realizedSummary(sales []portfolio.Sale) string {
+// realizedSummary sums up sales as the money they brought in, the gain in it and the tax that is
+// still owed on it at rate, such as "Realized $20,510.00 · gain +$12,385.00 · tax owed $3,269.64".
+// It is what the Sales view says above its table. The gain is that of the sales whose cost is
+// known, and the summary says how many it leaves out. What is owed is the tax on the sales that are
+// not cleared, and is left unsaid where there is nothing to work it out from: no rate, which is not
+// valid then, or no gain that is known.
+func realizedSummary(sales []portfolio.Sale, rate decimal.NullDecimal) string {
 	if len(sales) == 0 {
 		return "Nothing sold yet"
 	}
@@ -245,16 +397,22 @@ func realizedSummary(sales []portfolio.Sale) string {
 	case realized.Uncosted == len(sales):
 		return summary + "unknown"
 	case realized.Uncosted > 0:
-		return summary + formatGain(realized.Gain) + " without " + count(realized.Uncosted, "sale") + " of unknown cost"
+		summary += formatGain(realized.Gain) + " without " + count(realized.Uncosted, "sale") + " of unknown cost"
 	default:
-		return summary + formatGain(realized.Gain)
+		summary += formatGain(realized.Gain)
 	}
+
+	if rate.Valid {
+		summary += " · tax owed " + portfolio.FormatUSD(portfolio.TaxOwed(sales, rate.Decimal))
+	}
+
+	return summary
 }
 
 // saleRow renders a sale as a row of the Sales table: its day, the stock and the grant of the lot it
-// was sold from, the shares and the price of one, and what the sale brought in and gained. The
-// numbers are right-aligned and padded out like those of the other tables.
-func saleRow(sale portfolio.Sale) table.Row {
+// was sold from, the shares and the price of one, what the sale brought in, the tax on its gain at
+// rate, and the gain. The numbers are right-aligned and padded out like those of the other tables.
+func saleRow(sale portfolio.Sale, rate decimal.NullDecimal) table.Row {
 	gain := noValue
 	if amount, known := sale.Gain(); known {
 		gain = formatGain(amount)
@@ -267,8 +425,25 @@ func saleRow(sale portfolio.Sale) table.Row {
 		fmt.Sprintf("%*s", sharesColumnWidth, sale.Shares),
 		fmt.Sprintf("%*s", priceColumnWidth, portfolio.FormatUSD(sale.Price)),
 		fmt.Sprintf("%*s", valueColumnWidth, portfolio.FormatUSD(sale.Proceeds())),
+		fmt.Sprintf("%*s", taxColumnWidth, saleTax(sale, rate)),
 		fmt.Sprintf("%*s", valueColumnWidth, gain),
 	}
+}
+
+// saleTax renders the tax on the gain of sale at rate, which is in percent and not valid if the
+// account has none. A sale that is cleared has its tax checked off, whether or not folio can say
+// how much it was: that it is settled is the user's to say.
+func saleTax(sale portfolio.Sale, rate decimal.NullDecimal) string {
+	tax := noValue
+	if amount, known := sale.Tax(rate.Decimal); known && rate.Valid {
+		tax = portfolio.FormatUSD(amount)
+	}
+
+	if sale.Cleared {
+		return clearedMark + " " + tax
+	}
+
+	return tax
 }
 
 // formatGain renders a gain in dollars with its sign in front, a plus as well as a minus, so that

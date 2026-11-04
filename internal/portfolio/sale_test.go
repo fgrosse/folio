@@ -46,3 +46,39 @@ func TestNewRealized(t *testing.T) {
 
 	assert.Equal(t, "0", NewRealized(nil).Proceeds.String())
 }
+
+// TestSale_Tax covers what a sale costs in tax: the gains tax on its own gain, at the rate of the
+// account. A sale at a loss is not taxed, and a sale of a lot without a cost has no gain to tax, so
+// its tax is not known.
+func TestSale_Tax(t *testing.T) {
+	rate := shares("26.4")
+
+	// A gain of 50 * 247.7 = 12385.
+	tax, known := Sale{Shares: shares("50"), Price: shares("410.2"), Cost: shares("162.5")}.Tax(rate)
+	assert.True(t, known)
+	assert.Equal(t, "3269.64", tax.String())
+
+	tax, known = Sale{Shares: shares("10"), Price: shares("150"), Cost: shares("162.5")}.Tax(rate)
+	assert.True(t, known, "a loss is known not to be taxed")
+	assert.Equal(t, "0", tax.String())
+
+	_, known = Sale{Shares: shares("3"), Price: shares("390")}.Tax(rate)
+	assert.False(t, known)
+}
+
+// TestTaxOwed covers what the tax office is still to get for the sales: the tax on every sale that
+// was not cleared, which is what a sale is once the tax return it was part of is done. A loss adds
+// nothing, and neither does a sale whose cost is not known.
+func TestTaxOwed(t *testing.T) {
+	sales := []Sale{
+		{Shares: shares("50"), Price: shares("410.2"), Cost: shares("162.5"), Cleared: true},
+		{Shares: shares("10.5"), Price: shares("400.333"), Cost: shares("231.48")},
+		{Shares: shares("2"), Price: shares("401.5"), Cost: shares("380.12")},
+		{Shares: shares("10"), Price: shares("150"), Cost: shares("162.5")},
+		{Shares: shares("3"), Price: shares("390")},
+	}
+
+	// 26.4% of 1772.9565 and of 42.76, each to the cent: 468.06 + 11.29
+	assert.Equal(t, "479.35", TaxOwed(sales, shares("26.4")).String())
+	assert.Equal(t, "0", TaxOwed(nil, shares("26.4")).String())
+}

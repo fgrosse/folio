@@ -2,12 +2,14 @@ package tui
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/exp/golden"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -58,8 +60,8 @@ func TestSalesModel_LoadsPortfolio(t *testing.T) {
 	p := soldPortfolio()
 	rows := m.table.Rows()
 	require.Len(t, rows, 2)
-	assert.Equal(t, saleRow(p.Sales[0]), rows[0])
-	assert.Equal(t, saleRow(p.Sales[1]), rows[1])
+	assert.Equal(t, table.Row(shownSale(m, saleRow(p.Sales[0], p.GainsTaxRate))), rows[0])
+	assert.Equal(t, table.Row(shownSale(m, saleRow(p.Sales[1], p.GainsTaxRate))), rows[1])
 	store.AssertExpectations(t)
 }
 
@@ -77,6 +79,52 @@ func TestSalesModel_Keys(t *testing.T) {
 	require.Equal(t, 0, m.table.Cursor())
 	m.Update(keyPressed("j"))
 	assert.Equal(t, 1, m.table.Cursor(), "j should move the selection down a row")
+}
+
+// TestSalesModel_Columns covers which columns the Sales table has at which width. What a sale
+// brought in, the tax on it and its gain are in every window. The price of a share, which the
+// proceeds and the shares imply, is only in one wide enough to leave the grant its room as well,
+// and the narrowest window does without the grant too. A row has a cell for every column.
+func TestSalesModel_Columns(t *testing.T) {
+	cases := map[string]struct {
+		width    int
+		expected []string
+	}{
+		"the narrowest window": {
+			width:    82,
+			expected: []string{"Sold on", "Symbol", "Shares", "Proceeds", "Tax", "Gain"},
+		},
+		"not quite room for the grant": {
+			width:    88,
+			expected: []string{"Sold on", "Symbol", "Shares", "Proceeds", "Tax", "Gain"},
+		},
+		"room for the grant": {
+			width:    100,
+			expected: []string{"Sold on", "Symbol", "From", "Shares", "Proceeds", "Tax", "Gain"},
+		},
+		"room for the price": {
+			width:    110,
+			expected: []string{"Sold on", "Symbol", "From", "Shares", "Price", "Proceeds", "Tax", "Gain"},
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			m, _ := newTestingSales(t)
+			m.Update(tea.WindowSizeMsg{Width: c.width, Height: 20})
+
+			var titles []string
+			width := 0
+			for _, column := range m.table.Columns() {
+				titles = append(titles, strings.TrimSpace(column.Title))
+				width += column.Width + cellPadding
+			}
+
+			assert.Equal(t, c.expected, titles)
+			assert.Equal(t, tableWidth(c.width), width, "the columns should fill the table")
+			assert.Len(t, m.table.Rows()[0], len(c.expected))
+		})
+	}
 }
 
 // TestSalesModel_Render is the frame the Sales view puts on screen, in the shape of the other
@@ -127,6 +175,91 @@ func TestSalesModel_DeleteSale(t *testing.T) {
 	assert.False(t, m.CapturesKeys(), "the question should be closed")
 	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
 	store.AssertExpectations(t)
+}
+
+// TestSalesModel_ClearSale covers settling the tax on one sale: space, which ticks the sale off, has
+// the store mark the selected sale as cleared, without a question since another space takes it
+// back, and the view loads the portfolio again. On a sale that is cleared the same key marks it as
+// not cleared, and the help says which of the two it is going to do. Before anything was sold it
+// does nothing. The key is not c, which opens the configuration in every view.
+func TestSalesModel_ClearSale(t *testing.T) {
+	p := soldPortfolio()
+	p.Sales[1].Cleared = true
+	store := new(MockStore)
+	store.returns(p)
+	m := NewSalesModel(store, DefaultStyle())
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
+	m.Update(runCmd(t, m.Init()))
+	assert.Contains(t, ansi.Strip(m.View().Content), "d delete • space clear tax")
+	space := tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
+
+	store.On("ClearSales", []int{1}, true).Return(nil).Once()
+	_, cmd := m.Update(space)
+	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
+
+	m.Update(keyPressed("j")) // the second sale, which is cleared
+	assert.Contains(t, ansi.Strip(m.View().Content), "d delete • space unclear tax")
+
+	store.On("ClearSales", []int{2}, false).Return(nil).Once()
+	_, cmd = m.Update(space)
+	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
+	store.AssertExpectations(t)
+
+	empty := NewSalesModel(new(MockStore), DefaultStyle())
+	_, cmd = empty.Update(space)
+	assert.Nil(t, cmd)
+}
+
+// TestSalesModel_ClearYear covers what follows a tax return, which settles the sales of a year at
+// once: C asks whether to clear every sale of the year of the selected one that is not cleared yet,
+// saying how many they are and what tax goes with them, and a y has the store clear them together.
+// The sales of other years are left alone. A no clears nothing, and in a year with nothing left to
+// clear there is nothing to ask.
+func TestSalesModel_ClearYear(t *testing.T) {
+	p := soldPortfolio()
+	p.Sales = append(p.Sales,
+		portfolio.Sale{
+			ID: 3, LotID: 1, Date: day("2026-12-01"), Shares: dec("1"), Price: dec("420"),
+			Symbol: "PANW", Cost: dec("380.12"), Grant: "Payout", Cleared: true,
+		},
+		portfolio.Sale{
+			ID: 4, LotID: 1, Date: day("2027-01-10"), Shares: dec("1"), Price: dec("430"),
+			Symbol: "PANW", Cost: dec("380.12"), Grant: "Payout", Cleared: true,
+		},
+	)
+	store := new(MockStore)
+	store.returns(p)
+	m := NewSalesModel(store, DefaultStyle())
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
+	m.Update(runCmd(t, m.Init()))
+	assert.Contains(t, ansi.Strip(m.View().Content), "space clear tax • C clear year")
+
+	m.Update(keyPressed("C"))
+	require.True(t, m.CapturesKeys(), "the question should take the keyboard")
+	frame := ansi.Strip(m.View().Content)
+	assert.Contains(t, frame, "Mark 2 sales of 2026 as cleared, with $19.23 of tax?")
+	assert.Contains(t, frame, "y clear • n cancel")
+
+	_, cmd := m.Update(keyPressed("n"))
+	_, cmd = m.Update(runCmd(t, cmd))
+	assert.Nil(t, cmd)
+	assert.False(t, m.CapturesKeys(), "a no should close the question")
+
+	m.Update(keyPressed("C"))
+	_, cmd = m.Update(keyPressed("y"))
+	msg := runCmd(t, cmd)
+	require.Equal(t, ClearSalesMsg{ids: []int{1, 2}}, msg)
+
+	store.On("ClearSales", []int{1, 2}, true).Return(nil)
+	_, cmd = m.Update(msg)
+	assert.False(t, m.CapturesKeys(), "the question should be closed")
+	assert.IsType(t, PortfolioLoadedMsg{}, runCmd(t, cmd))
+	store.AssertExpectations(t)
+
+	m.table.SetCursor(3) // the sale of 2027, which is cleared
+	_, cmd = m.Update(keyPressed("C"))
+	assert.Nil(t, cmd)
+	assert.False(t, m.CapturesKeys(), "there should be no question to answer")
 }
 
 // TestSalesModel_DeleteWithNothingSelected covers d before anything was sold, where there is nothing
@@ -191,11 +324,16 @@ func TestViews_SelectTheFirstRow(t *testing.T) {
 
 // TestSaleRow covers how one sale reads as a row of the Sales table: its day, the stock and the
 // grant its lot was from, and the numbers right-aligned - how many shares, what one sold for, what
-// that brought in, and how much of it is gain over what the shares cost. A gain says which way it
-// goes with a sign, and a sale of a lot without a cost has none to state.
+// that brought in, the tax on the gain in it, and that gain over what the shares cost. A gain says
+// which way it goes with a sign, and a sale of a lot without a cost has none to state, and no tax.
+// Neither has any sale of an account without a rate to tax a gain at. A loss is not taxed, and the
+// tax on a sale that is cleared is checked off.
 func TestSaleRow(t *testing.T) {
+	rate := decimal.NewNullDecimal(dec("26.4"))
+
 	cases := map[string]struct {
 		sale     portfolio.Sale
+		rate     decimal.NullDecimal
 		expected table.Row
 	}{
 		"sold at a gain": {
@@ -203,68 +341,120 @@ func TestSaleRow(t *testing.T) {
 				Date: day("2026-09-15"), Symbol: "PANW", Grant: "Payout",
 				Shares: dec("50"), Price: dec("410.2"), Cost: dec("162.5"),
 			},
-			expected: table.Row{"2026-09-15", "PANW", "Payout", "        50", "   $410.20", "    $20,510.00", "   +$12,385.00"},
+			rate: rate,
+			expected: table.Row{
+				"2026-09-15", "PANW", "Payout", "        50", "   $410.20", "    $20,510.00", "   $3,269.64", "   +$12,385.00",
+			},
+		},
+		"sold at a gain and cleared": {
+			sale: portfolio.Sale{
+				Date: day("2026-09-15"), Symbol: "PANW", Grant: "Payout",
+				Shares: dec("50"), Price: dec("410.2"), Cost: dec("162.5"), Cleared: true,
+			},
+			rate: rate,
+			expected: table.Row{
+				"2026-09-15", "PANW", "Payout", "        50", "   $410.20", "    $20,510.00", " ✓ $3,269.64", "   +$12,385.00",
+			},
 		},
 		"sold at a loss": {
 			sale: portfolio.Sale{
 				Date: day("2025-08-01"), Symbol: "PANW", Grant: "Payout",
 				Shares: dec("230"), Price: dec("131.1961"), Cost: dec("162.5"),
 			},
-			expected: table.Row{"2025-08-01", "PANW", "Payout", "       230", "   $131.20", "    $30,175.10", "    -$7,199.90"},
+			rate: rate,
+			expected: table.Row{
+				"2025-08-01", "PANW", "Payout", "       230", "   $131.20", "    $30,175.10", "       $0.00", "    -$7,199.90",
+			},
 		},
 		"a lot without a cost, entered by hand": {
 			sale: portfolio.Sale{
 				Date: day("2026-09-20"), Symbol: "AAPL",
 				Shares: dec("2.5"), Price: dec("330"),
 			},
-			expected: table.Row{"2026-09-20", "AAPL", "", "       2.5", "   $330.00", "       $825.00", "             -"},
+			rate: rate,
+			expected: table.Row{
+				"2026-09-20", "AAPL", "", "       2.5", "   $330.00", "       $825.00", "           -", "             -",
+			},
+		},
+		"no rate to tax a gain at": {
+			sale: portfolio.Sale{
+				Date: day("2026-09-15"), Symbol: "PANW", Grant: "Payout",
+				Shares: dec("50"), Price: dec("410.2"), Cost: dec("162.5"), Cleared: true,
+			},
+			expected: table.Row{
+				"2026-09-15", "PANW", "Payout", "        50", "   $410.20", "    $20,510.00", "         ✓ -", "   +$12,385.00",
+			},
 		},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, c.expected, saleRow(c.sale))
+			assert.Equal(t, c.expected, saleRow(c.sale, c.rate))
 		})
 	}
 }
 
 // TestRealizedSummary covers the line the Sales view puts above its table, which is what tracking
-// sales is for: how much money the sales have brought in, and how much of that is gain. It says so
-// if the gain leaves out sales whose cost is not known, and if nothing was sold yet.
+// sales is for: how much money the sales have brought in, how much of that is gain, and how much tax
+// is still owed on it, which is the tax on the sales that are not cleared. It says so if the gain
+// leaves out sales whose cost is not known, and if nothing was sold yet. An account without a rate
+// to tax a gain at is not told what it owes, and neither is one whose every gain is unknown.
 func TestRealizedSummary(t *testing.T) {
 	gain := portfolio.Sale{Shares: dec("50"), Price: dec("410.2"), Cost: dec("162.5")}
+	cleared := portfolio.Sale{Shares: dec("2"), Price: dec("401.5"), Cost: dec("380.12"), Cleared: true}
 	loss := portfolio.Sale{Shares: dec("10"), Price: dec("150"), Cost: dec("162.5")}
 	uncosted := portfolio.Sale{Shares: dec("2.5"), Price: dec("330")}
+	rate := decimal.NewNullDecimal(dec("26.4"))
 
 	cases := map[string]struct {
 		sales    []portfolio.Sale
+		rate     decimal.NullDecimal
 		expected string
 	}{
 		"nothing sold": {
 			sales:    nil,
+			rate:     rate,
 			expected: "Nothing sold yet",
 		},
 		"a gain": {
 			sales:    []portfolio.Sale{gain},
-			expected: "Realized $20,510.00 · gain +$12,385.00",
+			rate:     rate,
+			expected: "Realized $20,510.00 · gain +$12,385.00 · tax owed $3,269.64",
+		},
+		"a gain that is cleared": {
+			sales:    []portfolio.Sale{gain, cleared},
+			rate:     rate,
+			expected: "Realized $21,313.00 · gain +$12,427.76 · tax owed $3,269.64",
+		},
+		"all cleared": {
+			sales:    []portfolio.Sale{cleared},
+			rate:     rate,
+			expected: "Realized $803.00 · gain +$42.76 · tax owed $0.00",
 		},
 		"a loss overall": {
 			sales:    []portfolio.Sale{loss},
-			expected: "Realized $1,500.00 · gain -$125.00",
+			rate:     rate,
+			expected: "Realized $1,500.00 · gain -$125.00 · tax owed $0.00",
 		},
 		"a sale without a cost": {
 			sales:    []portfolio.Sale{gain, uncosted},
-			expected: "Realized $21,335.00 · gain +$12,385.00 without 1 sale of unknown cost",
+			rate:     rate,
+			expected: "Realized $21,335.00 · gain +$12,385.00 without 1 sale of unknown cost · tax owed $3,269.64",
 		},
 		"only sales without a cost": {
 			sales:    []portfolio.Sale{uncosted, uncosted},
+			rate:     rate,
 			expected: "Realized $1,650.00 · gain unknown",
+		},
+		"no rate to tax a gain at": {
+			sales:    []portfolio.Sale{gain},
+			expected: "Realized $20,510.00 · gain +$12,385.00",
 		},
 	}
 
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, c.expected, realizedSummary(c.sales))
+			assert.Equal(t, c.expected, realizedSummary(c.sales, c.rate))
 		})
 	}
 }
