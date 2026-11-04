@@ -153,3 +153,39 @@ func TestLoadPortfolioCmd_ShowNet(t *testing.T) {
 		})
 	}
 }
+
+// TestLoadPortfolioCmd_ColorGains covers whether the views color the gain of a lot, which the
+// store keeps among the configuration: unlike the other switches it is on while it is not set, and
+// a value that is neither true nor false is an error that says which key it is in.
+func TestLoadPortfolioCmd_ColorGains(t *testing.T) {
+	cases := map[string]struct {
+		value    string
+		err      error
+		expected bool
+		error    string
+	}{
+		"not set": {err: portfolio.ErrNotSet, expected: true},
+		"false":   {value: "false", expected: false},
+		"true":    {value: "true", expected: true},
+		"neither": {value: "red", error: `color-gains: "red" is neither true nor false`},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			store := new(MockStore)
+			store.returnsAccount(testPortfolio())
+			store.On("GetConfig", portfolio.ColorGainsKey).Return(c.value, c.err)
+			store.On("GetConfig", mock.Anything).Return("", portfolio.ErrNotSet)
+
+			loaded, ok := runCmd(t, loadPortfolioCmd(store)).(PortfolioLoadedMsg)
+			require.True(t, ok)
+			if c.error != "" {
+				assert.EqualError(t, loaded.err, c.error)
+				return
+			}
+
+			require.NoError(t, loaded.err)
+			assert.Equal(t, c.expected, loaded.portfolio.ColorGains)
+		})
+	}
+}

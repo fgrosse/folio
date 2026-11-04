@@ -97,7 +97,8 @@ func (m *MockStore) ClearSales(ids []int, cleared bool) error {
 
 // testPortfolio is the account most tests of the views look at: PANW stock in two lots of 8.5
 // shares in all, and a grant with one vest released into the first of them and two still to come,
-// which are taxed at 44.3%. The gain of a sale is taxed at 26.4%.
+// which are taxed at 44.3%. The gain of a sale is taxed at 26.4%, and gains are in color, as they
+// are unless an account says otherwise.
 func testPortfolio() Portfolio {
 	return Portfolio{
 		Lots: []portfolio.Lot{
@@ -121,6 +122,7 @@ func testPortfolio() Portfolio {
 		},
 		TaxRate:      decimal.NewNullDecimal(dec("44.3")),
 		GainsTaxRate: decimal.NewNullDecimal(dec("26.4")),
+		ColorGains:   true,
 	}
 }
 
@@ -130,7 +132,7 @@ func (m *MockStore) returns(p Portfolio) {
 	m.returnsRate(portfolio.TaxRateKey, p.TaxRate)
 	m.returnsRate(portfolio.GainsTaxRateKey, p.GainsTaxRate)
 	m.On("GetConfig", portfolio.ShowNetSummaryKey).Return(strconv.FormatBool(p.ShowNet), nil)
-	m.On("GetConfig", portfolio.ColorGainsKey).Return("", portfolio.ErrNotSet).Maybe()
+	m.On("GetConfig", portfolio.ColorGainsKey).Return(strconv.FormatBool(p.ColorGains), nil)
 }
 
 // returnsRate sets store up to answer with rate for the key of a tax rate, written as folio config
