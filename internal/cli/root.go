@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"time"
 
@@ -14,8 +15,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/fgrosse/folio/internal/github"
 	"github.com/fgrosse/folio/internal/portfolio"
 	"github.com/fgrosse/folio/internal/tui"
+	"github.com/fgrosse/folio/internal/update"
 	"github.com/fgrosse/folio/internal/yahoo"
 )
 
@@ -37,6 +40,17 @@ type Folio struct {
 	// where the version comes from if no release build has set one.
 	buildInfo func() (*debug.BuildInfo, bool)
 
+	// releases is where the releases of folio are published, which "folio self-update" reads.
+	releases update.Source
+
+	// platform is what this binary was built for, which says which archive of a release is the
+	// one to update it with.
+	platform update.Platform
+
+	// executable returns the path of the file that this program was started from, which is the
+	// one that an update replaces.
+	executable func() (string, error)
+
 	// openTUI runs the interactive views over a store until the user quits. It is the real TUI
 	// unless a test puts something in its place, since the real one needs a terminal.
 	openTUI func(ctx context.Context, store tui.Store) error
@@ -49,9 +63,12 @@ func New() *Folio {
 			Use:   "folio",
 			Short: "Track what your stock is worth, held and still to vest",
 		},
-		quoter:    yahoo.New(),
-		now:       time.Now,
-		buildInfo: debug.ReadBuildInfo,
+		quoter:     yahoo.New(),
+		now:        time.Now,
+		buildInfo:  debug.ReadBuildInfo,
+		releases:   github.New(),
+		platform:   update.Platform{OS: runtime.GOOS, Arch: runtime.GOARCH},
+		executable: executable,
 	}
 	cmd.SilenceErrors = true
 	cmd.openTUI = cmd.runProgram
@@ -73,6 +90,7 @@ func New() *Folio {
 	cmd.AddCommand(cmd.StatusCmd())
 	cmd.AddCommand(cmd.DemoCmd())
 	cmd.AddCommand(cmd.VersionCmd())
+	cmd.AddCommand(cmd.SelfUpdateCmd())
 
 	return cmd
 }
