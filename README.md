@@ -223,8 +223,8 @@ ask for their prices.
   API: it may change or turn requests away without notice, and prices can be delayed.
 - Everything is in USD for now.
 - A grant and a sale cannot be edited yet, only deleted and entered again.
-- `folio self-update` does not update folio on Windows yet, where a release is still installed by
-  hand.
+- `folio self-update` does not update folio on Windows yet ([#44][issue-44]), where a release is
+  still installed by hand.
 - folio keeps records and adds them up; it is no tax or investment advice.
 
 ## Built With
@@ -271,5 +271,6 @@ A list of all available versions can be found at the [releases page][releases], 
 This project is licensed under the BSD-3-Clause License - see the [LICENSE](LICENSE) file for details.
 
 [releases]: https://github.com/fgrosse/folio/releases
+[issue-44]: https://github.com/fgrosse/folio/issues/44
 [contributors]: https://github.com/fgrosse/folio/contributors
 [built-with]: go.mod
