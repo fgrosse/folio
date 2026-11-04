@@ -391,6 +391,25 @@ func TestHoldingsModel_ColorsGains(t *testing.T) {
 	assert.Equal(t, "       -", rows[1][gainColumn])
 }
 
+// TestHoldingsModel_ColorsGainsInDetails covers the details of a lot under the same switch as the
+// table: the gain in the flyout is green with the colors on and as plain as its label with them
+// off, so that turning them off leaves no gain in color anywhere in the view.
+func TestHoldingsModel_ColorsGainsInDetails(t *testing.T) {
+	green := ansi.Style{}.ForegroundColor(DefaultStyle().Gain.GetForeground()).String()
+	p := testPortfolio()
+	m, _ := newTestingHoldings(t)
+	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+
+	p.ColorGains = true
+	m.Update(PortfolioLoadedMsg{portfolio: p})
+	require.Contains(t, ansi.Strip(m.View().Content), "PANW of 2026-01-15")
+	assert.Contains(t, m.flyoutLayer(20).GetContent(), green)
+
+	p.ColorGains = false
+	m.Update(PortfolioLoadedMsg{portfolio: p})
+	assert.NotContains(t, m.View().Content, green)
+}
+
 // TestHoldingsModel_HidesColumnsInANarrowWindow covers a window that has no room for every column:
 // the table then leaves out the gain, which the cost and the price next to it say already, rather
 // than squeezing the grant away, and shows it again once the window is wide enough. The row that

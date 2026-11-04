@@ -543,8 +543,15 @@ func (m *HoldingsModel) flyoutLayer(height int) *lipgloss.Layer {
 		return nil
 	}
 
+	// Without the colors of the gains, the gain in the details is in the color of its label, as it
+	// is in the table.
+	style := m.style
+	if !m.portfolio.ColorGains {
+		style.Gain, style.Loss = lipgloss.NewStyle(), lipgloss.NewStyle()
+	}
+
 	lot := m.lots[i]
-	return lotDetails(lot, m.portfolio.Quotes[lot.Symbol], m.portfolio.GainsTaxRate, m.style).Layer(flyoutWidth, height, m.style)
+	return lotDetails(lot, m.portfolio.Quotes[lot.Symbol], m.portfolio.GainsTaxRate, style).Layer(flyoutWidth, height, m.style)
 }
 
 // dialogLayer renders whichever dialog is open, or returns nil if none is.
