@@ -14,7 +14,7 @@ type keyMap struct {
 	Delete    key.Binding
 	Release   key.Binding
 	Details   key.Binding
-	Clear     key.Binding
+	Clear     key.Binding // space rather than c, which opens the configuration in every view
 	ClearYear key.Binding
 	Close     key.Binding
 	Quit      key.Binding
