@@ -5,7 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-_Nothing yet_
+- The Sales view shows the tax on the gain of each sale at the `gains-tax-rate`, and the line above the table adds up the tax that is still owed
+- `space` in the Sales view marks the tax of a sale as cleared, or takes that back, and `C` clears every sale of the selected sale's year at once
+- The Sales table leaves out the price of a share and then the grant in a terminal too narrow for them
 
 ## [v1.1.0] - 2026-10-06
 This release is about tax. folio now estimates what the account is worth after it: what is left of
