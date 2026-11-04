@@ -12,6 +12,7 @@ import (
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/shopspring/decimal"
 
 	"github.com/fgrosse/folio/internal/portfolio"
@@ -755,6 +756,29 @@ func lotRow(lot portfolio.Lot, quote portfolio.Quote) table.Row {
 		fmt.Sprintf("%*s", gainColumnWidth, gain),
 		fmt.Sprintf("%*s", valueColumnWidth, value),
 	}
+}
+
+// colorGain renders cell, the gain of lot at quote as the table shows it, in the color of where
+// the price went since the lot was acquired: style.Gain if up, style.Loss if down, and style.Flat if
+// by less than the tenth of a percent the cell is rounded to, or by what is not known, for want of a
+// cost or a quote, which is then the zero Quote.
+//
+// The table renders the selected row by wrapping it in a style of its own, and a cell that ended in
+// a full reset, as lipgloss renders one, would end the selection's background right after it. So
+// only the foreground is set, and taken back to the terminal's own after the cell.
+func colorGain(cell string, lot portfolio.Lot, quote portfolio.Quote, style Style) string {
+	color := style.Flat
+	if growth, ok := lot.GrowthPercent(quote.Price); ok && quote.Symbol != "" {
+		switch growth.Round(1).Sign() {
+		case 1:
+			color = style.Gain
+		case -1:
+			color = style.Loss
+		}
+	}
+
+	return ansi.Style{}.ForegroundColor(color.GetForeground()).String() + cell +
+		ansi.Style{}.ForegroundColor(nil).String()
 }
 
 // formatGrowth renders a growth in percent to one decimal and with its sign, such as "+123.4%" or

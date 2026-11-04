@@ -622,6 +622,52 @@ func TestLotRow(t *testing.T) {
 	}
 }
 
+// TestColorGain covers the color of the cell of a lot's gain in the table: green for a gain, red
+// for a loss, and gray for a gain that rounds to nothing or that is not known, for want of a cost
+// or a quote. The color is set and taken back for the foreground alone, so that the selected row
+// keeps its background past the cell, which a full reset after it would cut short.
+func TestColorGain(t *testing.T) {
+	panw := portfolio.Quote{Symbol: "PANW", Price: dec("396.25")}
+
+	cases := map[string]struct {
+		lot      portfolio.Lot
+		quote    portfolio.Quote
+		expected string
+	}{
+		"a gain": {
+			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("6"), Cost: dec("380.12")},
+			quote:    panw,
+			expected: "\x1b[38;5;78mcell\x1b[39m",
+		},
+		"a loss": {
+			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("3"), Cost: dec("452.86")},
+			quote:    panw,
+			expected: "\x1b[38;5;203mcell\x1b[39m",
+		},
+		"next to nothing": {
+			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("3"), Cost: dec("396.26")},
+			quote:    panw,
+			expected: "\x1b[38;5;240mcell\x1b[39m",
+		},
+		"no cost": {
+			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("3")},
+			quote:    panw,
+			expected: "\x1b[38;5;240mcell\x1b[39m",
+		},
+		"no quote": {
+			lot:      portfolio.Lot{Symbol: "PANW", Shares: dec("3"), Cost: dec("380.12")},
+			quote:    portfolio.Quote{},
+			expected: "\x1b[38;5;240mcell\x1b[39m",
+		},
+	}
+
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, c.expected, colorGain("cell", c.lot, c.quote, DefaultStyle()))
+		})
+	}
+}
+
 // TestHoldingsModel_ShowsDetails covers the flyout of the view: enter opens it on the selected lot,
 // and it leaves the keyboard to the view, so that it shows one lot after the other as the selection
 // moves through the table, and the keys that switch views still do.
