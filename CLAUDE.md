@@ -24,32 +24,10 @@ The three numbers are the bank's, and so are their definitions:
 
 ## LSP for Code Navigation
 
-Use the LSP (gopls) as the primary navigation tool. Do not read files to understand types,
-references, or definitions. Query LSP first. File reading is a fallback only when LSP cannot
-answer.
-
-**LSP tools and when to use them:**
-- `goToDefinition` / `goToImplementation` - jump to source
-- `findReferences` - see all usages across the codebase
-- `workspaceSymbol` - find where something is defined
-- `documentSymbol` - list all symbols in a file
-- `hover` - type info without reading the file
-- `incomingCalls` / `outgoingCalls` - call hierarchy
-
-Use Grep/Glob only for text/pattern searches (comments, strings, config values) where LSP
-does not help.
-
-After writing or editing code, check LSP diagnostics before moving on. Fix any type errors
-or missing imports immediately.
-
-**Before ANY of these actions, you MUST call findReferences first:**
-- Changing a function or method signature
-- Renaming a type, field, or function
-- Changing an interface method
-- Making a field a pointer or changing its type
-
-**Setup:** gopls is managed via mise (`mise install`). The `gopls-lsp` Claude Code plugin is
-enabled in `.claude/settings.json` and connects Claude Code to the gopls language server.
+Find types, definitions, references and callers with the LSP (gopls) rather than by reading
+files, and keep Grep for text such as comments, strings and config values. After an edit, check
+the LSP diagnostics and fix them before moving on. Call `findReferences` before changing a
+signature or an interface method, renaming something, or changing the type of a field.
 
 ## Architecture decisions
 
@@ -80,51 +58,20 @@ enabled in `.claude/settings.json` and connects Claude Code to the gopls languag
   record of its own rather than fewer shares on the lot: the lot keeps what it was acquired with,
   and what is held is that less its sales. The user says which lot a sale is from.
 - **Prices come from behind an interface and are cached in the database.** `portfolio.Quoter` is
-  what the domain asks of a source of prices, and `internal/yahoo` is the one there is, over an
-  endpoint that needs no key and is no official API. The views show the last quote the database has
-  right away and replace it once a fresh one arrives, so the TUI opens without waiting for the
-  network and still works without one. Tests never touch the network.
-- **A lot and a grant are typed as one line**, a spec: `12.5 PANW 2026-03-15 @380.12` and
-  `Payout: 10 PANW monthly x24 from 2026-01-15`. `NewLot` and `NewGrant` have the grammar in their
-  doc comments, and the CLI verbs and the TUI's dialogs both go through them.
-- **Realized money is not part of the three values.** Current counts what is left of the lots, and
-  what the sales brought in is stated next to the values, never added to the total, which stays
-  the bank's.
-- **A form for what one line cannot say.** A lot, a grant and a release are a spec in an
-  `InputDialog`. A sale has notes of several lines, so it is entered in a `FormDialog`, which has a
-  field for each value. Both hand what was typed to a function of the view's and know nothing of
-  what it means.
-- **Every view shows the same account.** They all receive the one `PortfolioLoadedMsg`, whichever
-  of them asked for the load, and each renders the same header with the three values. The Holdings
-  view is the one that keeps the quotes fresh: it fetches them on start and every five minutes.
-- **Tax is an estimate at two rates.** A vest is taxed as income at a rate that depends on the rest
-  of the year's income, which folio does not know, so the user sets one rate in percent for the
-  whole account (`folio config tax-rate`) and folio takes it off each vest. What is held was taxed
-  when it vested, and a sale of it is taxed on the gain since, at a rate of its own
-  (`folio config gains-tax-rate`). Each lot is taxed on its own gain, as the details of a lot in the
-  Holdings view show it: a lot that lost is not taxed and takes nothing off the gain of another, and
-  a lot without a cost has no gain that is known. The three values stay the bank's, before tax,
-  unless the user asks for them after tax (`folio config show-net-summary true`). Then the TUI's
-  header shows the potential value after the tax on the vests and the current value after the tax on
-  the gains, and the total is the two added up, so that the values on screen add up. A badge in
-  front of the total says once whether the three are `[GROSS]` or `[NET]`, and a value that has no
-  rate to take off it is marked `(gross)` under a badge that says net. The rates are kept in the
-  `settings` table, which holds what applies to the whole account, one value by name, so that it is
-  in the database like everything else.
-- **A sale owes its tax until it is cleared.** The Sales view shows the tax on the gain of every
-  sale and states the sum of those that are not cleared as what is owed. Clearing is the user's to
-  say, with a mark on the sale, and it is said by the year: a tax return settles the sales of one
-  year, so `C` clears those together, and `space` one sale. The key is not `c`, which is the app's
-  for the configuration. The mark says nothing about what was paid, only that folio is to stop
-  counting it.
-- **Everything is in USD for now**, the currency the stock trades in. Showing another currency is
-  issue #32.
-- **The demo is the one verb with a database of its own.** Every other verb shares the database of
-  the real account, which the root command opens and creates before the verb runs. `folio demo`
-  overrides those hooks, makes up an account in a temporary database, opens the TUI on it and
-  removes it afterwards, so that trying folio leaves nothing behind and the real account alone.
-- **The TUI is started through a hook**, `Folio.openTUI`, which a test replaces: the real one needs
-  a terminal, and the tests of a verb that opens it look at the store it was handed instead.
+  what the domain asks of a source of prices, and `internal/yahoo` is the one there is. The views
+  show the last quote the database has and replace it once a fresh one arrives, so the TUI opens
+  without waiting for the network and works without one. Tests never touch the network.
+- **A lot and a grant are typed as one line**, a spec such as `12.5 PANW 2026-03-15 @380.12`, which
+  `NewLot` and `NewGrant` parse. The CLI verbs and the TUI's dialogs both go through them, so the
+  grammar is the same everywhere.
+- **Realized money is not part of the three values.** What the sales brought in is stated next to
+  them, never added to the total, which stays the bank's.
+- **Tax is an estimate at rates the user sets.** folio cannot know what a vest is taxed at as
+  income, or a gain, so the account has a rate for each (`folio config tax-rate` and
+  `gains-tax-rate`). Every lot and every sale is taxed on its own gain, and a loss takes nothing off
+  another (#31). The three values stay the bank's, before tax, unless the user asks for them after
+  tax with `show-net-summary`. What applies to the whole account is kept in the `settings` table.
+- **Everything is in USD for now**, the currency the stock trades in (#32).
 
 ## How we build this
 
@@ -162,7 +109,6 @@ path without `internal/`, and a body that says what was done and why.
   `charm.land/lipgloss/v2`, *not* `github.com/charmbracelet/...`, which is the v1 line.
 - **Bubble Tea messages are exported**: every `...Msg` type in `internal/tui` gets an exported name,
   even when nothing outside the package sends or receives it. Their fields can stay unexported.
-- **Logging**: not wired up. If a daemon or HTTP surface ever appears, use `go.uber.org/zap`.
 
 ## Testing
 
@@ -204,4 +150,10 @@ issue is work that is still to do, and closing it is what marks it done: a pull 
   `needs-discussion`. The `next-issue` skill picks it, builds it in a worktree and opens the pull
   request.
 
-A decision goes into this file, and a gotcha goes into a comment at the code it affects.
+## Where knowledge goes
+
+This file is read in full at the start of every session, so it holds only what applies across
+packages and cannot be read off the code: a rule such as "no cgo" or "no floats for money", or the
+vocabulary of the domain. What one type, function or view does, and why, goes into its doc comment,
+and a gotcha into a comment at the code it affects. A feature does not get an entry here for being
+new.
