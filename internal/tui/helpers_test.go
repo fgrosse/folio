@@ -4,7 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/require"
 )
@@ -56,4 +58,18 @@ func day(s string) time.Time {
 // dec parses a decimal, such as a number of shares or a price, written the way it reads.
 func dec(s string) decimal.Decimal {
 	return decimal.RequireFromString(s)
+}
+
+// plainRows returns rows with the styling taken out of their cells, such as the color of a gain,
+// for a test of what the rows say rather than how they look.
+func plainRows(rows []table.Row) []table.Row {
+	plain := make([]table.Row, len(rows))
+	for i, row := range rows {
+		plain[i] = make(table.Row, len(row))
+		for j, cell := range row {
+			plain[i][j] = ansi.Strip(cell)
+		}
+	}
+
+	return plain
 }

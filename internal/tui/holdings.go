@@ -498,7 +498,12 @@ func (m *HoldingsModel) updateRows() {
 
 	rows := make([]table.Row, len(m.lots))
 	for i, lot := range m.lots {
-		rows[i] = shown(m, lotRow(lot, m.portfolio.Quotes[lot.Symbol]))
+		quote := m.portfolio.Quotes[lot.Symbol]
+		row := lotRow(lot, quote)
+		if m.portfolio.ColorGains {
+			row[gainColumn] = colorGain(row[gainColumn], lot, quote, m.style)
+		}
+		rows[i] = shown(m, row)
 	}
 
 	setRows(&m.table, rows)

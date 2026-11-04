@@ -53,7 +53,7 @@ func TestHoldingsModel_LoadsPortfolio(t *testing.T) {
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
 	m.Update(runCmd(t, loadPortfolioCmd(store)))
 
-	rows := m.table.Rows()
+	rows := plainRows(m.table.Rows())
 	require.Len(t, rows, 2)
 	assert.Equal(t, table.Row{"2026-01-15", "PANW", "Payout", "         6", "   $380.12", "   $396.25", "   +4.2%", "     $2,377.50"}, rows[0])
 	assert.Equal(t, table.Row{"2026-02-15", "PANW", "", "       2.5", "         -", "   $396.25", "       -", "       $990.63"}, rows[1])
@@ -364,10 +364,31 @@ func TestHoldingsModel_ShowsWhatIsLeft(t *testing.T) {
 	m, _ := newTestingHoldings(t)
 	m.Update(PortfolioLoadedMsg{portfolio: p})
 
-	rows := m.table.Rows()
+	rows := plainRows(m.table.Rows())
 	require.Len(t, rows, 1)
 	assert.Equal(t, table.Row{"2026-01-15", "PANW", "Payout", "         4", "   $380.12", "   $396.25", "   +4.2%", "     $1,585.00"}, rows[0])
 	assert.Contains(t, ansi.Strip(m.View().Content), "  4 PANW ")
+}
+
+// TestHoldingsModel_ColorsGains covers the switch of the account that says whether the column of
+// the gain is in color: with it on, the gain of the first lot is green and that of the second, which
+// has no cost, is gray, and with it off the cells are as plain as the rest of the row.
+func TestHoldingsModel_ColorsGains(t *testing.T) {
+	p := testPortfolio()
+	m, _ := newTestingHoldings(t)
+
+	p.ColorGains = true
+	m.Update(PortfolioLoadedMsg{portfolio: p})
+	rows := m.table.Rows()
+	require.Len(t, rows, 2)
+	assert.Equal(t, "\x1b[38;5;78m   +4.2%\x1b[39m", rows[0][gainColumn])
+	assert.Equal(t, "\x1b[38;5;240m       -\x1b[39m", rows[1][gainColumn])
+
+	p.ColorGains = false
+	m.Update(PortfolioLoadedMsg{portfolio: p})
+	rows = m.table.Rows()
+	assert.Equal(t, "   +4.2%", rows[0][gainColumn])
+	assert.Equal(t, "       -", rows[1][gainColumn])
 }
 
 // TestHoldingsModel_HidesColumnsInANarrowWindow covers a window that has no room for every column:
