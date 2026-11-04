@@ -195,6 +195,7 @@ folio config tax-rate 44.3%                        # the rate vests are taxed at
 folio config tax-rate                              # print it
 folio config gains-tax-rate 26.4%                  # the rate the gain of a sale is taxed at
 folio config show-net-summary true                 # show the values after tax in the header of the TUI
+folio config color-gains false                     # show the gains without green and red
 folio config --unset tax-rate                      # take a value back
 folio config                                       # the whole configuration, as YAML
 folio config -o json                               # the whole configuration, as JSON

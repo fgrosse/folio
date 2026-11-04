@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `space` in the Sales view marks the tax of a sale as cleared, or takes that back, and `C` clears every sale of the selected sale's year at once
 - The Sales table leaves out the price of a share and then the grant in a terminal too narrow for them
 - `folio self-update` updates a folio that was installed from a release to the latest one, or to a version that is given, after checking the download against the checksums of the release. `-y` skips the question it asks first. Not on Windows yet.
+- The Holdings view colors the gain of each lot: green for a gain, red for a loss, gray for none or one that is not known
+- `folio config color-gains false` turns those colors off, in the table and in the details of a lot
 
 ## [v1.1.0] - 2026-10-06
 This release is about tax. folio now estimates what the account is worth after it: what is left of
