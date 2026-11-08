@@ -97,6 +97,10 @@ refactoring that keeps the existing tests green. Those are committed on their ow
 Commits follow the Go convention: `<package>: <what changed>` in the imperative, with the package
 path without `internal/`, and a body that says what was done and why.
 
+A pull request that changes what a user of folio can see or do adds a line for it under
+`[Unreleased]` in `CHANGELOG.md`, before it is opened. A change to the code alone, such as a
+refactoring or a test, does not.
+
 ## Tooling
 
 - **mise** manages the Go version (`mise.toml`) and is the task runner - add `[tasks.*]` entries
