@@ -371,24 +371,49 @@ func TestHoldingsModel_ShowsWhatIsLeft(t *testing.T) {
 }
 
 // TestHoldingsModel_ColorsGains covers the switch of the account that says whether the column of
-// the gain is in color: with it on, the gain of the first lot is green and that of the second, which
-// has no cost, is gray, and with it off the cells are as plain as the rest of the row.
+// the gain is in color: with it on, the gain of a lot that went up is green, and with it off the
+// cell is as plain as the rest of the row.
 func TestHoldingsModel_ColorsGains(t *testing.T) {
 	p := testPortfolio()
 	m, _ := newTestingHoldings(t)
+	m.Update(keyPressed("j")) // off the first row, whose gain is plain while it is selected
 
 	p.ColorGains = true
 	m.Update(PortfolioLoadedMsg{portfolio: p})
 	rows := m.table.Rows()
 	require.Len(t, rows, 2)
 	assert.Equal(t, "\x1b[38;5;78m   +4.2%\x1b[39m", rows[0][gainColumn])
-	assert.Equal(t, "\x1b[38;5;240m       -\x1b[39m", rows[1][gainColumn])
 
 	p.ColorGains = false
 	m.Update(PortfolioLoadedMsg{portfolio: p})
 	rows = m.table.Rows()
 	assert.Equal(t, "   +4.2%", rows[0][gainColumn])
-	assert.Equal(t, "       -", rows[1][gainColumn])
+}
+
+// TestHoldingsModel_LeavesTheSelectedGainPlain covers the gain of the selected row, which is not
+// in color: the selection has a background of its own, and green or red on it is hard to read. It is
+// in the selection's color instead, and the gain of the row the selection left is colored again,
+// also when the window changes size.
+func TestHoldingsModel_LeavesTheSelectedGainPlain(t *testing.T) {
+	m, _ := newTestingHoldings(t)
+	require.Equal(t, 0, m.table.Cursor())
+
+	rows := m.table.Rows()
+	assert.Equal(t, "   +4.2%", rows[0][gainColumn], "the selected row")
+	assert.Equal(t, "\x1b[38;5;240m       -\x1b[39m", rows[1][gainColumn])
+
+	m.Update(keyPressed("j"))
+
+	rows = m.table.Rows()
+	assert.Equal(t, "\x1b[38;5;78m   +4.2%\x1b[39m", rows[0][gainColumn])
+	assert.Equal(t, "       -", rows[1][gainColumn], "the selected row")
+
+	// A new size of the window lays the rows out again, and the selection with them.
+	m.Update(tea.WindowSizeMsg{Width: 110, Height: 20})
+
+	rows = m.table.Rows()
+	assert.Equal(t, "\x1b[38;5;78m   +4.2%\x1b[39m", rows[0][gainColumn])
+	assert.Equal(t, "       -", rows[1][gainColumn], "the selected row after the resize")
 }
 
 // TestHoldingsModel_ColorsGainsInDetails covers the details of a lot under the same switch as the
