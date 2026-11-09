@@ -143,6 +143,7 @@ func (m *HoldingsModel) layout() {
 	m.table.SetColumns(m.columns())
 	m.updateRows()
 	m.table.SetCursor(cursor)
+	m.renderRows() // for the selection that is back on its row
 }
 
 // grantColumnWidth is what the columns that are always there leave to the column of the grant.
@@ -315,8 +316,13 @@ func (m *HoldingsModel) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 		return m, nil
 	}
 
+	selected := m.table.Cursor()
 	var cmd tea.Cmd
 	m.table, cmd = m.table.Update(msg)
+	if m.table.Cursor() != selected {
+		m.renderRows() // the gains are colored except on the selected row, which just moved
+	}
+
 	return m, cmd
 }
 
@@ -496,11 +502,21 @@ func (m *HoldingsModel) updateRows() {
 		}
 	}
 
+	m.renderRows()
+}
+
+// renderRows gives the table a row for every lot on display, with the gains in color if the account
+// wants them, except on the selected row: the selection has a background of its own, which green or
+// red is hard to read on, so the gain there is in the selection's color like the rest of the row.
+func (m *HoldingsModel) renderRows() {
+	// The row that is selected once the table has the rows, which is where setRows leaves it.
+	selected := max(min(m.table.Cursor(), len(m.lots)-1), 0)
+
 	rows := make([]table.Row, len(m.lots))
 	for i, lot := range m.lots {
 		quote := m.portfolio.Quotes[lot.Symbol]
 		row := lotRow(lot, quote)
-		if m.portfolio.ColorGains {
+		if m.portfolio.ColorGains && i != selected {
 			row[gainColumn] = colorGain(row[gainColumn], lot, quote, m.style)
 		}
 		rows[i] = shown(m, row)
@@ -775,9 +791,10 @@ func lotRow(lot portfolio.Lot, quote portfolio.Quote) table.Row {
 // by less than the tenth of a percent the cell is rounded to, or by what is not known, for want of a
 // cost or a quote, which is then the zero Quote.
 //
-// The table renders the selected row by wrapping it in a style of its own, and a cell that ended in
-// a full reset, as lipgloss renders one, would end the selection's background right after it. So
-// only the foreground is set, and taken back to the terminal's own after the cell.
+// Only the foreground is set, and taken back to the terminal's own after the cell, rather than
+// ending in the full reset lipgloss renders: that would also end any style the table wraps the row
+// in, such as the selection's background, right after the cell. The selected row is not colored for
+// now, but a cell should not decide what the rest of its row looks like.
 func colorGain(cell string, lot portfolio.Lot, quote portfolio.Quote, style Style) string {
 	color := style.Flat
 	if growth, ok := lot.GrowthPercent(quote.Price); ok && quote.Symbol != "" {
